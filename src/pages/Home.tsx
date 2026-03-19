@@ -33,7 +33,6 @@ export function Home() {
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recommendations, setRecommendations] = useState<Product[]>(MOCK_RECOMMENDATIONS);
-  const [isGenerating, setIsGenerating] = useState(false);
   
   const [analysisData, setAnalysisData] = useState<{ ppi: number; rotateY: number; skewY: number } | null>(null);
 
@@ -46,10 +45,11 @@ export function Home() {
     const file = acceptedFiles[0];
     if (file) {
       const reader = new FileReader();
+      // Dosya okuma başladığında UI'ı hemen güncellemek için setRoomImage buraya alındı
       reader.onload = (e) => {
         const base64 = e.target?.result as string;
         setRoomImage(base64);
-        analyzeRoom(base64);
+        analyzeRoom(base64); // Analizi başlat
       };
       reader.readAsDataURL(file);
     }
@@ -62,7 +62,11 @@ export function Home() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      if (!apiKey) throw new Error("API KEY MISSING");
+      if (!apiKey) {
+        console.warn("API Key missing, using default scale.");
+        setAnalysisData({ ppi: 6, rotateY: 0, skewY: 0 });
+        return;
+      }
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: "POST",
@@ -70,12 +74,14 @@ export function Home() {
         body: JSON.stringify({
           contents: [{
             parts: [
-              { text: "Analyze this room. Estimate PPI (scale) for the wall (4-10 range). Estimate rotateY (-15 to 15) and skewY (-5 to 5) so poster looks flat. Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number }" },
+              { text: "Analyze room image. Estimate PPI for the wall (4-10 range). Calculate rotateY (-15 to 15) and skewY (-5 to 5). Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number }" },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]
           }]
         })
       });
+
+      if (!response.ok) throw new Error("API Response not ok");
 
       const result = await response.json();
       const text = result.candidates[0].content.parts[0].text;
@@ -87,7 +93,9 @@ export function Home() {
         skewY: data.skewY || 0
       });
     } catch (e) {
-      console.error("Analysis patladı:", e);
+      console.error("Analiz hatası (Fallback uygulanıyor):", e);
+      // Hata olsa bile dosyanın yüklenmiş kalması ve varsayılan ölçeğin gelmesi için:
+      setAnalysisData({ ppi: 6, rotateY: 0, skewY: 0 });
     } finally {
       setIsAnalyzing(false);
     }
@@ -99,12 +107,6 @@ export function Home() {
     return (product.basePrice * sizeMultiplier) + framePrice;
   };
 
-  const handleCreateForMe = () => {
-    // Şimdilik analiz verileri gelince butona basıldığında bir şey yapması için boş bıraktım, 
-    // ama butonu ve tasarımı senin image_b78479.png'deki haline sabitledim.
-    alert("AI generation will happen here based on your room analysis.");
-  };
-
   const [pw, ph] = selectedSize.split('x').map(Number);
   const physicalWidth = orientation === 'portrait' ? pw : ph;
   const physicalHeight = orientation === 'portrait' ? ph : pw;
@@ -113,20 +115,20 @@ export function Home() {
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
-          {isAnalyzing ? (
+          {isAnalyzing && !roomImage ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/80 z-20 backdrop-blur-sm">
               <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-[10px] uppercase tracking-widest">Analyzing space scale...</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest">Processing Image...</p>
             </div>
-          ) : roomImage && analysisData ? (
+          ) : roomImage ? (
             <InteractiveCanvas 
               backgroundImage={roomImage} 
               mountedArt={selectedProduct?.image || null} 
               physicalWidth={physicalWidth}
               physicalHeight={physicalHeight}
-              naturalPixelsPerInch={analysisData.ppi}
+              naturalPixelsPerInch={analysisData?.ppi || 6}
               frameColor={(FRAME_COLORS as any)[selectedFrame]}
-              perspective={analysisData}
+              perspective={analysisData || { rotateY: 0, skewY: 0 }}
             />
           ) : (
             <div {...getRootProps()} className={`absolute inset-0 flex flex-col items-center justify-center cursor-pointer transition-all ${isDragActive ? 'bg-emerald-500/10' : 'hover:bg-zinc-800/50'}`}>
@@ -140,10 +142,7 @@ export function Home() {
 
       <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
         <div className="p-6 border-b border-zinc-800 sticky top-0 bg-zinc-950/90 backdrop-blur-md z-10">
-          <button 
-            onClick={handleCreateForMe}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(16,185,129,0.3)]"
-          >
+          <button className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
             <Sparkles className="w-5 h-5" /> MAKE ME FEEL SPECIAL
           </button>
           <p className="text-center text-emerald-500/60 text-[10px] mt-3 font-medium tracking-wide uppercase">A unique design crafted exclusively for your space.</p>
@@ -163,7 +162,6 @@ export function Home() {
                       <span className="flex items-center gap-1"><Maximize2 className="w-3 h-3" /> {selectedSize}"</span>
                       <span className="font-medium text-zinc-200">${calculatePrice(product).toFixed(2)}</span>
                     </div>
-                    <p className="text-[10px] text-zinc-500 mt-2 line-clamp-2 leading-relaxed italic">{product.description}</p>
                   </div>
                 </div>
 
