@@ -7,7 +7,7 @@ interface InteractiveCanvasProps {
   aspectRatio: number;
   wallCenterX: number;
   wallCenterY: number;
-  wallWidthRatio: number;
+  posterWidthRatio: number;  // posterin görüntü genişliğine oranı — direkt Gemini'den
   frameColor: string | null;
   perspective?: { rotateY: number; skewY: number };
 }
@@ -34,7 +34,7 @@ export function InteractiveCanvas({
   aspectRatio,
   wallCenterX,
   wallCenterY,
-  wallWidthRatio,
+  posterWidthRatio,
   frameColor,
   perspective = { rotateY: 0, skewY: 0 },
 }: InteractiveCanvasProps) {
@@ -63,10 +63,10 @@ export function InteractiveCanvas({
     return () => { img.removeEventListener('load', updateArea); ro.disconnect(); };
   }, [backgroundImage, updateArea]);
 
-  useEffect(() => { setDragDelta({ x: 0, y: 0 }); }, [wallCenterX, wallCenterY, wallWidthRatio]);
+  useEffect(() => { setDragDelta({ x: 0, y: 0 }); }, [wallCenterX, wallCenterY, posterWidthRatio]);
 
-  // Poster boyutu: wallWidthRatio'nun %55'i kadar — daha gerçekçi oda ölçeği
-  const posterWidth = renderedImg ? renderedImg.width * wallWidthRatio * 0.55 : 120;
+  // Poster genişliği = rendered görüntü genişliği × posterWidthRatio (Gemini'den direkt)
+  const posterWidth = renderedImg ? renderedImg.width * posterWidthRatio : 120;
   const posterHeight = posterWidth * aspectRatio;
 
   const centerX = renderedImg
@@ -109,11 +109,7 @@ export function InteractiveCanvas({
     window.addEventListener('touchend', onEnd);
   }, [startDrag]);
 
-  const frameThickness = frameColor ? Math.max(8, posterWidth * 0.025) : 0;
-
-  // Perspektif transform — rotateY değeri yoksa bile hafif 3D efekti için
-  const rotY = perspective.rotateY;
-  const skewY = perspective.skewY;
+  const frameThickness = frameColor ? Math.max(8, posterWidth * 0.03) : 0;
 
   return (
     <div ref={containerRef} className="relative w-full h-full rounded-2xl overflow-hidden bg-zinc-950">
@@ -137,24 +133,12 @@ export function InteractiveCanvas({
             height: posterHeight,
             cursor: 'grab',
             userSelect: 'none',
-            transition: dragging.current ? 'none' : 'left 0.5s cubic-bezier(0.34,1.56,0.64,1), top 0.5s cubic-bezier(0.34,1.56,0.64,1)',
-            // Gerçekçi 3D perspektif
-            transform: `perspective(800px) rotateY(${rotY}deg) skewY(${skewY}deg)`,
+            transform: `perspective(800px) rotateY(${perspective.rotateY}deg) skewY(${perspective.skewY}deg)`,
             transformOrigin: 'center center',
+            transition: dragging.current ? 'none' : 'left 0.5s cubic-bezier(0.34,1.56,0.64,1), top 0.5s cubic-bezier(0.34,1.56,0.64,1)',
+            borderRadius: 2,
           }}
         >
-          {/* Çerçeve katmanı */}
-          {frameColor && (
-            <div
-              className="absolute inset-0 pointer-events-none z-20"
-              style={{
-                boxShadow: `inset 0 0 0 ${frameThickness}px ${frameColor}`,
-                // Çerçeveye hafif iç gölge — derinlik hissi
-                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.4))',
-              }}
-            />
-          )}
-
           {mountedArt ? (
             <>
               <img
@@ -162,39 +146,29 @@ export function InteractiveCanvas({
                 className="w-full h-full object-cover pointer-events-none select-none"
                 draggable={false}
                 alt="Wall art"
-                style={{ padding: frameThickness }}
-              />
-              {/* Gerçekçi duvar gölgesi — posterın altına */}
-              <div
-                className="absolute pointer-events-none"
                 style={{
-                  inset: -2,
-                  zIndex: -1,
-                  boxShadow: `
-                    0 10px 40px rgba(0,0,0,0.45),
-                    0 4px 12px rgba(0,0,0,0.3),
-                    0 1px 3px rgba(0,0,0,0.2)
-                  `,
-                }}
-              />
-              {/* Hafif ambient ışık overlay — odanın ışığına uyum */}
-              <div
-                className="absolute inset-0 pointer-events-none z-10"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(255,255,255,0.06) 0%, rgba(0,0,0,0.08) 100%)',
                   padding: frameThickness,
+                  backgroundColor: frameColor || 'transparent',
+                  boxSizing: 'border-box',
                 }}
               />
+              {/* Gölge */}
+              <div className="absolute pointer-events-none" style={{
+                inset: -1,
+                zIndex: -1,
+                boxShadow: '0 12px 40px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3)',
+              }} />
+              {/* Ambient ışık */}
+              <div className="absolute inset-0 pointer-events-none z-10" style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0.07) 100%)',
+              }} />
             </>
           ) : (
-            <div
-              className="w-full h-full flex flex-col items-center justify-center gap-2"
-              style={{
-                border: '1.5px dashed rgba(255,255,255,0.25)',
-                backgroundColor: 'rgba(255,255,255,0.03)',
-                borderRadius: 2,
-              }}
-            >
+            <div className="w-full h-full flex flex-col items-center justify-center gap-2" style={{
+              border: '1.5px dashed rgba(255,255,255,0.25)',
+              backgroundColor: 'rgba(255,255,255,0.03)',
+              borderRadius: 2,
+            }}>
               <Move className="w-5 h-5 opacity-40" />
               <span className="text-[10px] font-mono uppercase tracking-widest opacity-30">Drag me</span>
             </div>
