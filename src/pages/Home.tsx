@@ -19,9 +19,9 @@ interface Product {
 }
 
 const MOCK_RECOMMENDATIONS: Product[] = [
-  { id: 'rec1', title: 'Dark Side of the Moon - Prism', basePrice: 45, image: 'https://picsum.photos/seed/cyberpunk/800/1200', category: 'Cyberpunk', description: 'The room has a strong music theme with the wall decal, the guitar, and the chalkboard wall...' },
-  { id: 'rec2', title: 'Pulp Fiction - The Dance', basePrice: 35, image: 'https://picsum.photos/seed/minimalist/800/1200', category: 'Minimalist', description: 'The room\'s black, white, and yellow color scheme, along with its somewhat retro/eclectic...' },
-  { id: 'rec3', title: 'Electric Stripe Symphony', basePrice: 55, image: 'https://picsum.photos/seed/renaissance/800/1200', category: 'Renaissance', description: 'A custom poster featuring a minimalist, stylized yellow electric guitar against a stark black and...' },
+  { id: 'rec1', title: 'Dark Side of the Moon - Prism', basePrice: 45, image: 'https://picsum.photos/seed/cyberpunk/800/1200', category: 'Cyberpunk', description: 'The room has a strong music theme...' },
+  { id: 'rec2', title: 'Pulp Fiction - The Dance', basePrice: 35, image: 'https://picsum.photos/seed/minimalist/800/1200', category: 'Minimalist', description: 'The room\'s black, white, and yellow...' },
+  { id: 'rec3', title: 'Electric Stripe Symphony', basePrice: 55, image: 'https://picsum.photos/seed/renaissance/800/1200', category: 'Renaissance', description: 'A custom poster featuring...' },
 ];
 
 const SIZE_MULTIPLIERS = { '12x18': 1, '18x24': 1.5, '24x36': 2.2 };
@@ -33,8 +33,9 @@ export function Home() {
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recommendations, setRecommendations] = useState<Product[]>(MOCK_RECOMMENDATIONS);
+  const [isGenerating, setIsGenerating] = useState(false);
   
-  const [analysisData, setAnalysisData] = useState<{ ppi: number; rotateY: number; skewY: number } | null>(null);
+  const [analysisData, setAnalysisData] = useState<{ ppi: number; rotateY: number; skewY: number; style: string; colors: string[]; mood: string; } | null>(null);
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedSize, setSelectedSize] = useState<SizeType>('24x36');
@@ -56,54 +57,87 @@ export function Home() {
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 } as any);
 
+  // AŞAMA 1: DERİN ANALİZ (REST API)
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
-    // VERCEL'DEKİ VITE_ ÖNEKLİ ANAHTAR
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    setAnalysisData(null);
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY; // Vercel'deki
 
     try {
       if (!apiKey) throw new Error("API KEY MISSING");
 
-      // 404 HATASINI ÇÖZEN GÜNCEL URL YAPISI (v1beta yerine v1 veya doğru model yolu)
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      // Nano Banana 2 modeli için REST çağrısı
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{
             parts: [
-              { text: "Analyze this room for wall art. Estimate PPI (scale 4-10) and perspective: rotateY (-15 to 15) and skewY (-5 to 5). Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number }" },
+              { text: "Analyze room for art. Estimate PPI (scale 4-10). Estimate rotateY (-15 to 15) and skewY (-5 to 5) so poster is flat. Identify room style & mood. Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number, \"style\": \"string\", \"colors\": [\"hex\"], \"mood\": \"string\" }" },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]
           }]
         })
       });
 
-      if (!response.ok) {
-        const errData = await response.json();
-        throw new Error(errData.error?.message || "API Error");
-      }
-
       const result = await response.json();
-      
-      // KONSOLDAKİ '0' HATASINI ÖNLEYEN KONTROLLÜ ERİŞİM
-      if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
-        const text = result.candidates[0].content.parts[0].text;
-        const data = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
-        setAnalysisData({
-          ppi: data.pixelsPerInch || 6,
-          rotateY: data.rotateY || 0,
-          skewY: data.skewY || 0
-        });
-      } else {
-        throw new Error("Invalid response format");
-      }
+      const text = result.candidates[0].content.parts[0].text;
+      const data = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
 
+      setAnalysisData({
+        ppi: data.pixelsPerInch || 6,
+        rotateY: data.rotateY || 0,
+        skewY: data.skewY || 0,
+        style: data.style,
+        colors: data.colors,
+        mood: data.mood
+      });
     } catch (e) {
-      console.error("Analiz patladı (Fallback devrede):", e);
-      // Analiz patlasa bile uygulamanın kilitlenmemesi ve görselin görünmesi için:
-      setAnalysisData({ ppi: 6, rotateY: 0, skewY: 0 });
+      console.error("Analiz patladı:", e);
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  // AŞAMA 2: ÖZEL SANAT ÜRETİMİ (REST API)
+  const handleCreateForMe = async () => {
+    if (!roomImage || !analysisData || isGenerating) return;
+    
+    setIsGenerating(true);
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+    try {
+      const prompt = `You are a world-class AI artist. Create unique poster art for this room context: Style ${analysisData.style}, Mood ${analysisData.mood}, Colors ${analysisData.colors.join(', ')}. Harmonize perfectly. Make it Pinterest-worthy and Instagrammable. High detail, aesthetic wall art.`;
+
+      // Nano Banana 2 modeli için REST çağrısı
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+      });
+
+      const result = await response.json();
+      const imgPart = result.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+
+      if (imgPart?.inlineData) {
+        const newArt = `data:image/png;base64,${imgPart.inlineData.data}`;
+        const newProduct: Product = {
+          id: `gen_${Date.now()}`,
+          title: 'Custom AI Masterpiece',
+          basePrice: 65,
+          image: newArt,
+          category: analysisData.style,
+          description: `Custom designed for your ${analysisData.mood} space.`,
+          isGenerated: true
+        };
+        // Mevcut önerilerin en başına AI ürününü ekle
+        setRecommendations([newProduct, ...MOCK_RECOMMENDATIONS]);
+        setSelectedProduct(newProduct);
+      }
+    } catch (error) {
+      console.error('Generation failed:', error);
+    } finally {
+      setIsGenerating(false);
     }
   };
 
@@ -121,35 +155,39 @@ export function Home() {
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
-          {isAnalyzing && !roomImage ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/80 z-20 backdrop-blur-sm">
+          {isAnalyzing ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-20 backdrop-blur-md">
               <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-[10px] uppercase tracking-widest">Processing Image...</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest opacity-50">Nano Banana 2 Analyzing...</p>
             </div>
-          ) : roomImage ? (
+          ) : roomImage && analysisData ? (
             <InteractiveCanvas 
               backgroundImage={roomImage} 
               mountedArt={selectedProduct?.image || null} 
               physicalWidth={physicalWidth}
               physicalHeight={physicalHeight}
-              naturalPixelsPerInch={analysisData?.ppi || 6}
+              naturalPixelsPerInch={analysisData.ppi}
               frameColor={(FRAME_COLORS as any)[selectedFrame]}
-              perspective={analysisData || { rotateY: 0, skewY: 0 }}
+              perspective={analysisData}
             />
           ) : (
-            <div {...getRootProps()} className={`absolute inset-0 flex flex-col items-center justify-center cursor-pointer transition-all ${isDragActive ? 'bg-emerald-500/10' : 'hover:bg-zinc-800/50'}`}>
+            <div {...getRootProps()} className={`absolute inset-0 flex flex-col items-center justify-center cursor-pointer transition-all border-2 border-dashed border-zinc-800 m-8 rounded-3xl ${isDragActive ? 'bg-emerald-500/10' : 'hover:bg-zinc-800/50'}`}>
               <input {...getInputProps()} />
               <ImageIcon className="w-12 h-12 opacity-20 mb-4" />
-              <p className="font-mono text-xs uppercase opacity-30 tracking-widest text-center px-12 text-zinc-400">Upload room photo to begin</p>
+              <p className="font-mono text-xs uppercase opacity-30 tracking-widest text-center px-12">Upload room photo to start AI Stylist</p>
             </div>
           )}
         </div>
       </div>
 
       <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
-        <div className="p-6 border-b border-zinc-800 sticky top-0 bg-zinc-950/90 backdrop-blur-md z-10">
-          <button className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-3 shadow-[0_0_30px_rgba(16,185,129,0.3)]">
-            <Sparkles className="w-5 h-5" /> MAKE ME FEEL SPECIAL
+        <div className="p-6 border-b border-zinc-800 sticky top-0 bg-zinc-950/90 backdrop-blur-md z-10 flex flex-col">
+          <button 
+            onClick={handleCreateForMe}
+            disabled={isGenerating || isAnalyzing || !roomImage}
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-30 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] border border-emerald-400/30"
+          >
+            {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> WEAVING MAGIC...</> : <><Sparkles className="w-5 h-5" /> MAKE ME FEEL SPECIAL</>}
           </button>
           <p className="text-center text-emerald-500/60 text-[10px] mt-3 font-medium tracking-wide uppercase">A unique design crafted exclusively for your space.</p>
         </div>
@@ -168,6 +206,7 @@ export function Home() {
                       <span className="flex items-center gap-1"><Maximize2 className="w-3 h-3" /> {selectedSize}"</span>
                       <span className="font-medium text-zinc-200">${calculatePrice(product).toFixed(2)}</span>
                     </div>
+                    <p className="text-[10px] text-zinc-500 mt-2 line-clamp-2 leading-relaxed italic">{product.description}</p>
                   </div>
                 </div>
 
