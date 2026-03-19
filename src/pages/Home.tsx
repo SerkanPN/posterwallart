@@ -20,7 +20,6 @@ interface Product {
 }
 
 const SIZE_MULTIPLIERS = { '12x18': 1, '18x24': 1.5, '24x36': 2.2 };
-const FRAME_PRICES = { 'unframed': 0, 'black': 20, 'oak': 25 };
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 export function Home() {
@@ -34,8 +33,8 @@ export function Home() {
     ppi: 5,
     rotateY: 0,
     skewY: 0,
-    suggestedStyle: 'Modern',
-    suggestedColors: ['#FFFFFF'],
+    suggestedStyle: '',
+    suggestedColors: [] as string[],
     roomDescription: ''
   });
 
@@ -57,19 +56,14 @@ export function Home() {
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { 'image/*': [] },
-    maxFiles: 1,
-  } as any);
+  const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoomDeeply = async (base64Image: string) => {
     setIsAnalyzing(true);
-    console.log("Analiz başlatıldı...");
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-preview',
+        model: 'gemini-2.0-flash-exp',
         contents: [
           {
             inlineData: {
@@ -77,38 +71,37 @@ export function Home() {
               mimeType: base64Image.split(';')[0].split(':')[1]
             }
           },
-          `Analyze this room photo. 
-          1. PPI: Scale based on furniture (e.g., 5-10).
-          2. Perspective: Estimate 'rotateY' (-15 to 15) and 'skewY' (-5 to 5) for the focal wall.
-          3. Design: Style name, dominant Hex colors, and 1-sentence analysis.
-          Output ONLY JSON: 
+          `Analyze this room as a professional interior designer. 
+          1. Perspective: Identify the main focal wall. Estimate 'rotateY' (-20 to 20 degrees) and 'skewY' (-10 to 10) so a poster fits perfectly flat on THAT wall.
+          2. Scale: Based on items like beds or doors, estimate a realistic PPI (pixels-per-inch).
+          3. Style & Color: Identify the interior style (e.g. Minimalist, Industrial) and dominant hex colors.
+          4. Suggest an art theme that matches the vibe.
+          Return ONLY JSON: 
           { "pixelsPerInch": number, "rotateY": number, "skewY": number, "suggestedStyle": "string", "suggestedColors": ["hex"], "roomDescription": "string" }`
         ],
         config: { responseMimeType: "application/json" }
       });
       
       const data = JSON.parse(response.text);
-      console.log("AI Verisi:", data);
-      
       setAnalysis({
         ppi: data.pixelsPerInch || 5,
         rotateY: data.rotateY || 0,
         skewY: data.skewY || 0,
-        suggestedStyle: data.suggestedStyle || 'Modern',
-        suggestedColors: data.suggestedColors || ['#FFFFFF'],
-        roomDescription: data.roomDescription || 'Ready for art.'
+        suggestedStyle: data.suggestedStyle,
+        suggestedColors: data.suggestedColors,
+        roomDescription: data.roomDescription
       });
 
       setRecommendations([{
-        id: 'rec_ai',
-        title: `${data.suggestedStyle} Expert Choice`,
-        basePrice: 50,
-        image: 'https://picsum.photos/seed/art_match/800/1200',
+        id: 'rec_match',
+        title: `${data.suggestedStyle} Match`,
+        basePrice: 45,
+        image: 'https://picsum.photos/seed/style/800/1200',
         category: data.suggestedStyle,
         description: data.roomDescription
       }]);
     } catch (e) {
-      console.error("Analiz patladı:", e);
+      console.error("Analysis failed:", e);
     } finally {
       setIsAnalyzing(false);
     }
@@ -120,7 +113,7 @@ export function Home() {
       setIsGenerating(true);
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const prompt = `Art for a ${analysis.suggestedStyle} room. Colors: ${analysis.suggestedColors.join(', ')}. Insight: ${analysis.roomDescription}. Create high-end gallery wall art.`;
+        const prompt = `Create high-end artistic wall art for a ${analysis.suggestedStyle} room. Colors: ${analysis.suggestedColors.join(', ')}. Insight: ${analysis.roomDescription}. The art must feel intentional and fit the room's energy perfectly.`;
         
         const response = await ai.models.generateContent({
           model: 'gemini-2.0-flash-exp',
@@ -141,18 +134,18 @@ export function Home() {
         if (newArt) {
           const newProduct: Product = {
             id: `gen_${Date.now()}`,
-            title: 'Your AI Masterpiece',
+            title: 'Your Custom AI Art',
             basePrice: 65,
             image: newArt,
             category: analysis.suggestedStyle,
-            description: 'Intelligently crafted for your unique space.',
+            description: 'Generated based on your room analysis.',
             isGenerated: true
           };
           setRecommendations([newProduct, ...recommendations]);
           setSelectedProduct(newProduct);
         }
       } catch (error) {
-        console.error("Üretim hatası:", error);
+        alert('Generation failed.');
       } finally {
         setIsGenerating(false);
       }
@@ -164,13 +157,13 @@ export function Home() {
   const physicalHeight = orientation === 'portrait' ? ph : pw;
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
+    <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden">
       <div className="flex-1 p-6 flex flex-col relative">
-        <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
+        <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800">
           {isAnalyzing ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-20 backdrop-blur-xl">
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/80 z-20 backdrop-blur-sm">
               <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-sm uppercase tracking-[0.2em] animate-pulse">Deep Analyzing Room...</p>
+              <p className="font-mono text-sm uppercase">Analyzing Space...</p>
             </div>
           ) : roomImage ? (
             <InteractiveCanvas 
@@ -183,54 +176,37 @@ export function Home() {
               perspective={{ rotateY: analysis.rotateY, skewY: analysis.skewY }}
             />
           ) : (
-            <div {...getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all border-2 border-dashed border-zinc-800 m-4 rounded-xl">
+            <div {...getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all">
               <input {...getInputProps()} />
-              <div className="w-20 h-20 bg-zinc-800 rounded-3xl flex items-center justify-center mb-6">
-                <Upload className="w-10 h-10 text-zinc-400" />
-              </div>
-              <p className="font-bold text-lg tracking-tight">Upload Your Room Photo</p>
-              <p className="text-zinc-500 text-sm mt-2">AI will analyze scale and perspective automatically</p>
+              <ImageIcon className="w-16 h-16 opacity-50 mb-4" />
+              <p className="font-mono text-sm uppercase">Upload room photo to begin</p>
             </div>
           )}
         </div>
       </div>
 
-      <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
-        <div className="p-8 border-b border-zinc-800 sticky top-0 bg-zinc-950/95 backdrop-blur-md z-10">
-          <button
-            onClick={handleCreateForMe}
-            disabled={isGenerating || isAnalyzing || !roomImage}
-            className="w-full py-5 bg-indigo-600 hover:bg-indigo-500 text-white font-black uppercase tracking-[0.1em] rounded-2xl transition-all shadow-[0_0_40px_rgba(99,102,241,0.2)] disabled:opacity-30 flex items-center justify-center gap-3"
-          >
-            {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> Designing...</> : <><Sparkles className="w-5 h-5" /> Make Me Feel Special</>}
-          </button>
-        </div>
+      <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto p-6">
+        <button
+          onClick={handleCreateForMe}
+          disabled={isGenerating || isAnalyzing || !roomImage}
+          className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] mb-8"
+        >
+          {isGenerating ? 'Weaving Art...' : 'MAKE ME FEEL SPECIAL'}
+        </button>
 
-        <div className="p-8 space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold tracking-tight">Expert Picks</h2>
-            {analysis.suggestedStyle && <span className="px-3 py-1 bg-indigo-500/10 text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-full border border-indigo-500/20">{analysis.suggestedStyle}</span>}
-          </div>
-          
-          {recommendations.length === 0 && <p className="text-zinc-600 text-center py-12 italic">Analysis results will appear here</p>}
-
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><Sparkles className="w-5 h-5 text-indigo-400" /> Top Matches</h2>
+        <div className="space-y-4">
           {recommendations.map((product) => (
             <div 
               key={product.id}
-              className={`rounded-[2rem] border p-5 transition-all duration-500 ${selectedProduct?.id === product.id ? 'border-indigo-500 bg-zinc-900 shadow-2xl' : 'border-zinc-800 hover:border-zinc-700 cursor-pointer'}`}
+              className={`rounded-xl border p-4 cursor-pointer transition-all ${selectedProduct?.id === product.id ? 'border-indigo-500 bg-zinc-900/50' : 'border-zinc-800 hover:border-zinc-700'}`}
               onClick={() => setSelectedProduct(product)}
             >
-              <div className="flex gap-6">
-                <div className="w-24 h-24 rounded-2xl overflow-hidden shadow-inner border border-zinc-800 flex-shrink-0">
-                  <img src={product.image} className="w-full h-full object-cover" />
-                </div>
+              <div className="flex gap-4">
+                <img src={product.image} className="w-20 h-20 rounded-lg object-cover" />
                 <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-base truncate">{product.title}</h3>
-                  <p className="text-xs text-zinc-500 mt-2 line-clamp-2 leading-relaxed italic">"{product.description}"</p>
-                  <div className="flex items-center justify-between mt-4">
-                    <p className="font-mono font-bold text-indigo-400">${(product.basePrice * SIZE_MULTIPLIERS[selectedSize]).toFixed(2)}</p>
-                    <button className="p-2 bg-zinc-800 rounded-full hover:bg-indigo-600 transition-colors"><ShoppingBag className="w-4 h-4" /></button>
-                  </div>
+                  <h3 className="font-bold text-sm truncate">{product.title}</h3>
+                  <p className="text-[10px] text-zinc-500 line-clamp-2">{product.description}</p>
                 </div>
               </div>
             </div>
