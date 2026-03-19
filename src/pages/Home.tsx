@@ -1,34 +1,38 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { motion } from 'motion/react';
-import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2 } from 'lucide-react';
+import { Upload } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 
-const MOCK_RECOMMENDATIONS = [
-  { id: 'rec1', title: 'Dark Side of the Moon - Prism', basePrice: 45, image: 'https://picsum.photos/seed/cyberpunk/800/1200', category: 'Cyberpunk', description: 'AI recommended for your music theme.' },
-  { id: 'rec2', title: 'Pulp Fiction - The Dance', basePrice: 35, image: 'https://picsum.photos/seed/minimalist/800/1200', category: 'Minimalist', description: 'Matches your room colors.' },
-  { id: 'rec3', title: 'Electric Stripe Symphony', basePrice: 55, image: 'https://picsum.photos/seed/renaissance/800/1200', category: 'Renaissance', description: 'Stylized match for your space.' },
-];
-
-const SIZE_MULTIPLIERS = { '12x18': 1, '18x24': 1.5, '24x36': 2.2 };
-const FRAME_PRICES = { 'unframed': 0, 'black': 20, 'oak': 25 };
-const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
+const FRAME_COLORS: Record<string, string | null> = {
+  unframed: null,
+  black: '#18181b',
+  oak: '#8b5a2b',
+};
 
 export function Home() {
-  const { user, useToken, addToCart } = useStore();
+  const { user, useToken } = useStore();
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  
-  const [analysisData, setAnalysisData] = useState<{
-    ppi: number;
+
+  const [wallAnalysis, setWallAnalysis] = useState<{
+    wallCenterX: number;
+    wallCenterY: number;
+    wallWidthRatio: number;
     rotateY: number;
     skewY: number;
-    top: number;
-    left: number;
-  } | null>(null);
+    suggestedStyle: string;
+    roomDescription: string;
+  }>({
+    wallCenterX: 0.35,
+    wallCenterY: 0.35,
+    wallWidthRatio: 0.45,
+    rotateY: 0,
+    skewY: 0,
+    suggestedStyle: '',
+    roomDescription: '',
+  });
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedSize, setSelectedSize] = useState('24x36');
@@ -37,119 +41,238 @@ export function Home() {
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        setRoomImage(base64);
-        analyzeRoom(base64);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setRoomImage(base64);
+      analyzeRoom(base64);
+    };
+    reader.readAsDataURL(file);
   }, []);
 
-  const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 });
+  const { getRootProps, getInputProps } = useDropzone({
+    onDrop,
+    accept: { 'image/*': [] },
+    maxFiles: 1,
+  });
 
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
-    setAnalysisData(null);
-    setRecommendations(MOCK_RECOMMENDATIONS);
-
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    const modelName = "gemini-3.1-flash-image-preview"; 
+    const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
 
     try {
-      if (!apiKey) throw new Error("API KEY MISSING");
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: 'image/jpeg',
+                    data: base64Image.split(',')[1],
+                  },
+                },
+                {
+                  text: `You are analyzing a room photo to place a wall art poster on the main empty wall.
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: "Analyze this room for wall art. 1. Find the main wall. 2. Estimate PPI (scale 3-6) for a realistic fit. 3. Estimate rotateY (-10 to 10) for perspective. 4. COORDINATES: Return 'top' and 'left' percentages (0-100) for the center of the wall. Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number, \"top\": number, \"left\": number }" },
-              { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
-            ]
-          }]
-        })
+Analyze the image and return a JSON with these fields:
+- wallCenterX: horizontal center of the best empty wall area for art placement, as a ratio 0.0 (left edge) to 1.0 (right edge) of the image width
+- wallCenterY: vertical center of that wall area, as a ratio 0.0 (top) to 1.0 (bottom) of the image height  
+- wallWidthRatio: how wide is that wall as a fraction of the total image width (0.1 to 0.9)
+- rotateY: perspective tilt of the wall in degrees (-15 to 15, 0 if wall faces camera directly)
+- skewY: vertical skew of the wall in degrees (-5 to 5, 0 if wall is straight)
+- suggestedStyle: one word style (Modern/Minimalist/Bohemian/Industrial/Scandinavian)
+- roomDescription: one short sentence describing the room
+
+Example for a living room with the main wall on the left side:
+{"wallCenterX":0.3,"wallCenterY":0.35,"wallWidthRatio":0.5,"rotateY":5,"skewY":0,"suggestedStyle":"Modern","roomDescription":"A bright minimalist living room with white walls."}
+
+Return ONLY raw JSON, no markdown, no backticks, no explanation.`,
+                },
+              ],
+            }],
+            generationConfig: {
+              response_mime_type: 'application/json',
+            },
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok || !data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        console.error('Gemini API error:', data);
+        throw new Error(data.error?.message || 'No response from API');
+      }
+
+      const text = data.candidates[0].content.parts[0].text;
+      const parsed = JSON.parse(text.trim());
+      console.log('🔍 Gemini Wall Analysis:', parsed);
+
+      setWallAnalysis({
+        wallCenterX: parsed.wallCenterX ?? 0.35,
+        wallCenterY: parsed.wallCenterY ?? 0.35,
+        wallWidthRatio: parsed.wallWidthRatio ?? 0.45,
+        rotateY: parsed.rotateY ?? 0,
+        skewY: parsed.skewY ?? 0,
+        suggestedStyle: parsed.suggestedStyle || 'Modern',
+        roomDescription: parsed.roomDescription || 'Analyzed space',
       });
 
-      const result = await response.json();
-      const textResponse = result.candidates[0].content.parts[0].text;
-      const data = JSON.parse(textResponse.replace(/```json/g, '').replace(/```/g, '').trim());
+      setRecommendations([{
+        id: '1',
+        title: 'Curated Match',
+        image: 'https://picsum.photos/seed/art/800/1200',
+        basePrice: 40,
+        description: parsed.roomDescription || 'Matches your room style',
+      }]);
 
-      setAnalysisData({
-        ppi: data.pixelsPerInch || 5,
-        rotateY: data.rotateY || 0,
-        skewY: data.skewY || 0,
-        top: data.top || 40,
-        left: data.left || 50
-      });
     } catch (e) {
-      console.error("Analysis Pattı:", e);
+      console.error('Analysis failed:', e);
     } finally {
       setIsAnalyzing(false);
     }
   };
 
-  const calculatePrice = (product: any) => {
-    const sizeMultiplier = SIZE_MULTIPLIERS[selectedSize as keyof typeof SIZE_MULTIPLIERS];
-    const framePrice = FRAME_PRICES[selectedFrame as keyof typeof FRAME_PRICES];
-    return (product.basePrice * sizeMultiplier) + framePrice;
-  };
-
   const [pw, ph] = selectedSize.split('x').map(Number);
   const physicalWidth = orientation === 'portrait' ? pw : ph;
   const physicalHeight = orientation === 'portrait' ? ph : pw;
+  const aspectRatio = physicalHeight / physicalWidth;
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden">
+      {/* Sol: Canvas */}
       <div className="flex-1 p-6 flex flex-col relative">
-        <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
+        <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800">
           {isAnalyzing ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-20 backdrop-blur-xl">
-              <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-[10px] uppercase tracking-widest opacity-50">Nano Banana 2 Analyzing...</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/80 z-20 backdrop-blur-sm font-mono text-sm uppercase tracking-widest">
+              <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <span>Analyzing Space...</span>
             </div>
-          ) : roomImage && analysisData ? (
-            <InteractiveCanvas 
-              backgroundImage={roomImage} 
-              mountedArt={selectedProduct?.image || null} 
-              physicalWidth={physicalWidth}
-              physicalHeight={physicalHeight}
-              naturalPixelsPerInch={analysisData.ppi}
-              frameColor={(FRAME_COLORS as any)[selectedFrame]}
-              perspective={analysisData}
+          ) : roomImage ? (
+            <InteractiveCanvas
+              backgroundImage={roomImage}
+              mountedArt={selectedProduct?.image || null}
+              aspectRatio={aspectRatio}
+              wallCenterX={wallAnalysis.wallCenterX}
+              wallCenterY={wallAnalysis.wallCenterY}
+              wallWidthRatio={wallAnalysis.wallWidthRatio}
+              frameColor={FRAME_COLORS[selectedFrame]}
+              perspective={{ rotateY: wallAnalysis.rotateY, skewY: wallAnalysis.skewY }}
             />
           ) : (
-            <div {...getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/30 transition-all border-2 border-dashed border-zinc-800 m-8 rounded-3xl">
+            <div
+              {...getRootProps()}
+              className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all border-2 border-dashed border-zinc-800 m-4 rounded-xl"
+            >
               <input {...getInputProps()} />
-              <Upload className="w-10 h-10 mb-4 opacity-10" />
-              <p className="font-mono text-[10px] uppercase tracking-widest opacity-30">Upload Room Image</p>
+              <Upload className="w-12 h-12 mb-4 opacity-20" />
+              <p className="font-mono text-xs uppercase tracking-widest opacity-40">Upload Room Image</p>
             </div>
           )}
         </div>
       </div>
 
-      <div className="w-[400px] border-l border-zinc-800 bg-zinc-950 flex flex-col p-6 overflow-y-auto">
-        <button className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl mb-10 text-xs tracking-widest transition-all">MAKE ME FEEL SPECIAL</button>
-        <h2 className="text-xs font-black uppercase tracking-widest mb-6 opacity-40">Top Matches</h2>
-        <div className="space-y-4">
-          {recommendations.map((p) => (
-            <div 
-              key={p.id} 
-              className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900 shadow-xl' : 'border-zinc-800'}`}
-              onClick={() => setSelectedProduct(p)}
-            >
-              <div className="flex gap-4 items-center">
-                <img src={p.image} className="w-14 h-14 rounded-xl object-cover" />
-                <div>
-                  <h3 className="font-bold text-xs">{p.title}</h3>
-                  <p className="text-[10px] text-zinc-500 mt-1">${calculatePrice(p).toFixed(2)}</p>
+      {/* Sağ: Panel */}
+      <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col p-6 overflow-y-auto gap-6">
+        <button className="w-full py-4 bg-emerald-600 text-white font-bold uppercase rounded-xl">
+          MAKE ME FEEL SPECIAL
+        </button>
+
+        {/* Boyut Seçici */}
+        <div>
+          <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">Size</h3>
+          <div className="flex gap-2 flex-wrap">
+            {['18x24', '24x36', '36x48'].map(size => (
+              <button
+                key={size}
+                onClick={() => setSelectedSize(size)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all ${
+                  selectedSize === size
+                    ? 'border-emerald-500 text-emerald-400 bg-emerald-950'
+                    : 'border-zinc-700 text-zinc-400'
+                }`}
+              >
+                {size}"
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Yönelim */}
+        <div>
+          <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">Orientation</h3>
+          <div className="flex gap-2">
+            {(['portrait', 'landscape'] as const).map(o => (
+              <button
+                key={o}
+                onClick={() => setOrientation(o)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all capitalize ${
+                  orientation === o
+                    ? 'border-emerald-500 text-emerald-400 bg-emerald-950'
+                    : 'border-zinc-700 text-zinc-400'
+                }`}
+              >
+                {o}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Çerçeve */}
+        <div>
+          <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">Frame</h3>
+          <div className="flex gap-2">
+            {Object.entries(FRAME_COLORS).map(([key, color]) => (
+              <button
+                key={key}
+                onClick={() => setSelectedFrame(key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all capitalize ${
+                  selectedFrame === key
+                    ? 'border-emerald-500 text-emerald-400 bg-emerald-950'
+                    : 'border-zinc-700 text-zinc-400'
+                }`}
+              >
+                {color && (
+                  <span
+                    className="inline-block w-2 h-2 rounded-full mr-1.5"
+                    style={{ backgroundColor: color }}
+                  />
+                )}
+                {key}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Top Matches */}
+        <div>
+          <h2 className="text-lg font-bold mb-4">Top Matches</h2>
+          <div className="space-y-4">
+            {recommendations.map((p) => (
+              <div
+                key={p.id}
+                className={`p-4 border rounded-xl cursor-pointer transition-all ${
+                  selectedProduct?.id === p.id
+                    ? 'border-emerald-500 bg-zinc-900'
+                    : 'border-zinc-800 hover:border-zinc-600'
+                }`}
+                onClick={() => setSelectedProduct(selectedProduct?.id === p.id ? null : p)}
+              >
+                <div className="flex gap-4 items-center">
+                  <img src={p.image} className="w-16 h-16 rounded-lg object-cover" alt={p.title} />
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-sm">{p.title}</h3>
+                    <p className="text-xs text-zinc-500 line-clamp-2 mt-0.5">{p.description}</p>
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </div>
     </div>
