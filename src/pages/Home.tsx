@@ -1,10 +1,8 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { motion } from 'motion/react';
-import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag } from 'lucide-react';
+import { Upload, Move } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
-import { GoogleGenAI } from "@google/genai";
 
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
@@ -13,18 +11,16 @@ export function Home() {
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [isGenerating, setIsGenerating] = useState(false);
-  
-  // Analiz ve Perspektif State'leri
+
   const [analysis, setAnalysis] = useState({
-    ppi: 6, // Başlangıçta daha küçük bir ölçek (Odayı kaplamaması için)
+    ppi: 6,
     rotateY: 0,
     skewY: 0,
     suggestedStyle: '',
     roomDescription: ''
   });
 
-  const [selectedProduct, setSelectedProduct] = useState<any>(null); // BAŞLANGIÇTA NULL (Boş Çerçeve)
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedSize, setSelectedSize] = useState('24x36');
   const [selectedFrame, setSelectedFrame] = useState('unframed');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
@@ -42,43 +38,67 @@ export function Home() {
     }
   }, []);
 
-  const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 });
+  const { getRootProps, getInputProps } = useDropzone({
+    onDrop,
+    accept: { 'image/*': [] },
+    maxFiles: 1
+  });
 
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
-    // API KEY KONTROLÜ
-    const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env.VITE_GEMINI_API_KEY;
-    
+
+    const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
+
     try {
-      if (!apiKey) throw new Error("API Key Missing");
-      
-      const genAI = new GoogleGenAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: 'image/jpeg',
+                    data: base64Image.split(',')[1]
+                  }
+                },
+                {
+                  text: `Analyze this room for wall art placement. Return ONLY a raw JSON object, no markdown, no backticks, no explanation:
+{"pixelsPerInch": <number 4-10, estimate wall scale>, "rotateY": <number -15 to 15, wall perspective angle>, "skewY": <number -5 to 5, vertical skew>, "suggestedStyle": "<one word: Modern/Minimalist/Bohemian/Industrial/Scandinavian>", "roomDescription": "<one short sentence describing the room>"}`
+                }
+              ]
+            }],
+            generationConfig: {
+              response_mime_type: 'application/json'
+            }
+          })
+        }
+      );
 
-      const prompt = "Analyze this room for wall art. Estimate PPI (scale) for the wall (range 4-10). Calculate 'rotateY' (-15 to 15) and 'skewY' (-5 to 5) for perspective. Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number }";
+      const data = await response.json();
+      const text = data.candidates[0].content.parts[0].text;
+      const parsed = JSON.parse(text.trim());
 
-      const result = await model.generateContent([
-        prompt,
-        { inlineData: { data: base64Image.split(',')[1], mimeType: "image/jpeg" } }
-      ]);
-      
-      const text = (await result.response).text();
-      const data = JSON.parse(text.replace(/```json/g, '').replace(/```/g, ''));
-      
       setAnalysis({
-        ppi: data.pixelsPerInch || 6,
-        rotateY: data.rotateY || 0,
-        skewY: data.skewY || 0,
-        suggestedStyle: 'Modern',
-        roomDescription: 'Analyzed space'
+        ppi: parsed.pixelsPerInch || 6,
+        rotateY: parsed.rotateY || 0,
+        skewY: parsed.skewY || 0,
+        suggestedStyle: parsed.suggestedStyle || 'Modern',
+        roomDescription: parsed.roomDescription || 'Analyzed space',
       });
 
-      setRecommendations([
-        { id: '1', title: 'Curated Match', image: 'https://picsum.photos/seed/art/800/1200', basePrice: 40, description: 'Matches your room style' }
-      ]);
+      setRecommendations([{
+        id: '1',
+        title: 'Curated Match',
+        image: 'https://picsum.photos/seed/art/800/1200',
+        basePrice: 40,
+        description: parsed.roomDescription || 'Matches your room style',
+      }]);
+
     } catch (e) {
-      console.error("Analysis Pattı:", e);
-      // Analiz patlasa bile posterin odayı kaplamasını engellemek için güvenli değerler:
+      console.error('Analysis failed:', e);
       setAnalysis(prev => ({ ...prev, ppi: 6, rotateY: 0, skewY: 0 }));
     } finally {
       setIsAnalyzing(false);
@@ -99,9 +119,9 @@ export function Home() {
               <span>Analyzing Space...</span>
             </div>
           ) : roomImage ? (
-            <InteractiveCanvas 
-              backgroundImage={roomImage} 
-              mountedArt={selectedProduct?.image || null} 
+            <InteractiveCanvas
+              backgroundImage={roomImage}
+              mountedArt={selectedProduct?.image || null}
               physicalWidth={physicalWidth}
               physicalHeight={physicalHeight}
               naturalPixelsPerInch={analysis.ppi}
@@ -109,7 +129,10 @@ export function Home() {
               perspective={{ rotateY: analysis.rotateY, skewY: analysis.skewY }}
             />
           ) : (
-            <div {...getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all border-2 border-dashed border-zinc-800 m-4 rounded-xl">
+            <div
+              {...getRootProps()}
+              className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all border-2 border-dashed border-zinc-800 m-4 rounded-xl"
+            >
               <input {...getInputProps()} />
               <Upload className="w-12 h-12 mb-4 opacity-20" />
               <p className="font-mono text-xs uppercase tracking-widest opacity-40">Upload Room Image</p>
@@ -119,13 +142,19 @@ export function Home() {
       </div>
 
       <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col p-6 overflow-y-auto">
-        <button className="w-full py-4 bg-emerald-600 text-white font-bold uppercase rounded-xl mb-8">MAKE ME FEEL SPECIAL</button>
+        <button className="w-full py-4 bg-emerald-600 text-white font-bold uppercase rounded-xl mb-8">
+          MAKE ME FEEL SPECIAL
+        </button>
         <h2 className="text-lg font-bold mb-6">Top Matches</h2>
         <div className="space-y-4">
           {recommendations.map((p) => (
-            <div 
-              key={p.id} 
-              className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`}
+            <div
+              key={p.id}
+              className={`p-4 border rounded-xl cursor-pointer transition-all ${
+                selectedProduct?.id === p.id
+                  ? 'border-emerald-500 bg-zinc-900'
+                  : 'border-zinc-800'
+              }`}
               onClick={() => setSelectedProduct(p)}
             >
               <div className="flex gap-4">
