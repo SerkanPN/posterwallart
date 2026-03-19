@@ -19,9 +19,9 @@ interface Product {
 }
 
 const MOCK_RECOMMENDATIONS: Product[] = [
-  { id: 'rec1', title: 'Dark Side of the Moon - Prism', basePrice: 45, image: 'https://picsum.photos/seed/cyberpunk/800/1200', category: 'Cyberpunk', description: 'The room has a strong music theme...' },
-  { id: 'rec2', title: 'Pulp Fiction - The Dance', basePrice: 35, image: 'https://picsum.photos/seed/minimalist/800/1200', category: 'Minimalist', description: 'The room\'s black, white, and yellow...' },
-  { id: 'rec3', title: 'Electric Stripe Symphony', basePrice: 55, image: 'https://picsum.photos/seed/renaissance/800/1200', category: 'Renaissance', description: 'A custom poster featuring...' },
+  { id: 'rec1', title: 'Dark Side of the Moon - Prism', basePrice: 45, image: 'https://picsum.photos/seed/cyberpunk/800/1200', category: 'Cyberpunk', description: 'Strong music theme match.' },
+  { id: 'rec2', title: 'Pulp Fiction - The Dance', basePrice: 35, image: 'https://picsum.photos/seed/minimalist/800/1200', category: 'Minimalist', description: 'Retro vibe match.' },
+  { id: 'rec3', title: 'Electric Stripe Symphony', basePrice: 55, image: 'https://picsum.photos/seed/renaissance/800/1200', category: 'Renaissance', description: 'Stylized match for your space.' },
 ];
 
 const SIZE_MULTIPLIERS = { '12x18': 1, '18x24': 1.5, '24x36': 2.2 };
@@ -35,10 +35,17 @@ export function Home() {
   const [recommendations, setRecommendations] = useState<Product[]>(MOCK_RECOMMENDATIONS);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  const [analysisData, setAnalysisData] = useState<{ ppi: number; rotateY: number; skewY: number; style: string; colors: string[]; mood: string; } | null>(null);
+  const [analysisData, setAnalysisData] = useState<{ 
+    ppi: number; 
+    rotateY: number; 
+    skewY: number;
+    style: string;
+    colors: string[];
+    mood: string;
+  } | null>(null);
 
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedSize, setSelectedSize] = useState<SizeType>('24x36');
+  const [selectedSize, setSelectedSize] = useState<SizeType>('12x18'); // En küçük boyutla başla
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('unframed');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
@@ -55,25 +62,21 @@ export function Home() {
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 } as any);
+  const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 } as any);
 
-  // AŞAMA 1: DERİN ANALİZ (REST API)
+  // PROMPT 1: SADECE ANALİZ VE ÇERÇEVE BİLGİSİ
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
-    setAnalysisData(null);
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY; // Vercel'deki
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      if (!apiKey) throw new Error("API KEY MISSING");
-
-      // Nano Banana 2 modeli için REST çağrısı
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{
             parts: [
-              { text: "Analyze room for art. Estimate PPI (scale 4-10). Estimate rotateY (-15 to 15) and skewY (-5 to 5) so poster is flat. Identify room style & mood. Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number, \"style\": \"string\", \"colors\": [\"hex\"], \"mood\": \"string\" }" },
+              { text: "Analyze this room for wall art placement. 1. Identify objects (like chairs/beds) to estimate realistic scale. 2. Calculate PPI (pixels-per-inch) so a chosen poster size looks physically correct. 3. Estimate perspective (rotateY -15 to 15). 4. Identify room style, colors, and mood for recommendations. Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number, \"style\": \"string\", \"colors\": [\"hex\"], \"mood\": \"string\" }" },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]
           }]
@@ -81,8 +84,7 @@ export function Home() {
       });
 
       const result = await response.json();
-      const text = result.candidates[0].content.parts[0].text;
-      const data = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+      const data = JSON.parse(result.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
 
       setAnalysisData({
         ppi: data.pixelsPerInch || 6,
@@ -92,6 +94,10 @@ export function Home() {
         colors: data.colors,
         mood: data.mood
       });
+      
+      // Analiz bitince poster seçili olmasın, sadece boş çerçeve çıksın
+      setSelectedProduct(null);
+
     } catch (e) {
       console.error("Analiz patladı:", e);
     } finally {
@@ -99,7 +105,7 @@ export function Home() {
     }
   };
 
-  // AŞAMA 2: ÖZEL SANAT ÜRETİMİ (REST API)
+  // PROMPT 2: BUTONA TIKLANDIĞINDA GÖRSEL ÜRETİMİ
   const handleCreateForMe = async () => {
     if (!roomImage || !analysisData || isGenerating) return;
     
@@ -107,9 +113,16 @@ export function Home() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      const prompt = `You are a world-class AI artist. Create unique poster art for this room context: Style ${analysisData.style}, Mood ${analysisData.mood}, Colors ${analysisData.colors.join(', ')}. Harmonize perfectly. Make it Pinterest-worthy and Instagrammable. High detail, aesthetic wall art.`;
+      // Eğer kullanıcı seçim yapmışsa onları kullan, yapmamışsa analizi kullan
+      const finalStyle = selectedProduct?.category || analysisData.style;
+      const finalMood = analysisData.mood;
 
-      // Nano Banana 2 modeli için REST çağrısı
+      const prompt = `You are a world-class AI artist. Generate a UNIQUE poster artwork (image only, no background/room).
+      Room Style: ${finalStyle}. Emotional Tone: ${finalMood}. Palette: ${analysisData.colors.join(', ')}.
+      Guidelines: modern, high-end wall art, Pinterest-worthy, Instagrammable. 
+      Orientation: ${orientation}. 
+      Return only the poster artwork as an image.`;
+
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -126,25 +139,22 @@ export function Home() {
           title: 'Custom AI Masterpiece',
           basePrice: 65,
           image: newArt,
-          category: analysisData.style,
-          description: `Custom designed for your ${analysisData.mood} space.`,
+          category: finalStyle,
+          description: `Designed for your ${finalStyle} space.`,
           isGenerated: true
         };
-        // Mevcut önerilerin en başına AI ürününü ekle
         setRecommendations([newProduct, ...MOCK_RECOMMENDATIONS]);
         setSelectedProduct(newProduct);
       }
     } catch (error) {
-      console.error('Generation failed:', error);
+      console.error('Üretim hatası:', error);
     } finally {
       setIsGenerating(false);
     }
   };
 
   const calculatePrice = (product: Product) => {
-    const sizeMultiplier = SIZE_MULTIPLIERS[selectedSize];
-    const framePrice = FRAME_PRICES[selectedFrame];
-    return (product.basePrice * sizeMultiplier) + framePrice;
+    return (product.basePrice * SIZE_MULTIPLIERS[selectedSize]) + FRAME_PRICES[selectedFrame];
   };
 
   const [pw, ph] = selectedSize.split('x').map(Number);
@@ -158,7 +168,7 @@ export function Home() {
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-20 backdrop-blur-md">
               <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-[10px] uppercase tracking-widest opacity-50">Nano Banana 2 Analyzing...</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest opacity-50">Architectural Analysis...</p>
             </div>
           ) : roomImage && analysisData ? (
             <InteractiveCanvas 
@@ -171,25 +181,24 @@ export function Home() {
               perspective={analysisData}
             />
           ) : (
-            <div {...getRootProps()} className={`absolute inset-0 flex flex-col items-center justify-center cursor-pointer transition-all border-2 border-dashed border-zinc-800 m-8 rounded-3xl ${isDragActive ? 'bg-emerald-500/10' : 'hover:bg-zinc-800/50'}`}>
+            <div {...getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all border-2 border-dashed border-zinc-800 m-8 rounded-3xl">
               <input {...getInputProps()} />
               <ImageIcon className="w-12 h-12 opacity-20 mb-4" />
-              <p className="font-mono text-xs uppercase opacity-30 tracking-widest text-center px-12">Upload room photo to start AI Stylist</p>
+              <p className="font-mono text-xs uppercase opacity-30 tracking-widest text-center px-12">Upload room photo</p>
             </div>
           )}
         </div>
       </div>
 
       <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
-        <div className="p-6 border-b border-zinc-800 sticky top-0 bg-zinc-950/90 backdrop-blur-md z-10 flex flex-col">
+        <div className="p-6 border-b border-zinc-800 sticky top-0 bg-zinc-950/90 backdrop-blur-md z-10">
           <button 
             onClick={handleCreateForMe}
             disabled={isGenerating || isAnalyzing || !roomImage}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-30 shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] border border-emerald-400/30"
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-30 shadow-[0_0_30px_rgba(16,185,129,0.3)]"
           >
-            {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> WEAVING MAGIC...</> : <><Sparkles className="w-5 h-5" /> MAKE ME FEEL SPECIAL</>}
+            {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> GENERATING ART...</> : <><Sparkles className="w-5 h-5" /> MAKE ME FEEL SPECIAL</>}
           </button>
-          <p className="text-center text-emerald-500/60 text-[10px] mt-3 font-medium tracking-wide uppercase">A unique design crafted exclusively for your space.</p>
         </div>
 
         <div className="p-6 space-y-4">
@@ -199,14 +208,13 @@ export function Home() {
             return (
               <div key={product.id} className={`rounded-xl border transition-all overflow-hidden ${isSelected ? 'border-indigo-500 bg-zinc-900/50' : 'border-zinc-800 hover:border-zinc-700 cursor-pointer'}`} onClick={() => setSelectedProduct(product)}>
                 <div className="p-4 flex gap-4">
-                  <img src={product.image} className="w-20 h-20 rounded-lg object-cover border border-zinc-800 flex-shrink-0" />
+                  <img src={product.image} className="w-20 h-20 rounded-lg object-cover border border-zinc-800" />
                   <div className="flex-1 min-w-0">
                     <h3 className="font-bold text-sm truncate">{product.title}</h3>
                     <div className="flex items-center gap-2 mt-1 text-xs text-zinc-400">
                       <span className="flex items-center gap-1"><Maximize2 className="w-3 h-3" /> {selectedSize}"</span>
                       <span className="font-medium text-zinc-200">${calculatePrice(product).toFixed(2)}</span>
                     </div>
-                    <p className="text-[10px] text-zinc-500 mt-2 line-clamp-2 leading-relaxed italic">{product.description}</p>
                   </div>
                 </div>
 
@@ -240,9 +248,6 @@ export function Home() {
                         </div>
                       </div>
                     </div>
-                    <button onClick={(e) => { e.stopPropagation(); addToCart({ ...product, price: calculatePrice(product) }); }} className="w-full py-3 bg-zinc-100 hover:bg-white text-zinc-900 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 mt-2">
-                      <ShoppingBag className="w-4 h-4" /> Buy Now - ${calculatePrice(product).toFixed(2)}
-                    </button>
                   </div>
                 )}
               </div>
