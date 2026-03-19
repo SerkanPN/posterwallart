@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '../lib/supabase';
 
 export interface Product {
   id: string;
@@ -25,8 +26,12 @@ interface StoreState {
   user: User | null;
   cart: CartItem[];
   wishlist: Product[];
-  login: (user: User) => void;
-  logout: () => void;
+  isLoading: boolean;
+  
+  login: (email: string) => Promise<void>;
+  logout: () => Promise<void>;
+  checkUser: () => Promise<void>;
+  
   addTokens: (amount: number) => void;
   useToken: () => boolean;
   addToCart: (product: Product) => void;
@@ -37,12 +42,62 @@ interface StoreState {
 }
 
 export const useStore = create<StoreState>((set, get) => ({
-  user: { id: '1', name: 'Guest User', email: 'guest@example.com', tokens: 5, isSeller: false }, // Mock logged in user for demo
+  user: null,
   cart: [],
   wishlist: [],
-  login: (user) => set({ user }),
-  logout: () => set({ user: null }),
-  addTokens: (amount) => set((state) => ({ user: state.user ? { ...state.user, tokens: state.user.tokens + amount } : null })),
+  isLoading: false,
+
+  login: async (email: string) => {
+    set({ isLoading: true });
+    const { error } = await supabase.auth.signInWithOtp({ email });
+    if (error) {
+      alert(error.message);
+    } else {
+      alert('Giriş linki e-posta adresine gönderildi! Lütfen kontrol et.');
+    }
+    set({ isLoading: false });
+  },
+
+  logout: async () => {
+    await supabase.auth.signOut();
+    set({ user: null });
+  },
+
+  checkUser: async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+      set({ 
+        user: { 
+          id: session.user.id, 
+          name: session.user.email?.split('@')[0] || 'User', 
+          email: session.user.email || '', 
+          tokens: 5, 
+          isSeller: false 
+        } 
+      });
+    }
+    
+    supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        set({ 
+          user: { 
+            id: session.user.id, 
+            name: session.user.email?.split('@')[0] || 'User', 
+            email: session.user.email || '', 
+            tokens: 5, 
+            isSeller: false 
+          } 
+        });
+      } else {
+        set({ user: null });
+      }
+    });
+  },
+
+  addTokens: (amount) => set((state) => ({ 
+    user: state.user ? { ...state.user, tokens: state.user.tokens + amount } : null 
+  })),
+
   useToken: () => {
     const { user } = get();
     if (user && user.tokens > 0) {
@@ -51,6 +106,7 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     return false;
   },
+
   addToCart: (product) => set((state) => {
     const existing = state.cart.find(item => item.id === product.id);
     if (existing) {
@@ -58,10 +114,15 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     return { cart: [...state.cart, { ...product, quantity: 1 }] };
   }),
-  removeFromCart: (productId) => set((state) => ({ cart: state.cart.filter(item => item.id !== productId) })),
+
+  removeFromCart: (productId) => set((state) => ({ 
+    cart: state.cart.filter(item => item.id !== productId) 
+  })),
+  
   updateQuantity: (productId, quantity) => set((state) => ({
     cart: state.cart.map(item => item.id === productId ? { ...item, quantity: Math.max(1, quantity) } : item)
   })),
+  
   toggleWishlist: (product) => set((state) => {
     const exists = state.wishlist.find(item => item.id === product.id);
     if (exists) {
@@ -69,5 +130,6 @@ export const useStore = create<StoreState>((set, get) => ({
     }
     return { wishlist: [...state.wishlist, product] };
   }),
+  
   clearCart: () => set({ cart: [] }),
 }));
