@@ -25,9 +25,9 @@ export function Home() {
     suggestedStyle: string;
     roomDescription: string;
   }>({
-    wallCenterX: 0.35,
-    wallCenterY: 0.35,
-    wallWidthRatio: 0.45,
+    wallCenterX: 0.3,
+    wallCenterY: 0.3,
+    wallWidthRatio: 0.35,
     rotateY: 0,
     skewY: 0,
     suggestedStyle: '',
@@ -45,6 +45,7 @@ export function Home() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const base64 = e.target?.result as string;
+      // Önce resmi göster (boş çerçeveyle), sonra analiz et
       setRoomImage(base64);
       analyzeRoom(base64);
     };
@@ -77,21 +78,23 @@ export function Home() {
                   },
                 },
                 {
-                  text: `You are analyzing a room photo to place a wall art poster on the main empty wall.
+                  text: `You are analyzing a room photo to place a wall art poster on the best empty wall space.
 
-Analyze the image and return a JSON with these fields:
-- wallCenterX: horizontal center of the best empty wall area for art placement, as a ratio 0.0 (left edge) to 1.0 (right edge) of the image width
-- wallCenterY: vertical center of that wall area, as a ratio 0.0 (top) to 1.0 (bottom) of the image height  
-- wallWidthRatio: how wide is that wall as a fraction of the total image width (0.1 to 0.9)
-- rotateY: perspective tilt of the wall in degrees (-15 to 15, 0 if wall faces camera directly)
-- skewY: vertical skew of the wall in degrees (-5 to 5, 0 if wall is straight)
-- suggestedStyle: one word style (Modern/Minimalist/Bohemian/Industrial/Scandinavian)
-- roomDescription: one short sentence describing the room
+Look at the image carefully. Find the largest empty wall area suitable for hanging art.
 
-Example for a living room with the main wall on the left side:
-{"wallCenterX":0.3,"wallCenterY":0.35,"wallWidthRatio":0.5,"rotateY":5,"skewY":0,"suggestedStyle":"Modern","roomDescription":"A bright minimalist living room with white walls."}
+Return a JSON object with:
+- wallCenterX: the horizontal center of that empty wall area, as a fraction of image width (0.0 = left edge, 1.0 = right edge)
+- wallCenterY: the vertical center of that empty wall area, as a fraction of image height (0.0 = top, 1.0 = bottom). This should be upper-middle area of the wall, typically between 0.2 and 0.5
+- wallWidthRatio: width of that wall as a fraction of total image width (0.2 to 0.8)
+- rotateY: perspective angle of the wall (-15 to 15, 0 = wall faces camera directly)
+- skewY: vertical skew (-5 to 5, 0 = straight)
+- suggestedStyle: one word (Modern/Minimalist/Bohemian/Industrial/Scandinavian)
+- roomDescription: one sentence about the room
 
-Return ONLY raw JSON, no markdown, no backticks, no explanation.`,
+Example for a room where the main empty wall is on the left side at about 30% from left, 30% from top:
+{"wallCenterX":0.30,"wallCenterY":0.30,"wallWidthRatio":0.40,"rotateY":0,"skewY":0,"suggestedStyle":"Modern","roomDescription":"A bright minimalist living room."}
+
+Return ONLY the raw JSON object. No markdown, no backticks, no extra text.`,
                 },
               ],
             }],
@@ -114,9 +117,9 @@ Return ONLY raw JSON, no markdown, no backticks, no explanation.`,
       console.log('🔍 Gemini Wall Analysis:', parsed);
 
       setWallAnalysis({
-        wallCenterX: parsed.wallCenterX ?? 0.35,
-        wallCenterY: parsed.wallCenterY ?? 0.35,
-        wallWidthRatio: parsed.wallWidthRatio ?? 0.45,
+        wallCenterX: parsed.wallCenterX ?? 0.3,
+        wallCenterY: parsed.wallCenterY ?? 0.3,
+        wallWidthRatio: parsed.wallWidthRatio ?? 0.35,
         rotateY: parsed.rotateY ?? 0,
         skewY: parsed.skewY ?? 0,
         suggestedStyle: parsed.suggestedStyle || 'Modern',
@@ -148,23 +151,8 @@ Return ONLY raw JSON, no markdown, no backticks, no explanation.`,
       {/* Sol: Canvas */}
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800">
-          {isAnalyzing ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/80 z-20 backdrop-blur-sm font-mono text-sm uppercase tracking-widest">
-              <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <span>Analyzing Space...</span>
-            </div>
-          ) : roomImage ? (
-            <InteractiveCanvas
-              backgroundImage={roomImage}
-              mountedArt={selectedProduct?.image || null}
-              aspectRatio={aspectRatio}
-              wallCenterX={wallAnalysis.wallCenterX}
-              wallCenterY={wallAnalysis.wallCenterY}
-              wallWidthRatio={wallAnalysis.wallWidthRatio}
-              frameColor={FRAME_COLORS[selectedFrame]}
-              perspective={{ rotateY: wallAnalysis.rotateY, skewY: wallAnalysis.skewY }}
-            />
-          ) : (
+          {!roomImage ? (
+            // Henüz görsel yok — upload alanı
             <div
               {...getRootProps()}
               className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all border-2 border-dashed border-zinc-800 m-4 rounded-xl"
@@ -173,6 +161,27 @@ Return ONLY raw JSON, no markdown, no backticks, no explanation.`,
               <Upload className="w-12 h-12 mb-4 opacity-20" />
               <p className="font-mono text-xs uppercase tracking-widest opacity-40">Upload Room Image</p>
             </div>
+          ) : (
+            // Görsel var — canvas göster (analiz sürüyor olsa bile)
+            <>
+              <InteractiveCanvas
+                backgroundImage={roomImage}
+                mountedArt={selectedProduct?.image || null}
+                aspectRatio={aspectRatio}
+                wallCenterX={wallAnalysis.wallCenterX}
+                wallCenterY={wallAnalysis.wallCenterY}
+                wallWidthRatio={wallAnalysis.wallWidthRatio}
+                frameColor={FRAME_COLORS[selectedFrame]}
+                perspective={{ rotateY: wallAnalysis.rotateY, skewY: wallAnalysis.skewY }}
+              />
+              {/* Analiz sürerken üstünde ince bir overlay */}
+              {isAnalyzing && (
+                <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-zinc-900/90 backdrop-blur-sm px-4 py-2 rounded-full border border-zinc-700 z-20">
+                  <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                  <span className="font-mono text-xs uppercase tracking-widest text-zinc-400">Analyzing wall...</span>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -183,7 +192,7 @@ Return ONLY raw JSON, no markdown, no backticks, no explanation.`,
           MAKE ME FEEL SPECIAL
         </button>
 
-        {/* Boyut Seçici */}
+        {/* Boyut */}
         <div>
           <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">Size</h3>
           <div className="flex gap-2 flex-wrap">
