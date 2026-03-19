@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { Move, Maximize } from 'lucide-react';
+import { Move } from 'lucide-react';
 
 interface InteractiveCanvasProps {
   backgroundImage: string;
@@ -40,51 +40,35 @@ export function InteractiveCanvas({
   };
 
   const scale = getScale();
-  // Ölçeği %10 daha küçülterek odaya daha doğal oturmasını sağlıyoruz
-  const widthPx = physicalWidth * naturalPixelsPerInch * scale * 0.9;
-  const heightPx = physicalHeight * naturalPixelsPerInch * scale * 0.9;
-  const frameThicknessPx = (naturalPixelsPerInch * scale) * 0.04;
+  const widthPx = physicalWidth * naturalPixelsPerInch * scale;
+  const heightPx = physicalHeight * naturalPixelsPerInch * scale;
+  const frameThicknessPx = (naturalPixelsPerInch * scale) * 0.05;
 
   return (
     <div ref={containerRef} className="relative w-full h-full rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center shadow-2xl">
-      {backgroundImage && (
-        <img 
-          src={backgroundImage} 
-          alt="Room" 
-          className="absolute inset-0 w-full h-full object-contain pointer-events-none" 
-        />
-      )}
+      {backgroundImage && <img src={backgroundImage} alt="Room" className="absolute inset-0 w-full h-full object-contain pointer-events-none" />}
 
       {mountedArt ? (
         <motion.div
           drag
           dragConstraints={containerRef}
-          dragElastic={0.1}
-          className="absolute cursor-grab active:cursor-grabbing flex items-center justify-center z-10"
+          className="absolute cursor-grab active:cursor-grabbing flex items-center justify-center"
           style={{ 
             width: widthPx, 
             height: heightPx,
             padding: frameColor ? `${frameThicknessPx}px` : '0px',
             backgroundColor: frameColor || 'transparent',
-            boxShadow: '0 30px 60px rgba(0,0,0,0.7), inset 0 0 20px rgba(0,0,0,0.3)',
-            // AI PERSPEKTİF VERİSİ BURADA UYGULANIYOR
-            transform: `perspective(1200px) rotateY(${perspective.rotateY}deg) skewY(${perspective.skewY}deg)`,
+            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
+            // PERSPEKTİF ANALİZİ BURADA UYGULANIYOR
+            transform: `perspective(1000px) rotateY(${perspective.rotateY}deg) skewY(${perspective.skewY}deg)`
           }}
         >
-          <img 
-            src={mountedArt} 
-            alt="Art" 
-            className="w-full h-full object-cover pointer-events-none rounded-sm" 
-            draggable={false} 
-          />
-          <div className="absolute -bottom-10 opacity-0 group-hover:opacity-100 transition-opacity bg-black/80 px-3 py-1 rounded text-[10px] font-mono uppercase tracking-tighter text-zinc-400">
-            {physicalWidth}" x {physicalHeight}"
-          </div>
+          <img src={mountedArt} alt="Mounted Art" className="w-full h-full object-cover pointer-events-none" draggable={false} />
         </motion.div>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
-          <div className="bg-black/60 backdrop-blur-xl px-8 py-4 rounded-3xl border border-white/5 text-sm font-bold text-zinc-100 uppercase tracking-[0.2em] flex items-center gap-4 shadow-2xl">
-            <Maximize className="w-5 h-5 text-indigo-400" />
+          <div className="bg-black/50 backdrop-blur-sm px-6 py-3 rounded-full border border-zinc-800 text-sm font-mono text-zinc-400 uppercase tracking-widest flex items-center gap-3">
+            <Move className="w-4 h-4" />
             <span>Select art to mount</span>
           </div>
         </div>
