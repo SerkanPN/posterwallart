@@ -19,15 +19,15 @@ export function Home() {
   const [wallAnalysis, setWallAnalysis] = useState<{
     wallCenterX: number;
     wallCenterY: number;
-    wallWidthRatio: number;
+    posterWidthRatio: number;  // posterin görüntü genişliğine oranı
     rotateY: number;
     skewY: number;
     suggestedStyle: string;
     roomDescription: string;
   }>({
-    wallCenterX: 0.3,
-    wallCenterY: 0.3,
-    wallWidthRatio: 0.35,
+    wallCenterX: 0.5,
+    wallCenterY: 0.32,
+    posterWidthRatio: 0.18,
     rotateY: 0,
     skewY: 0,
     suggestedStyle: '',
@@ -45,7 +45,6 @@ export function Home() {
     const reader = new FileReader();
     reader.onload = (e) => {
       const base64 = e.target?.result as string;
-      // Önce resmi göster (boş çerçeveyle), sonra analiz et
       setRoomImage(base64);
       analyzeRoom(base64);
     };
@@ -78,23 +77,25 @@ export function Home() {
                   },
                 },
                 {
-                  text: `You are analyzing a room photo to place a wall art poster on the best empty wall space.
+                  text: `Look at this room photo. I want to place a framed poster on the main empty wall.
 
-Look at the image carefully. Find the largest empty wall area suitable for hanging art.
+Using the objects in the room (sofa, chairs, doors, etc.) as size reference, estimate:
 
-Return a JSON object with:
-- wallCenterX: the horizontal center of that empty wall area, as a fraction of image width (0.0 = left edge, 1.0 = right edge)
-- wallCenterY: the vertical center of that empty wall area, as a fraction of image height (0.0 = top, 1.0 = bottom). This should be upper-middle area of the wall, typically between 0.2 and 0.5
-- wallWidthRatio: width of that wall as a fraction of total image width (0.2 to 0.8)
-- rotateY: perspective angle of the wall (-15 to 15, 0 = wall faces camera directly)
-- skewY: vertical skew (-5 to 5, 0 = straight)
-- suggestedStyle: one word (Modern/Minimalist/Bohemian/Industrial/Scandinavian)
-- roomDescription: one sentence about the room
+1. Where is the center of the best empty wall space? Give as X (0=left edge, 1=right edge) and Y (0=top, 1=bottom) fractions of the image.
+2. How wide should the poster be to look realistic and proportional on that wall? Give as a fraction of the total image width (e.g. 0.15 means the poster takes up 15% of the image width).
+3. What is the wall's perspective angle? If the wall faces the camera straight on, rotateY=0. If it's angled to the right, rotateY is positive (up to 15). If angled left, negative.
+4. Any vertical skew? skewY (-5 to 5).
 
-Example for a room where the main empty wall is on the left side at about 30% from left, 30% from top:
-{"wallCenterX":0.30,"wallCenterY":0.30,"wallWidthRatio":0.40,"rotateY":0,"skewY":0,"suggestedStyle":"Modern","roomDescription":"A bright minimalist living room."}
-
-Return ONLY the raw JSON object. No markdown, no backticks, no extra text.`,
+Return ONLY this JSON:
+{
+  "wallCenterX": <0.0 to 1.0>,
+  "wallCenterY": <0.0 to 1.0>,
+  "posterWidthRatio": <0.08 to 0.35>,
+  "rotateY": <-15 to 15>,
+  "skewY": <-5 to 5>,
+  "suggestedStyle": "<Modern|Minimalist|Bohemian|Industrial|Scandinavian>",
+  "roomDescription": "<one sentence>"
+}`,
                 },
               ],
             }],
@@ -117,9 +118,9 @@ Return ONLY the raw JSON object. No markdown, no backticks, no extra text.`,
       console.log('🔍 Gemini Wall Analysis:', parsed);
 
       setWallAnalysis({
-        wallCenterX: parsed.wallCenterX ?? 0.3,
-        wallCenterY: parsed.wallCenterY ?? 0.3,
-        wallWidthRatio: parsed.wallWidthRatio ?? 0.35,
+        wallCenterX: parsed.wallCenterX ?? 0.5,
+        wallCenterY: parsed.wallCenterY ?? 0.32,
+        posterWidthRatio: parsed.posterWidthRatio ?? 0.18,
         rotateY: parsed.rotateY ?? 0,
         skewY: parsed.skewY ?? 0,
         suggestedStyle: parsed.suggestedStyle || 'Modern',
@@ -148,11 +149,9 @@ Return ONLY the raw JSON object. No markdown, no backticks, no extra text.`,
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden">
-      {/* Sol: Canvas */}
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800">
           {!roomImage ? (
-            // Henüz görsel yok — upload alanı
             <div
               {...getRootProps()}
               className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all border-2 border-dashed border-zinc-800 m-4 rounded-xl"
@@ -162,7 +161,6 @@ Return ONLY the raw JSON object. No markdown, no backticks, no extra text.`,
               <p className="font-mono text-xs uppercase tracking-widest opacity-40">Upload Room Image</p>
             </div>
           ) : (
-            // Görsel var — canvas göster (analiz sürüyor olsa bile)
             <>
               <InteractiveCanvas
                 backgroundImage={roomImage}
@@ -170,11 +168,10 @@ Return ONLY the raw JSON object. No markdown, no backticks, no extra text.`,
                 aspectRatio={aspectRatio}
                 wallCenterX={wallAnalysis.wallCenterX}
                 wallCenterY={wallAnalysis.wallCenterY}
-                wallWidthRatio={wallAnalysis.wallWidthRatio}
+                posterWidthRatio={wallAnalysis.posterWidthRatio}
                 frameColor={FRAME_COLORS[selectedFrame]}
                 perspective={{ rotateY: wallAnalysis.rotateY, skewY: wallAnalysis.skewY }}
               />
-              {/* Analiz sürerken üstünde ince bir overlay */}
               {isAnalyzing && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-zinc-900/90 backdrop-blur-sm px-4 py-2 rounded-full border border-zinc-700 z-20">
                   <div className="w-3 h-3 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
@@ -186,92 +183,55 @@ Return ONLY the raw JSON object. No markdown, no backticks, no extra text.`,
         </div>
       </div>
 
-      {/* Sağ: Panel */}
       <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col p-6 overflow-y-auto gap-6">
         <button className="w-full py-4 bg-emerald-600 text-white font-bold uppercase rounded-xl">
           MAKE ME FEEL SPECIAL
         </button>
 
-        {/* Boyut */}
         <div>
           <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">Size</h3>
           <div className="flex gap-2 flex-wrap">
             {['18x24', '24x36', '36x48'].map(size => (
-              <button
-                key={size}
-                onClick={() => setSelectedSize(size)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all ${
-                  selectedSize === size
-                    ? 'border-emerald-500 text-emerald-400 bg-emerald-950'
-                    : 'border-zinc-700 text-zinc-400'
-                }`}
-              >
+              <button key={size} onClick={() => setSelectedSize(size)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all ${selectedSize === size ? 'border-emerald-500 text-emerald-400 bg-emerald-950' : 'border-zinc-700 text-zinc-400'}`}>
                 {size}"
               </button>
             ))}
           </div>
         </div>
 
-        {/* Yönelim */}
         <div>
           <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">Orientation</h3>
           <div className="flex gap-2">
             {(['portrait', 'landscape'] as const).map(o => (
-              <button
-                key={o}
-                onClick={() => setOrientation(o)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all capitalize ${
-                  orientation === o
-                    ? 'border-emerald-500 text-emerald-400 bg-emerald-950'
-                    : 'border-zinc-700 text-zinc-400'
-                }`}
-              >
+              <button key={o} onClick={() => setOrientation(o)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all capitalize ${orientation === o ? 'border-emerald-500 text-emerald-400 bg-emerald-950' : 'border-zinc-700 text-zinc-400'}`}>
                 {o}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Çerçeve */}
         <div>
           <h3 className="text-xs font-mono uppercase tracking-widest text-zinc-500 mb-3">Frame</h3>
           <div className="flex gap-2">
             {Object.entries(FRAME_COLORS).map(([key, color]) => (
-              <button
-                key={key}
-                onClick={() => setSelectedFrame(key)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all capitalize ${
-                  selectedFrame === key
-                    ? 'border-emerald-500 text-emerald-400 bg-emerald-950'
-                    : 'border-zinc-700 text-zinc-400'
-                }`}
-              >
-                {color && (
-                  <span
-                    className="inline-block w-2 h-2 rounded-full mr-1.5"
-                    style={{ backgroundColor: color }}
-                  />
-                )}
+              <button key={key} onClick={() => setSelectedFrame(key)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono border transition-all capitalize ${selectedFrame === key ? 'border-emerald-500 text-emerald-400 bg-emerald-950' : 'border-zinc-700 text-zinc-400'}`}>
+                {color && <span className="inline-block w-2 h-2 rounded-full mr-1.5" style={{ backgroundColor: color }} />}
                 {key}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Top Matches */}
         <div>
           <h2 className="text-lg font-bold mb-4">Top Matches</h2>
           <div className="space-y-4">
             {recommendations.map((p) => (
-              <div
-                key={p.id}
-                className={`p-4 border rounded-xl cursor-pointer transition-all ${
-                  selectedProduct?.id === p.id
-                    ? 'border-emerald-500 bg-zinc-900'
-                    : 'border-zinc-800 hover:border-zinc-600'
-                }`}
-                onClick={() => setSelectedProduct(selectedProduct?.id === p.id ? null : p)}
-              >
+              <div key={p.id}
+                className={`p-4 border rounded-xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800 hover:border-zinc-600'}`}
+                onClick={() => setSelectedProduct(selectedProduct?.id === p.id ? null : p)}>
                 <div className="flex gap-4 items-center">
                   <img src={p.image} className="w-16 h-16 rounded-lg object-cover" alt={p.title} />
                   <div className="flex-1 min-w-0">
