@@ -45,11 +45,10 @@ export function Home() {
     const file = acceptedFiles[0];
     if (file) {
       const reader = new FileReader();
-      // Dosya okuma başladığında UI'ı hemen güncellemek için setRoomImage buraya alındı
       reader.onload = (e) => {
         const base64 = e.target?.result as string;
         setRoomImage(base64);
-        analyzeRoom(base64); // Analizi başlat
+        analyzeRoom(base64);
       };
       reader.readAsDataURL(file);
     }
@@ -59,42 +58,49 @@ export function Home() {
 
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
+    // VERCEL'DEKİ VITE_ ÖNEKLİ ANAHTAR
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      if (!apiKey) {
-        console.warn("API Key missing, using default scale.");
-        setAnalysisData({ ppi: 6, rotateY: 0, skewY: 0 });
-        return;
-      }
+      if (!apiKey) throw new Error("API KEY MISSING");
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
+      // 404 HATASINI ÇÖZEN GÜNCEL URL YAPISI (v1beta yerine v1 veya doğru model yolu)
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{
             parts: [
-              { text: "Analyze room image. Estimate PPI for the wall (4-10 range). Calculate rotateY (-15 to 15) and skewY (-5 to 5). Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number }" },
+              { text: "Analyze this room for wall art. Estimate PPI (scale 4-10) and perspective: rotateY (-15 to 15) and skewY (-5 to 5). Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number }" },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]
           }]
         })
       });
 
-      if (!response.ok) throw new Error("API Response not ok");
+      if (!response.ok) {
+        const errData = await response.json();
+        throw new Error(errData.error?.message || "API Error");
+      }
 
       const result = await response.json();
-      const text = result.candidates[0].content.parts[0].text;
-      const data = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+      
+      // KONSOLDAKİ '0' HATASINI ÖNLEYEN KONTROLLÜ ERİŞİM
+      if (result.candidates && result.candidates[0]?.content?.parts[0]?.text) {
+        const text = result.candidates[0].content.parts[0].text;
+        const data = JSON.parse(text.replace(/```json/g, '').replace(/```/g, '').trim());
+        setAnalysisData({
+          ppi: data.pixelsPerInch || 6,
+          rotateY: data.rotateY || 0,
+          skewY: data.skewY || 0
+        });
+      } else {
+        throw new Error("Invalid response format");
+      }
 
-      setAnalysisData({
-        ppi: data.pixelsPerInch || 6,
-        rotateY: data.rotateY || 0,
-        skewY: data.skewY || 0
-      });
     } catch (e) {
-      console.error("Analiz hatası (Fallback uygulanıyor):", e);
-      // Hata olsa bile dosyanın yüklenmiş kalması ve varsayılan ölçeğin gelmesi için:
+      console.error("Analiz patladı (Fallback devrede):", e);
+      // Analiz patlasa bile uygulamanın kilitlenmemesi ve görselin görünmesi için:
       setAnalysisData({ ppi: 6, rotateY: 0, skewY: 0 });
     } finally {
       setIsAnalyzing(false);
@@ -134,7 +140,7 @@ export function Home() {
             <div {...getRootProps()} className={`absolute inset-0 flex flex-col items-center justify-center cursor-pointer transition-all ${isDragActive ? 'bg-emerald-500/10' : 'hover:bg-zinc-800/50'}`}>
               <input {...getInputProps()} />
               <ImageIcon className="w-12 h-12 opacity-20 mb-4" />
-              <p className="font-mono text-xs uppercase opacity-30 tracking-widest text-center px-12">Upload room photo to begin</p>
+              <p className="font-mono text-xs uppercase opacity-30 tracking-widest text-center px-12 text-zinc-400">Upload room photo to begin</p>
             </div>
           )}
         </div>
@@ -171,7 +177,7 @@ export function Home() {
                       <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2 block">Size</label>
                       <div className="grid grid-cols-3 gap-2">
                         {(['12x18', '18x24', '24x36'] as SizeType[]).map(size => (
-                          <button key={size} onClick={(e) => { e.stopPropagation(); setSelectedSize(size); }} className={`py-2 text-[10px] font-bold rounded-lg border transition-all ${selectedSize === size ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{size}"</button>
+                          <button key={size} onClick={(e) => { e.stopPropagation(); setSelectedSize(size); }} className={`py-2 text-[10px] font-bold rounded-lg border transition-all ${selectedSize === size ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{size}"</button>
                         ))}
                       </div>
                     </div>
