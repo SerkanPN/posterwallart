@@ -52,17 +52,18 @@ export function InteractiveCanvas({
         <motion.div
           drag
           dragConstraints={containerRef}
-          className="absolute cursor-grab active:cursor-grabbing flex items-center justify-center"
+          className="absolute cursor-grab active:cursor-grabbing flex items-center justify-center z-10"
           style={{ 
             width: widthPx, 
             height: heightPx,
             padding: frameColor ? `${frameThicknessPx}px` : '0px',
             backgroundColor: frameColor || 'transparent',
-            boxShadow: '0 25px 50px rgba(0,0,0,0.6)',
-            transform: `perspective(1000px) rotateY(${perspective.rotateY}deg) skewY(${perspective.skewY}deg)`
+            boxShadow: '0 30px 60px rgba(0,0,0,0.6)',
+            // NANO BANANA 2 PERSPEKTİF VERİSİ BURADA
+            transform: `perspective(1200px) rotateY(${perspective.rotateY}deg) skewY(${perspective.skewY}deg)`
           }}
         >
-          <img src={mountedArt} alt="Mounted Art" className="w-full h-full object-cover pointer-events-none" draggable={false} />
+          <img src={mountedArt} alt="Mounted Art" className="w-full h-full object-cover pointer-events-none rounded-sm" draggable={false} />
         </motion.div>
       ) : (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
