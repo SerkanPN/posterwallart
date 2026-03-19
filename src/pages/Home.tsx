@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { motion } from 'motion/react';
-import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag } from 'lucide-react';
+import { Upload, Move } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 
@@ -12,7 +11,14 @@ export function Home() {
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [analysisData, setAnalysisData] = useState<{ ppi: number; rotateY: number; skewY: number } | null>(null);
+
+  const [analysis, setAnalysis] = useState({
+    ppi: 6,
+    rotateY: 0,
+    skewY: 0,
+    suggestedStyle: '',
+    roomDescription: ''
+  });
 
   const [selectedProduct, setSelectedProduct] = useState<any>(null);
   const [selectedSize, setSelectedSize] = useState('24x36');
@@ -32,46 +38,74 @@ export function Home() {
     }
   }, []);
 
-  const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 });
+  const { getRootProps, getInputProps } = useDropzone({
+    onDrop,
+    accept: { 'image/*': [] },
+    maxFiles: 1
+  });
 
-  // SDK YERİNE DOĞRUDAN REST API ÇAĞRISI
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
-    setAnalysisData(null);
 
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    const modelName = "gemini-3.1-flash-image-preview"; // Nano Banana 2
+    const apiKey = (import.meta as any).env.VITE_GEMINI_API_KEY;
 
     try {
-      if (!apiKey) throw new Error("API_KEY_MISSING");
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{
+              parts: [
+                {
+                  inline_data: {
+                    mime_type: 'image/jpeg',
+                    data: base64Image.split(',')[1]
+                  }
+                },
+                {
+                  text: `Analyze this room for wall art placement. Return ONLY a raw JSON object, no markdown, no backticks, no explanation:
+{"pixelsPerInch": <number 4-10, estimate wall scale>, "rotateY": <number -15 to 15, wall perspective angle>, "skewY": <number -5 to 5, vertical skew>, "suggestedStyle": "<one word: Modern/Minimalist/Bohemian/Industrial/Scandinavian>", "roomDescription": "<one short sentence describing the room>"}`
+                }
+              ]
+            }],
+            generationConfig: {
+              response_mime_type: 'application/json'
+            }
+          })
+        }
+      );
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: "Analyze this room. 1. Estimate PPI (scale) for the focal wall (range 4-10). 2. Estimate perspective 'rotateY' (-15 to 15) and 'skewY' (-5 to 5). Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number }" },
-              { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
-            ]
-          }]
-        })
+      const data = await response.json();
+
+      if (!response.ok || !data.candidates?.[0]?.content?.parts?.[0]?.text) {
+        console.error('Gemini API error:', data);
+        throw new Error(data.error?.message || 'No response from API');
+      }
+
+      const text = data.candidates[0].content.parts[0].text;
+      const parsed = JSON.parse(text.trim());
+
+      setAnalysis({
+        ppi: parsed.pixelsPerInch || 6,
+        rotateY: parsed.rotateY || 0,
+        skewY: parsed.skewY || 0,
+        suggestedStyle: parsed.suggestedStyle || 'Modern',
+        roomDescription: parsed.roomDescription || 'Analyzed space',
       });
 
-      const result = await response.json();
-      const textResponse = result.candidates[0].content.parts[0].text;
-      const data = JSON.parse(textResponse.replace(/```json/g, '').replace(/```/g, '').trim());
+      setRecommendations([{
+        id: '1',
+        title: 'Curated Match',
+        image: 'https://picsum.photos/seed/art/800/1200',
+        basePrice: 40,
+        description: parsed.roomDescription || 'Matches your room style',
+      }]);
 
-      setAnalysisData({
-        ppi: data.pixelsPerInch || 6,
-        rotateY: data.rotateY || 0,
-        skewY: data.skewY || 0
-      });
-
-      setRecommendations([{ id: '1', title: 'Nano Match', image: 'https://picsum.photos/seed/nano/800/1200', basePrice: 40, description: 'AI Curated' }]);
     } catch (e) {
-      console.error("REST API Hatası:", e);
-      alert("Analysis failed. Check your API Key and Network tab.");
+      console.error('Analysis failed:', e);
+      setAnalysis(prev => ({ ...prev, ppi: 6, rotateY: 0, skewY: 0 }));
     } finally {
       setIsAnalyzing(false);
     }
@@ -84,45 +118,57 @@ export function Home() {
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden">
       <div className="flex-1 p-6 flex flex-col relative">
-        <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
+        <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800">
           {isAnalyzing ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/80 z-20 backdrop-blur-sm">
-              <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-[10px] uppercase tracking-[0.3em]">Nano Banana 2 Analyzing...</p>
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/80 z-20 backdrop-blur-sm font-mono text-sm uppercase tracking-widest">
+              <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <span>Analyzing Space...</span>
             </div>
-          ) : roomImage && analysisData ? (
-            <InteractiveCanvas 
-              backgroundImage={roomImage} 
-              mountedArt={selectedProduct?.image || null} 
+          ) : roomImage ? (
+            <InteractiveCanvas
+              backgroundImage={roomImage}
+              mountedArt={selectedProduct?.image || null}
               physicalWidth={physicalWidth}
               physicalHeight={physicalHeight}
-              naturalPixelsPerInch={analysisData.ppi}
+              naturalPixelsPerInch={analysis.ppi}
               frameColor={(FRAME_COLORS as any)[selectedFrame]}
-              perspective={{ rotateY: analysisData.rotateY, skewY: analysisData.skewY }}
+              perspective={{ rotateY: analysis.rotateY, skewY: analysis.skewY }}
             />
           ) : (
-            <div {...getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/30 transition-all border-2 border-dashed border-zinc-800 m-8 rounded-3xl">
+            <div
+              {...getRootProps()}
+              className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all border-2 border-dashed border-zinc-800 m-4 rounded-xl"
+            >
               <input {...getInputProps()} />
-              <Upload className="w-10 h-10 mb-4 opacity-10" />
-              <p className="font-mono text-[10px] uppercase tracking-widest opacity-30">Upload Room Image</p>
+              <Upload className="w-12 h-12 mb-4 opacity-20" />
+              <p className="font-mono text-xs uppercase tracking-widest opacity-40">Upload Room Image</p>
             </div>
           )}
         </div>
       </div>
 
-      <div className="w-[400px] border-l border-zinc-800 bg-zinc-950 flex flex-col p-6 overflow-y-auto">
-        <button className="w-full py-4 bg-emerald-600 text-white font-bold uppercase rounded-xl mb-10 text-xs tracking-widest shadow-[0_0_30px_rgba(16,185,129,0.2)]">MAKE ME FEEL SPECIAL</button>
-        <h2 className="text-xs font-black uppercase tracking-widest mb-6 opacity-40">Top Matches</h2>
+      <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col p-6 overflow-y-auto">
+        <button className="w-full py-4 bg-emerald-600 text-white font-bold uppercase rounded-xl mb-8">
+          MAKE ME FEEL SPECIAL
+        </button>
+        <h2 className="text-lg font-bold mb-6">Top Matches</h2>
         <div className="space-y-4">
           {recommendations.map((p) => (
-            <div 
-              key={p.id} 
-              className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900 shadow-xl' : 'border-zinc-800'}`}
+            <div
+              key={p.id}
+              className={`p-4 border rounded-xl cursor-pointer transition-all ${
+                selectedProduct?.id === p.id
+                  ? 'border-emerald-500 bg-zinc-900'
+                  : 'border-zinc-800'
+              }`}
               onClick={() => setSelectedProduct(p)}
             >
-              <div className="flex gap-4 items-center">
-                <img src={p.image} className="w-14 h-14 rounded-xl object-cover" />
-                <h3 className="font-bold text-xs">{p.title}</h3>
+              <div className="flex gap-4">
+                <img src={p.image} className="w-16 h-16 rounded-lg object-cover" />
+                <div>
+                  <h3 className="font-bold text-sm">{p.title}</h3>
+                  <p className="text-xs text-zinc-500 line-clamp-1">{p.description}</p>
+                </div>
               </div>
             </div>
           ))}
