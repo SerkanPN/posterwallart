@@ -61,7 +61,7 @@ export function Home() {
   const analyzeRoomDeeply = async (base64Image: string) => {
     setIsAnalyzing(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY });
       const response = await ai.models.generateContent({
         model: 'gemini-2.0-flash-exp',
         contents: [
@@ -72,10 +72,9 @@ export function Home() {
             }
           },
           `Analyze this room as a professional interior designer. 
-          1. Perspective: Identify the main focal wall. Estimate 'rotateY' (-20 to 20 degrees) and 'skewY' (-10 to 10) so a poster fits perfectly flat on THAT wall.
-          2. Scale: Based on items like beds or doors, estimate a realistic PPI (pixels-per-inch).
-          3. Style & Color: Identify the interior style (e.g. Minimalist, Industrial) and dominant hex colors.
-          4. Suggest an art theme that matches the vibe.
+          1. Perspective: Identify the focal wall. Estimate 'rotateY' (-20 to 20) and 'skewY' (-10 to 10) for that specific wall.
+          2. Scale: Estimate realistic PPI (pixels-per-inch).
+          3. Room: Identify style (e.g. Modern, Bohem) and hex colors.
           Return ONLY JSON: 
           { "pixelsPerInch": number, "rotateY": number, "skewY": number, "suggestedStyle": "string", "suggestedColors": ["hex"], "roomDescription": "string" }`
         ],
@@ -96,7 +95,7 @@ export function Home() {
         id: 'rec_match',
         title: `${data.suggestedStyle} Match`,
         basePrice: 45,
-        image: 'https://picsum.photos/seed/style/800/1200',
+        image: 'https://picsum.photos/seed/interior/800/1200',
         category: data.suggestedStyle,
         description: data.roomDescription
       }]);
@@ -112,8 +111,8 @@ export function Home() {
     if (useToken()) {
       setIsGenerating(true);
       try {
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const prompt = `Create high-end artistic wall art for a ${analysis.suggestedStyle} room. Colors: ${analysis.suggestedColors.join(', ')}. Insight: ${analysis.roomDescription}. The art must feel intentional and fit the room's energy perfectly.`;
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || import.meta.env.VITE_GEMINI_API_KEY });
+        const prompt = `Art piece for a ${analysis.suggestedStyle} room. Colors: ${analysis.suggestedColors.join(', ')}. Insight: ${analysis.roomDescription}. High-end unique wall art.`;
         
         const response = await ai.models.generateContent({
           model: 'gemini-2.0-flash-exp',
@@ -134,11 +133,11 @@ export function Home() {
         if (newArt) {
           const newProduct: Product = {
             id: `gen_${Date.now()}`,
-            title: 'Your Custom AI Art',
+            title: 'AI Masterpiece',
             basePrice: 65,
             image: newArt,
             category: analysis.suggestedStyle,
-            description: 'Generated based on your room analysis.',
+            description: 'Custom art intelligently matched to your room.',
             isGenerated: true
           };
           setRecommendations([newProduct, ...recommendations]);
@@ -163,7 +162,7 @@ export function Home() {
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/80 z-20 backdrop-blur-sm">
               <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-sm uppercase">Analyzing Space...</p>
+              <p className="font-mono text-sm uppercase">Analyzing Perspective...</p>
             </div>
           ) : roomImage ? (
             <InteractiveCanvas 
@@ -179,7 +178,7 @@ export function Home() {
             <div {...getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all">
               <input {...getInputProps()} />
               <ImageIcon className="w-16 h-16 opacity-50 mb-4" />
-              <p className="font-mono text-sm uppercase">Upload room photo to begin</p>
+              <p className="font-mono text-sm uppercase">Upload Room Photo</p>
             </div>
           )}
         </div>
@@ -191,7 +190,7 @@ export function Home() {
           disabled={isGenerating || isAnalyzing || !roomImage}
           className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] mb-8"
         >
-          {isGenerating ? 'Weaving Art...' : 'MAKE ME FEEL SPECIAL'}
+          {isGenerating ? 'Weaving art...' : 'MAKE ME FEEL SPECIAL'}
         </button>
 
         <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><Sparkles className="w-5 h-5 text-indigo-400" /> Top Matches</h2>
