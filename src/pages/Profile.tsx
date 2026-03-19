@@ -1,17 +1,31 @@
 import { useStore } from '../store/useStore';
 import { User, History, Package, Settings, LogOut, Zap } from 'lucide-react';
+import { useState } from 'react';
 
 export function Profile() {
-  const { user, logout } = useStore();
+  const { user, logout, login } = useStore();
+  const [email, setEmail] = useState('');
 
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-24 flex flex-col items-center justify-center text-center">
         <User className="w-16 h-16 text-zinc-500 mb-6" />
         <h2 className="text-3xl font-bold tracking-tighter uppercase mb-4">Sign in to view profile</h2>
-        <button className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase tracking-widest rounded-xl transition-all">
-          Sign In / Register
-        </button>
+        <div className="flex w-full max-w-sm gap-2">
+          <input 
+            type="email" 
+            placeholder="Email address"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-4 focus:outline-none focus:border-indigo-500 transition-colors"
+          />
+          <button 
+            onClick={() => login(email)}
+            className="px-8 py-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold uppercase tracking-widest rounded-xl transition-all"
+          >
+            Sign In
+          </button>
+        </div>
       </div>
     );
   }
