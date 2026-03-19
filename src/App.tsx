@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { Home } from './pages/Home';
@@ -12,8 +13,15 @@ import { Tokens } from './pages/Tokens';
 import { Profile } from './pages/Profile';
 import { SellerDashboard } from './pages/SellerDashboard';
 import { Wishlist } from './pages/Wishlist';
+import { useStore } from './store/useStore';
 
 export default function App() {
+  const { checkUser } = useStore();
+
+  useEffect(() => {
+    checkUser();
+  }, [checkUser]);
+
   return (
     <BrowserRouter>
       <Routes>
