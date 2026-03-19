@@ -56,7 +56,7 @@ export function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   
   // Canvas & Product State
-  const [naturalPPI, setNaturalPPI] = useState<number>(15); // Fallback PPI
+  const [naturalPPI, setNaturalPPI] = useState<number>(5); // PPI değerini 15'ten 5'e çekerek başlangıçta daha küçük/gerçekçi ölçek sağladık
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedSize, setSelectedSize] = useState<SizeType>('24x36');
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('unframed');
@@ -89,7 +89,7 @@ export function Home() {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.0-flash-preview', // Model ismi güncellendi
         contents: [
           {
             inlineData: {
@@ -97,7 +97,7 @@ export function Home() {
               mimeType: base64Image.split(';')[0].split(':')[1]
             }
           },
-          "Analyze this room image to determine its physical scale. Look for standard objects like beds, doors, chairs, or windows. Estimate the 'pixels per inch' (PPI) for the main focal wall where a poster would hang. For example, if a standard 80-inch door is 400 pixels tall in the image, the PPI would be 5. Return ONLY a JSON object with a single numeric field 'pixelsPerInch'."
+          "Analyze this room image. Find a standard object (like a door, bed, or chair) to estimate the scale. Calculate the pixels-per-inch (PPI) for the back wall. Standard door = 80 inches. If that door is 400px, PPI = 5. IMPORTANT: Provide a realistic PPI usually between 2 and 10. Return ONLY JSON: { \"pixelsPerInch\": number }"
         ],
         config: {
           responseMimeType: "application/json",
@@ -112,11 +112,13 @@ export function Home() {
       });
       const data = JSON.parse(response.text);
       if (data.pixelsPerInch) {
-        setNaturalPPI(data.pixelsPerInch);
+        // AI'dan gelen PPI değerini daha gerçekçi ölçeklendirmek için sınırladık
+        const calibratedPPI = Math.min(Math.max(data.pixelsPerInch, 2), 12);
+        setNaturalPPI(calibratedPPI);
       }
     } catch (e) {
       console.error("Failed to analyze room scale:", e);
-      setNaturalPPI(15); // Fallback
+      setNaturalPPI(5); // Failback daha gerçekçi bir değere çekildi
     } finally {
       setIsAnalyzing(false);
     }
@@ -134,7 +136,7 @@ export function Home() {
         const prompt = `A highly detailed poster art piece in the style of ${selectedStyle || 'Abstract'}, using a color palette of ${selectedColor || 'various colors'}. Suitable for modern home decor.`;
         
         const response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash-image',
+          model: 'gemini-2.0-flash-exp', // Model ismi düzeltildi
           contents: {
             parts: [{ text: prompt }],
           },
