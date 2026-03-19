@@ -19,7 +19,7 @@ export function Home() {
   const [wallAnalysis, setWallAnalysis] = useState<{
     wallCenterX: number;
     wallCenterY: number;
-    posterWidthRatio: number;  // posterin görüntü genişliğine oranı
+    posterWidthRatio: number;
     rotateY: number;
     skewY: number;
     suggestedStyle: string;
@@ -79,22 +79,27 @@ export function Home() {
                 {
                   text: `Look at this room photo. I want to place a framed poster on the main empty wall.
 
-Using the objects in the room (sofa, chairs, doors, etc.) as size reference, estimate:
+Using the real objects in the room (sofa, chairs, doors, etc.) as size reference, estimate:
 
-1. Where is the center of the best empty wall space? Give as X (0=left edge, 1=right edge) and Y (0=top, 1=bottom) fractions of the image.
-2. How wide should the poster be to look realistic and proportional on that wall? Give as a fraction of the total image width (e.g. 0.15 means the poster takes up 15% of the image width).
-3. What is the wall's perspective angle? If the wall faces the camera straight on, rotateY=0. If it's angled to the right, rotateY is positive (up to 15). If angled left, negative.
-4. Any vertical skew? skewY (-5 to 5).
+1. Where is the best empty wall spot for a poster? Give its center as wallCenterX (0=left edge, 1=right edge of image) and wallCenterY (0=top, 1=bottom).
+
+2. How wide should the poster be to look realistic and proportional to the room? Give posterWidthRatio as a fraction of the total image width (e.g. a poster that takes up 20% of image width = 0.20).
+
+3. What is the perspective angle of that wall? rotateY in degrees (negative=wall faces left, positive=wall faces right, 0=wall faces camera). skewY for any vertical tilt.
+
+4. What interior style is this room? One word.
+
+5. One sentence describing the room.
 
 Return ONLY this JSON:
 {
   "wallCenterX": <0.0 to 1.0>,
   "wallCenterY": <0.0 to 1.0>,
-  "posterWidthRatio": <0.08 to 0.35>,
-  "rotateY": <-15 to 15>,
+  "posterWidthRatio": <0.10 to 0.35>,
+  "rotateY": <-20 to 20>,
   "skewY": <-5 to 5>,
-  "suggestedStyle": "<Modern|Minimalist|Bohemian|Industrial|Scandinavian>",
-  "roomDescription": "<one sentence>"
+  "suggestedStyle": "<style>",
+  "roomDescription": "<sentence>"
 }`,
                 },
               ],
