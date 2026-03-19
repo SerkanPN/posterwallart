@@ -58,8 +58,7 @@ export function InteractiveCanvas({
             height: heightPx,
             padding: frameColor ? `${frameThicknessPx}px` : '0px',
             backgroundColor: frameColor || 'transparent',
-            boxShadow: '0 20px 50px rgba(0,0,0,0.5)',
-            // PERSPEKTİF ANALİZİ BURADA UYGULANIYOR
+            boxShadow: '0 25px 50px rgba(0,0,0,0.6)',
             transform: `perspective(1000px) rotateY(${perspective.rotateY}deg) skewY(${perspective.skewY}deg)`
           }}
         >
