@@ -30,7 +30,6 @@ export function Home() {
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Analiz Sonuçları
   const [analysis, setAnalysis] = useState({
     ppi: 5,
     rotateY: 0,
@@ -77,13 +76,13 @@ export function Home() {
               mimeType: base64Image.split(';')[0].split(':')[1]
             }
           },
-          `Bu odayı profesyonel bir iç mimar gibi analiz et. 
-          1. Odadaki eşyaların (yatak, kapı, masa) boyutuna bakarak duvar için gerçekçi bir PPI (pixels-per-inch) hesapla.
-          2. Ana duvarın açısını bul: 'rotateY' (-15 ile 15 derece arası) ve 'skewY' (-5 ile 5 arası).
-          3. Odanın stilini (Modern, Bohem, Endüstriyel vb.) ve dominant renk paletini belirle.
-          4. Bu odaya en çok yakışacak poster temasını belirle.
-          JSON olarak şu yapıda yanıt ver: 
-          { "pixelsPerInch": sayı, "rotateY": sayı, "skewY": sayı, "suggestedStyle": "stil adı", "suggestedColors": ["hex1", "hex2"], "roomDescription": "kısa analiz" }`
+          `Analyze this room as a professional interior designer. 
+          1. Estimate scale (pixels-per-inch) based on furniture. 
+          2. Wall angle: estimate 'rotateY' (-15 to 15 degrees) and 'skewY' (-5 to 5) so a poster fits perfectly flat on the back wall. 
+          3. Room style & dominant color palette (Hex codes).
+          4. Detailed room analysis for artistic context.
+          Return ONLY JSON: 
+          { "pixelsPerInch": number, "rotateY": number, "skewY": number, "suggestedStyle": "string", "suggestedColors": ["hex"], "roomDescription": "string" }`
         ],
         config: { responseMimeType: "application/json" }
       });
@@ -98,17 +97,16 @@ export function Home() {
         roomDescription: data.roomDescription
       });
 
-      // İlk öneriyi oluştur
       setRecommendations([{
         id: 'rec_ai',
-        title: `${data.suggestedStyle} Tasarımı`,
+        title: `${data.suggestedStyle} Style Match`,
         basePrice: 50,
         image: 'https://picsum.photos/seed/interior/800/1200',
         category: data.suggestedStyle,
         description: data.roomDescription
       }]);
     } catch (e) {
-      console.error("Analiz hatası:", e);
+      console.error("Analysis failed:", e);
     } finally {
       setIsAnalyzing(false);
     }
@@ -120,11 +118,7 @@ export function Home() {
       setIsGenerating(true);
       try {
         const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-        const prompt = `Create a high-end wall art poster. 
-        Style: ${analysis.suggestedStyle}. 
-        Color Palette: ${analysis.suggestedColors.join(', ')}. 
-        Context: It must perfectly match a room described as: ${analysis.roomDescription}. 
-        The art should feel intentional and artistic, not like a stock photo.`;
+        const prompt = `High-end artistic wall art. Style: ${analysis.suggestedStyle}. Colors: ${analysis.suggestedColors.join(', ')}. Context: To fit in a ${analysis.roomDescription}. Create something unique and intentional.`;
         
         const response = await ai.models.generateContent({
           model: 'gemini-2.0-flash-exp',
@@ -145,27 +139,27 @@ export function Home() {
         if (newArt) {
           const newProduct: Product = {
             id: `gen_${Date.now()}`,
-            title: 'Odanıza Özel Başyapıt',
+            title: 'AI Masterpiece',
             basePrice: 65,
             image: newArt,
             category: analysis.suggestedStyle,
-            description: 'Yapay zeka tarafından odanızın analizine göre üretildi.',
+            description: 'Custom art generated for your room.',
             isGenerated: true
           };
           setRecommendations([newProduct, ...recommendations]);
           setSelectedProduct(newProduct);
         }
       } catch (error) {
-        alert('Görsel üretilemedi.');
+        alert('Failed to generate.');
       } finally {
         setIsGenerating(false);
       }
     }
   };
 
-  const { w: physicalWidth, h: physicalHeight } = selectedSize.split('x').map(Number).reduce((acc, val, i) => {
-    return orientation === 'portrait' ? (i === 0 ? { ...acc, w: val } : { ...acc, h: val }) : (i === 0 ? { ...acc, h: val } : { ...acc, w: val });
-  }, { w: 0, h: 0 });
+  const [pw, ph] = selectedSize.split('x').map(Number);
+  const physicalWidth = orientation === 'portrait' ? pw : ph;
+  const physicalHeight = orientation === 'portrait' ? ph : pw;
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden">
@@ -174,7 +168,7 @@ export function Home() {
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/80 z-20 backdrop-blur-sm">
               <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-sm uppercase tracking-widest">Oda Analiz Ediliyor...</p>
+              <p className="font-mono text-sm uppercase tracking-widest">Analyzing Room...</p>
             </div>
           ) : roomImage ? (
             <InteractiveCanvas 
@@ -184,14 +178,13 @@ export function Home() {
               physicalHeight={physicalHeight}
               naturalPixelsPerInch={analysis.ppi}
               frameColor={FRAME_COLORS[selectedFrame]}
-              // InteractiveCanvas'a bu yeni özellikleri de prop olarak göndermelisin
-              // perspectiveData={{ rotateY: analysis.rotateY, skewY: analysis.skewY }}
+              perspective={{ rotateY: analysis.rotateY, skewY: analysis.skewY }}
             />
           ) : (
             <div {...getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all">
               <input {...getInputProps()} />
               <ImageIcon className="w-16 h-16 opacity-50 mb-4" />
-              <p className="font-mono text-sm uppercase">Oda fotoğrafı yükleyin</p>
+              <p className="font-mono text-sm uppercase">Upload Room Photo</p>
             </div>
           )}
         </div>
@@ -204,18 +197,13 @@ export function Home() {
             disabled={isGenerating || isAnalyzing || !roomImage}
             className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase tracking-widest rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)]"
           >
-            {isGenerating ? 'Sanat Üretiliyor...' : 'Benim İçin Tasarla'}
+            {isGenerating ? 'Weaving Art...' : 'MAKE ME FEEL SPECIAL'}
           </button>
-          {analysis.suggestedStyle && (
-            <p className="text-center text-emerald-500 text-[10px] mt-2 uppercase font-bold tracking-widest">
-              Önerilen Stil: {analysis.suggestedStyle}
-            </p>
-          )}
         </div>
 
         <div className="p-6 space-y-4">
           <h2 className="text-lg font-bold tracking-tight flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-indigo-400" /> Uygun Seçenekler
+            <Sparkles className="w-5 h-5 text-indigo-400" /> Top Matches
           </h2>
           {recommendations.map((product) => (
             <div 
@@ -224,10 +212,10 @@ export function Home() {
               onClick={() => setSelectedProduct(product)}
             >
               <div className="flex gap-4">
-                <img src={product.image} className="w-20 h-20 rounded-lg object-cover border border-zinc-800" />
+                <img src={product.image} className="w-20 h-20 rounded-lg object-cover" />
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-sm truncate">{product.title}</h3>
-                  <p className="text-[10px] text-zinc-500 mt-1 line-clamp-2">{product.description}</p>
+                  <p className="text-[10px] text-zinc-500 line-clamp-2">{product.description}</p>
                   <p className="text-xs font-bold mt-2 text-indigo-400">${(product.basePrice * SIZE_MULTIPLIERS[selectedSize]).toFixed(2)}</p>
                 </div>
               </div>
