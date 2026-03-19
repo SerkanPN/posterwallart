@@ -28,23 +28,9 @@ const MOCK_RECOMMENDATIONS: Product[] = [
   { id: 'rec3', title: 'Electric Stripe Symphony', basePrice: 55, image: 'https://picsum.photos/seed/renaissance/800/1200', category: 'Renaissance', description: 'A custom poster featuring a minimalist, stylized yellow electric guitar against a stark black and...' },
 ];
 
-const SIZE_MULTIPLIERS = {
-  '12x18': 1,
-  '18x24': 1.5,
-  '24x36': 2.2
-};
-
-const FRAME_PRICES = {
-  'unframed': 0,
-  'black': 20,
-  'oak': 25
-};
-
-const FRAME_COLORS = {
-  'unframed': null,
-  'black': '#18181b',
-  'oak': '#8b5a2b'
-};
+const SIZE_MULTIPLIERS = { '12x18': 1, '18x24': 1.5, '24x36': 2.2 };
+const FRAME_PRICES = { 'unframed': 0, 'black': 20, 'oak': 25 };
+const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 export function Home() {
   const { user, useToken, addToCart } = useStore();
@@ -55,9 +41,10 @@ export function Home() {
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Canvas & Product State
+  // Analiz ve Perspektif State'leri
   const [naturalPPI, setNaturalPPI] = useState<number>(15);
   const [perspective, setPerspective] = useState({ rotateY: 0, skewY: 0 });
+
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedSize, setSelectedSize] = useState<SizeType>('24x36');
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('unframed');
@@ -76,11 +63,7 @@ export function Home() {
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { 'image/*': [] },
-    maxFiles: 1,
-  } as any);
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
@@ -88,10 +71,11 @@ export function Home() {
     if (!selectedProduct) setSelectedProduct(MOCK_RECOMMENDATIONS[0]);
 
     try {
+      // SDK BAŞLATMA BURADA DÜZELTİLDİ
       const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY || "");
       const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-image-preview" });
 
-      const prompt = "Analyze this room. 1. Estimate PPI (scale) for the back wall. 2. Calculate perspective: 'rotateY' (-20 to 20 deg) and 'skewY' (-10 to 10 deg) so a poster looks flat on the wall. Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number }";
+      const prompt = "Analyze this room. 1. Estimate PPI (scale) for the back wall. 2. Perspective: estimate 'rotateY' (-20 to 20 deg) and 'skewY' (-10 to 10) for a poster to sit flat on that wall. Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number }";
 
       const result = await model.generateContent([
         prompt,
@@ -110,7 +94,7 @@ export function Home() {
       setPerspective({ rotateY: data.rotateY || 0, skewY: data.skewY || 0 });
 
     } catch (e) {
-      console.error("Failed to analyze room scale:", e);
+      console.error("Analysis failed:", e);
       setNaturalPPI(15);
     } finally {
       setIsAnalyzing(false);
@@ -127,45 +111,34 @@ export function Home() {
       try {
         const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY || "");
         const model = genAI.getGenerativeModel({ model: "gemini-3.1-flash-image-preview" });
-        const prompt = `A highly detailed poster art piece in the style of ${selectedStyle || 'Abstract'}, using a color palette of ${selectedColor || 'various colors'}. Suitable for modern home decor.`;
+        const prompt = `Art poster. Style: ${selectedStyle || 'Abstract'}. Colors: ${selectedColor || 'various'}. High-end decor.`;
         
-        const response = await model.generateContent(prompt);
-        const result = await response.response;
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
 
-        let newArt = '';
-        const parts = result.candidates?.[0]?.content?.parts;
-        if (parts) {
-          for (const part of parts) {
-            if (part.inlineData) {
-              newArt = `data:image/png;base64,${part.inlineData.data}`;
-              break;
-            }
-          }
-        }
+        // Görsel verisi kontrolü
+        const parts = response.candidates?.[0]?.content?.parts;
+        const imgPart = parts?.find(p => p.inlineData);
 
-        if (newArt) {
+        if (imgPart?.inlineData) {
+          const newArt = `data:image/png;base64,${imgPart.inlineData.data}`;
           const newProduct: Product = {
             id: `gen_${Date.now()}`,
-            title: 'AI Generated Masterpiece',
+            title: 'AI Generated Art',
             basePrice: 65,
             image: newArt,
             category: selectedStyle || 'Abstract',
-            description: `A custom poster featuring a ${selectedStyle || 'unique'} style generated specifically for your space.`,
+            description: `Generated for your space.`,
             isGenerated: true
           };
           setRecommendations([newProduct, ...recommendations]);
           setSelectedProduct(newProduct);
-        } else {
-          throw new Error('No image returned from AI');
         }
       } catch (error) {
-        console.error('Failed to generate image:', error);
-        alert('Failed to generate image. Please try again.');
+        console.error('Generation failed:', error);
       } finally {
         setIsGenerating(false);
       }
-    } else {
-      alert('Not enough tokens. Please purchase more.');
     }
   };
 
@@ -175,8 +148,8 @@ export function Home() {
   };
 
   const calculatePrice = (product: Product) => {
-    const sizeMultiplier = SIZE_MULTIPLIERS[selectedSize];
-    const framePrice = FRAME_PRICES[selectedFrame];
+    const sizeMultiplier = SIZE_MULTIPLIERS[selectedSize as keyof typeof SIZE_MULTIPLIERS];
+    const framePrice = FRAME_PRICES[selectedFrame as keyof typeof FRAME_PRICES];
     return (product.basePrice * sizeMultiplier) + framePrice;
   };
 
@@ -184,13 +157,12 @@ export function Home() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden">
-      {/* Left Panel: Canvas Area */}
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800">
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 text-zinc-500 bg-zinc-950/80 z-20 backdrop-blur-sm">
               <div className="w-16 h-16 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin" />
-              <p className="font-mono text-sm uppercase tracking-widest animate-pulse">Analyzing Space Scale...</p>
+              <p className="font-mono text-sm uppercase animate-pulse">Analyzing Space...</p>
             </div>
           ) : roomImage ? (
             <InteractiveCanvas 
@@ -199,148 +171,53 @@ export function Home() {
               physicalWidth={physicalWidth}
               physicalHeight={physicalHeight}
               naturalPixelsPerInch={naturalPPI}
-              frameColor={FRAME_COLORS[selectedFrame]}
+              frameColor={FRAME_COLORS[selectedFrame as keyof typeof FRAME_COLORS]}
               perspective={perspective}
             />
           ) : (
-            <div 
-              {...getRootProps()} 
-              className={`absolute inset-0 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 ${isDragActive ? 'bg-indigo-500/10' : 'hover:bg-zinc-800/50'}`}
-            >
+            <div {...getRootProps()} className={`absolute inset-0 flex flex-col items-center justify-center cursor-pointer transition-all ${isDragActive ? 'bg-indigo-500/10' : 'hover:bg-zinc-800/50'}`}>
               <input {...getInputProps()} />
               <ImageIcon className="w-16 h-16 opacity-50 mb-4" />
-              <p className="font-mono text-sm uppercase tracking-widest text-zinc-400">Upload a room photo to begin</p>
-              <p className="text-xs text-zinc-600 mt-2">Drag & drop or click to browse</p>
+              <p className="font-mono text-sm uppercase text-zinc-400">Upload room photo</p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Right Panel: Sidebar Controls & Recommendations */}
       <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
-        
-        {/* Hero Button Section */}
         <div className="p-6 border-b border-zinc-800 sticky top-0 bg-zinc-950/90 backdrop-blur-md z-10 flex flex-col">
           <button
             onClick={handleCreateForMe}
             disabled={isGenerating || isAnalyzing || !roomImage}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_30px_rgba(16,185,129,0.3)] hover:shadow-[0_0_40px_rgba(16,185,129,0.5)] border border-emerald-400/30"
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-50"
           >
-            {isGenerating ? (
-              <><Sparkles className="w-5 h-5 animate-spin" /> Weaving Magic...</>
-            ) : (
-              <><Sparkles className="w-5 h-5" /> Make Me Feel Special</>
-            )}
+            {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> Designing...</> : <><Sparkles className="w-5 h-5" /> Make Me Feel Special</>}
           </button>
-          <p className="text-center text-emerald-500/80 text-xs mt-3 font-medium tracking-wide">
-            A unique design crafted exclusively for your space.
-          </p>
         </div>
 
-        {/* Product List */}
         <div className="p-6 space-y-4">
           <div className="flex items-center gap-2 mb-2">
             <Sparkles className="w-5 h-5 text-indigo-400" />
             <h2 className="text-lg font-bold tracking-tight">Top Matches</h2>
           </div>
-
-          {recommendations.length === 0 && !roomImage && (
-            <p className="text-sm text-zinc-500 text-center py-8">Upload a room photo to see AI recommendations.</p>
-          )}
-
-          {recommendations.map((product) => {
-            const isSelected = selectedProduct?.id === product.id;
-            
-            return (
-              <div 
-                key={product.id}
-                className={`rounded-xl border transition-all duration-200 overflow-hidden ${isSelected ? 'border-indigo-500 bg-zinc-900/50' : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700 cursor-pointer'}`}
-                onClick={() => !isSelected && setSelectedProduct(product)}
-              >
-                <div className="p-4 flex gap-4">
-                  <div className="w-24 h-24 rounded-lg overflow-hidden flex-shrink-0 border border-zinc-800 bg-zinc-900 relative">
-                    <img src={product.image} alt={product.title} className="w-full h-full object-cover" />
-                    {product.isGenerated && (
-                      <div className="absolute top-1 right-1 bg-yellow-500/20 text-yellow-500 text-[10px] font-bold px-1.5 py-0.5 rounded uppercase">
-                        AI
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-sm truncate">{product.title}</h3>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-zinc-400">
-                      <span className="flex items-center gap-1"><Maximize2 className="w-3 h-3" /> {selectedSize}"</span>
-                      <span className="font-medium text-zinc-200">${calculatePrice(product).toFixed(2)}</span>
-                    </div>
-                    <p className="text-xs text-zinc-500 mt-2 line-clamp-2 leading-relaxed">{product.description}</p>
-                  </div>
+          {recommendations.map((product) => (
+            <div 
+              key={product.id}
+              className={`rounded-xl border transition-all overflow-hidden ${selectedProduct?.id === product.id ? 'border-indigo-500 bg-zinc-900/50' : 'border-zinc-800 bg-zinc-950 hover:border-zinc-700 cursor-pointer'}`}
+              onClick={() => setSelectedProduct(product)}
+            >
+              <div className="p-4 flex gap-4">
+                <div className="w-24 h-24 rounded-lg overflow-hidden border border-zinc-800 flex-shrink-0 bg-zinc-900">
+                  <img src={product.image} className="w-full h-full object-cover" />
                 </div>
-
-                {/* Expanded Configurator */}
-                {isSelected && (
-                  <div className="px-4 pb-4 pt-2 border-t border-zinc-800/50 space-y-4">
-                    
-                    {/* Size Selection */}
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2 block">Size</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(['12x18', '18x24', '24x36'] as SizeType[]).map(size => (
-                          <button
-                            key={size}
-                            onClick={(e) => { e.stopPropagation(); setSelectedSize(size); }}
-                            className={`py-2 text-xs font-medium rounded-lg border transition-colors ${selectedSize === size ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600'}`}
-                          >
-                            {size}"
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Orientation */}
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2 block">Orientation</label>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setOrientation('portrait'); }}
-                          className={`flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${orientation === 'portrait' ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
-                        >
-                          Portrait
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setOrientation('landscape'); }}
-                          className={`flex-1 py-2 text-xs font-medium rounded-lg border transition-colors ${orientation === 'landscape' ? 'bg-zinc-800 text-zinc-100 border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800 hover:border-zinc-700'}`}
-                        >
-                          Landscape
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Frame Selection */}
-                    <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2 block">Frame</label>
-                      <div className="grid grid-cols-3 gap-2">
-                        {(['unframed', 'black', 'oak'] as FrameType[]).map(frame => (
-                          <button
-                            key={frame}
-                            onClick={(e) => { e.stopPropagation(); setSelectedFrame(frame); }}
-                            className={`py-2 flex flex-col items-center gap-1 rounded-lg border transition-colors ${selectedFrame === frame ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'}`}
-                          >
-                            <div className="w-6 h-6 rounded flex items-center justify-center border border-zinc-700" style={{ backgroundColor: FRAME_COLORS[frame] || '#f4f4f5' }}>
-                              {frame === 'unframed' && <div className="w-4 h-4 border border-dashed border-zinc-400" />}
-                            </div>
-                            <span className="text-[10px] capitalize text-zinc-400">{frame}</span>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Buy Button */}
-                    <button \n                      onClick={(e) => { \n                        e.stopPropagation(); \n                        addToCart({ ...product, price: calculatePrice(product), type: 'physical' }); \n                      }}\n                      className="w-full py-3 bg-zinc-100 hover:bg-white text-zinc-900 font-bold text-sm rounded-xl transition-colors flex items-center justify-center gap-2 mt-2"\n                    >\n                      <ShoppingBag className="w-4 h-4" />\n                      Buy Now - ${calculatePrice(product).toFixed(2)}\n                    </button>
-                  </div>
-                )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-sm truncate">{product.title}</h3>
+                  <p className="text-xs text-zinc-200 mt-1">${calculatePrice(product).toFixed(2)}</p>
+                  <p className="text-xs text-zinc-500 mt-2 line-clamp-2">{product.description}</p>
+                </div>
               </div>
-            );
-          })}
+            </div>
+          ))}
         </div>
       </div>
     </div>
