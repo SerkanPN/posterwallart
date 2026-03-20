@@ -18,7 +18,7 @@ export function InteractiveCanvas({
 }: InteractiveCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [displayScale, setDisplayScale] = useState(1);
-  const [globalZoom, setGlobalZoom] = useState(1); // Slider kontrolü için
+  const [globalZoom, setGlobalZoom] = useState(1);
   
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -37,7 +37,7 @@ export function InteractiveCanvas({
     };
   }, [backgroundImage]);
 
-  // PPI dengesi: 24x36 seçildiğinde odaya göre cüce kalmaması için 5-10 arası tutuyoruz.
+  // Ölçek: 24x36 seçildiğinde odaya göre gerçekçi durması için PPI 5-10 arasına sabitlendi
   const safePPI = Math.min(Math.max(naturalPixelsPerInch || 6, 5), 10);
   const effectivePPI = safePPI * displayScale;
   
@@ -46,7 +46,6 @@ export function InteractiveCanvas({
 
   return (
     <div className="relative w-full h-full flex flex-col items-center justify-center group">
-      {/* CANVAS ALANI */}
       <div 
         ref={containerRef} 
         className="relative w-full h-full rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950 flex items-center justify-center cursor-move"
@@ -80,14 +79,14 @@ export function InteractiveCanvas({
             ) : (
               <div className="flex flex-col items-center gap-2 opacity-20">
                 <Move className="w-4 h-4 text-white" />
-                <span className="text-[8px] uppercase font-bold tracking-widest text-white">Position<br/>Art</span>
+                <span className="text-[8px] uppercase font-bold tracking-widest text-white text-center">Position<br/>Art</span>
               </div>
             )}
           </motion.div>
         </motion.div>
       </div>
 
-      {/* ZOOM SLIDER - Alt tarafta sabit durur */}
+      {/* ZOOM SLIDER - Odanın altında slider */}
       <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900/80 backdrop-blur-xl px-6 py-3 rounded-2xl border border-white/10 flex items-center gap-4 shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 z-50">
         <ZoomIn className="w-4 h-4 text-zinc-400" />
         <input 
