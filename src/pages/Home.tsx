@@ -1,23 +1,17 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout, Lock } from 'lucide-react';
+import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { supabase } from '../lib/supabase';
+import { AuthModal } from '../components/AuthModal';
 
 type SizeType = '8x10' | '11x14' | '16x20' | '18x24' | '20x30' | '24x36';
 type FrameType = 'unframed' | 'black' | 'oak';
 
 interface Product {
-  id: string;
-  title: string;
-  basePrice: number;
-  image: string;
-  category: string;
-  description: string;
-  isGenerated?: boolean;
-  slug?: string;
+  id: string; title: string; basePrice: number; image: string; category: string; description: string; isGenerated?: boolean; slug?: string;
 }
 
 const SIZES = [
@@ -40,7 +34,6 @@ const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'B
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 export function Home() {
-  // Store'dan kullanıcı ve jeton bilgilerini alıyoruz
   const { user, tokens, useToken, addToCart, setAuthModalOpen } = useStore();
   
   const [roomImage, setRoomImage] = useState<string | null>(null);
@@ -59,12 +52,7 @@ export function Home() {
   const [analysisData, setAnalysisData] = useState<any>(null);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    // Giriş yapmamış kullanıcı analiz bile yapamasın
-    if (!user) {
-      setAuthModalOpen(true);
-      return;
-    }
-
+    if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
     if (file) {
       const reader = new FileReader();
@@ -103,29 +91,23 @@ export function Home() {
           ]}]
         })
       });
-      const res = await response.json();
-      const data = JSON.parse(res.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-      setAnalysisData(data);
-    } catch (e) { console.error(e); } finally { setIsAnalyzing(false); }
+      if (response.ok) {
+        const res = await response.json();
+        const data = JSON.parse(res.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+        setAnalysisData(data);
+      }
+    } catch (e) { console.error("Room analysis failed:", e); } finally { setIsAnalyzing(false); }
   };
 
   const handleCreateForMe = async () => {
-    // GÜVENLİK KONTROLLERİ
-    if (!user) {
-      setAuthModalOpen(true);
-      return;
-    }
-    if (tokens <= 0) {
-      alert("Insufficient tokens! Please refill your balance.");
-      return;
-    }
+    if (!user) { setAuthModalOpen(true); return; }
+    if (tokens <= 0) { alert("Insufficient tokens! Please refill your balance."); return; }
     if (!analysisData || isGenerating) return;
 
     setIsGenerating(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      // Jetonu harca
       await useToken();
 
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
@@ -139,11 +121,14 @@ export function Home() {
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
+      // GÖRSEL ÜRETİMİ İÇİN 3.1-flash-image-preview (SENİN KURALIN)
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents })
       });
+
+      if (!response.ok) throw new Error("Image generation failed");
 
       const res = await response.json();
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
@@ -151,18 +136,30 @@ export function Home() {
       if (imgPart?.inlineData) {
         const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         
-        let aiMeta = { title: "AI Masterpiece", description: "", alt_text: "", tags: [] };
+        let aiMeta = { 
+          title: `${selectedStyle} Masterpiece`, 
+          description: "A beautiful AI-generated artwork.", 
+          alt_text: "AI poster", 
+          tags: ["art", selectedStyle.toLowerCase()] 
+        };
+
         try {
+          // SEO ÜRETİMİ İÇİN 2.0-flash (SENİN KURALIN)
           const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `Create a professional SEO title, a 2-sentence description, alt text, and tags for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY JSON: { "title": "...", "description": "...", "alt_text": "...", "tags": ["..."] }` }] }]
+              contents: [{ parts: [{ text: `Create a professional SEO title, a 2-sentence description, alt text, and tags for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY valid JSON: { "title": "...", "description": "...", "alt_text": "...", "tags": ["..."] }` }] }]
             })
           });
-          const seoData = await seoRes.json();
-          aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-        } catch (e) { console.error("SEO Gen failed", e); }
+          
+          if (seoRes.ok) {
+            const seoData = await seoRes.json();
+            if (seoData.candidates && seoData.candidates[0]) {
+               aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+            }
+          }
+        } catch (e) { console.error("SEO Gen failed, using defaults", e); }
 
         const now = new Date();
         const dateStr = now.toISOString().split('T')[0];
@@ -170,7 +167,7 @@ export function Home() {
         const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
         const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-        const { data: newProduct } = await supabase
+        const { data: newProduct, error: supabaseError } = await supabase
           .from('products')
           .insert([{
             creator_id: user.id,
@@ -187,6 +184,10 @@ export function Home() {
           }])
           .select().single();
 
+        if (supabaseError) {
+           console.error("Supabase Insert Error:", supabaseError);
+        }
+
         const product = { 
           id: newProduct?.id || Date.now().toString(), 
           title: aiMeta.title, 
@@ -202,6 +203,7 @@ export function Home() {
       }
     } catch (e) { 
       console.error(e); 
+      alert("Failed to generate image. Please check your API token or try again.");
     } finally { 
       setIsGenerating(false); 
     }
@@ -213,12 +215,14 @@ export function Home() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-20 backdrop-blur-md">
-              <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-[10px] uppercase tracking-widest">Architectural Analysis...</p>
+              <Loader2 className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-500">Architectural Analysis...</p>
             </div>
           ) : roomImage && analysisData ? (
             <InteractiveCanvas 
@@ -231,12 +235,12 @@ export function Home() {
               perspective={{ rotateY: analysisData.rotateY, skewY: analysisData.skewY }}
             />
           ) : (
-            <div {...roomDrop.getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 border-2 border-dashed border-zinc-800 m-8 rounded-3xl transition-all">
+            <div {...roomDrop.getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 border-2 border-dashed border-zinc-800 m-8 rounded-3xl transition-all group">
               <input {...roomDrop.getInputProps()} />
-              {!user && <Lock className="w-8 h-8 text-zinc-600 mb-2" />}
-              <Upload className="w-12 h-12 opacity-20 mb-4" />
-              <p className="font-mono text-xs uppercase opacity-30 tracking-widest px-12 text-center">
-                {user ? "Step 1: Upload Room Image" : "Please login to upload room"}
+              {!user && <Lock className="w-8 h-8 text-zinc-600 mb-2 group-hover:text-white" />}
+              <Upload className="w-12 h-12 opacity-20 mb-4 group-hover:opacity-40" />
+              <p className="font-mono text-xs uppercase opacity-30 tracking-widest px-12 text-center group-hover:opacity-60">
+                {user ? "Step 1: Upload Room Image" : "Please login to proceed"}
               </p>
             </div>
           )}
