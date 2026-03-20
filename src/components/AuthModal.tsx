@@ -2,16 +2,11 @@ import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { X, Mail, Sparkles, Loader2 } from 'lucide-react';
 
-interface AuthModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-export function AuthModal({ isOpen, onClose }: AuthModalProps) {
-  const { login, isLoading } = useStore();
+export function AuthModal() {
+  const { login, isLoading, isAuthModalOpen, setAuthModalOpen } = useStore();
   const [email, setEmail] = useState('');
 
-  if (!isOpen) return null;
+  if (!isAuthModalOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,7 +17,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
       <div className="relative w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-[2.5rem] p-10 shadow-2xl animate-in fade-in zoom-in duration-300">
-        <button onClick={onClose} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors">
+        <button onClick={() => setAuthModalOpen(false)} className="absolute top-6 right-6 text-zinc-500 hover:text-white transition-colors">
           <X className="w-6 h-6" />
         </button>
 
