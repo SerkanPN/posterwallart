@@ -82,7 +82,7 @@ export function Shop() {
             {filteredProducts.map((product) => (
               <div key={product.id} className="relative group bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all">
                 {/* Tüm kartı kaplayan link */}
-                <Link to={`/product/${product.id}`} className="absolute inset-0 z-10" />
+                <Link to={`/product/${product.slug}`} className="absolute inset-0 z-10" />
                 
                 <div className="aspect-[3/4] relative overflow-hidden bg-black">
                   <img src={product.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.title} />
