@@ -18,6 +18,8 @@ interface Product {
   description: string;
   isGenerated?: boolean;
   slug?: string;
+  alt_text?: string;
+  tags?: string[];
 }
 
 const SIZES = [
@@ -102,15 +104,15 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    if (!user) { alert("Please sign in to use the AI Generator."); return; }
+    if (!user) { alert("Please sign in to proceed."); return; }
     if (tokens <= 0) { alert("Insufficient tokens! Please refill your balance."); return; }
     if (!analysisData || isGenerating) return;
     setIsGenerating(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+
     try {
       await useToken();
-      const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
-      const prompt = `Act as a world-class 4K abstract painter. Style: ${selectedStyle}, Theme: ${selectedTheme}.`;
+      const prompt = `Create a high-end 4K aesthetic digital painting. Style: ${selectedStyle}, Theme: ${selectedTheme}. Orientation: ${orientation}.`;
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
@@ -125,35 +127,36 @@ export function Home() {
       if (imgPart?.inlineData) {
         const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         
-        let seoTitle = "AI Masterpiece";
-        let seoDescription = "";
+        // --- AI SEO & METADATA GENERATION ---
+        let aiMeta = { title: "AI Masterpiece", description: "", alt_text: "", tags: [] };
         try {
           const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `Create a professional SEO title and a 2-sentence description for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY JSON: { "title": "...", "description": "..." }` }] }]
+              contents: [{ parts: [{ text: `Generate professional SEO metadata for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY JSON: { "title": "catchy title", "description": "2-sentence description", "alt_text": "descriptive alt text", "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"] }` }] }]
             })
           });
           const seoData = await seoRes.json();
-          const parsedSeo = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-          seoTitle = parsedSeo.title;
-          seoDescription = parsedSeo.description;
-        } catch (e) { seoTitle = `${selectedStyle} ${selectedTheme} Poster`; }
+          aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+        } catch (e) { console.error("SEO Gen failed", e); }
 
-        // URL SLUG: title+category+poster+wall-art+date+hour
+        // --- CUSTOM SLUG GENERATION ---
         const now = new Date();
         const dateStr = now.toISOString().split('T')[0];
         const hourStr = now.getHours().toString().padStart(2, '0');
-        const slugBase = `${seoTitle} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
+        const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
         const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+        // --- SAVE TO SUPABASE ---
         const { data: newProduct } = await supabase
           .from('products')
           .insert([{
             creator_id: user.id,
-            title: seoTitle,
-            description: seoDescription,
+            title: aiMeta.title,
+            description: aiMeta.description,
+            alt_text: aiMeta.alt_text,
+            tags: aiMeta.tags,
             image_url: base64Image,
             category: selectedStyle,
             slug: slug,
@@ -165,11 +168,11 @@ export function Home() {
 
         const product = { 
           id: newProduct?.id || Date.now().toString(), 
-          title: seoTitle, 
+          title: aiMeta.title, 
           image: base64Image, 
           basePrice: selectedSize.price, 
           category: selectedStyle,
-          description: seoDescription,
+          description: aiMeta.description,
           isGenerated: true,
           slug: slug
         };
