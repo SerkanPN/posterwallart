@@ -1,101 +1,95 @@
 import { useStore } from '../store/useStore';
-import { Sparkles, Zap, Crown, CheckCircle2 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { CreditCard, Zap, Check, ShieldCheck, ShoppingBag } from 'lucide-react';
 
-const PACKAGES = [
-  { id: 'pkg_1', name: 'Starter', tokens: 1, price: 1, icon: Sparkles, color: 'text-zinc-400', bg: 'bg-zinc-900', border: 'border-zinc-800' },
-  { id: 'pkg_5', name: 'Creator', tokens: 5, price: 5, icon: Zap, color: 'text-indigo-400', bg: 'bg-indigo-950/20', border: 'border-indigo-500/50', popular: true },
-  { id: 'pkg_10', name: 'Pro', tokens: 10, price: 10, icon: Crown, color: 'text-amber-400', bg: 'bg-amber-950/20', border: 'border-amber-500/50' },
+const TOKEN_PACKS = [
+  { id: 'p1', amount: 1, price: 1, popular: false },
+  { id: 'p5', amount: 5, price: 5, popular: false },
+  { id: 'p10', amount: 10, price: 10, popular: true },
+  { id: 'p25', amount: 25, price: 25, popular: false },
+  { id: 'p50', amount: 50, price: 50, popular: false },
+  { id: 'p100', amount: 100, price: 100, popular: false },
 ];
 
 export function Tokens() {
-  const { user, addTokens } = useStore();
+  const { user, tokens } = useStore();
 
-  const handlePurchase = (pkg: typeof PACKAGES[0]) => {
+  const handlePurchase = async (packId: string) => {
     if (!user) {
-      alert('Please sign in to purchase tokens.');
+      alert("Lütfen önce giriş yapın.");
       return;
     }
-    // Mock purchase flow
-    alert(`Purchasing ${pkg.tokens} tokens for $${pkg.price}...`);
-    setTimeout(() => {
-      addTokens(pkg.tokens);
-      alert('Purchase successful!');
-    }, 1000);
+    // Stripe Checkout API entegrasyonu buraya gelecek
+    console.log(`${packId} satın alma işlemi başlatılıyor...`);
   };
 
   return (
-    <div className="container mx-auto px-4 py-24 max-w-5xl">
-      <div className="text-center mb-16">
-        <h1 className="text-5xl font-bold tracking-tighter uppercase mb-6">
-          Fuel Your <span className="text-indigo-500">Creativity</span>
-        </h1>
-        <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-          Purchase AI generation tokens to create unique, high-end posters for your space. 
-          1 Token = 1 AI Generation.
-        </p>
-      </div>
+    <div className="min-h-screen bg-zinc-950 text-white p-8 font-sans">
+      <div className="max-w-6xl mx-auto">
+        <header className="text-center mb-16">
+          <h1 className="text-5xl font-black uppercase tracking-tighter mb-4 italic">Refill Your Creative Power</h1>
+          <p className="text-zinc-500 text-sm max-w-2xl mx-auto leading-relaxed">
+            Basit ve şeffaf: <span className="text-white font-bold">1 Jeton = 1 Dolar</span>. 
+            Her üretim 1 jeton harcar. Tasarımlarınızı dijital olarak indirmek ücretsizdir. 
+            Özel haklar (Private) için üretim sonrası ek ödeme yapabilirsiniz.
+          </p>
+        </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {PACKAGES.map((pkg, i) => (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
-            key={pkg.id}
-            className={`relative flex flex-col p-8 rounded-3xl border ${pkg.bg} ${pkg.border} backdrop-blur-sm`}
-          >
-            {pkg.popular && (
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-indigo-500 text-white px-4 py-1 rounded-full text-xs font-bold uppercase tracking-widest">
-                Most Popular
-              </div>
-            )}
-            
-            <div className="flex items-center justify-between mb-8">
-              <pkg.icon className={`w-10 h-10 ${pkg.color}`} />
-              <h3 className="text-2xl font-bold tracking-tight">{pkg.name}</h3>
+        {/* Mevcut Durum */}
+        <div className="bg-zinc-900 border border-zinc-800 p-8 rounded-[2rem] mb-12 flex items-center justify-between shadow-2xl">
+          <div className="flex items-center gap-6">
+            <div className="w-16 h-16 bg-emerald-500/10 rounded-2xl flex items-center justify-center border border-emerald-500/20">
+              <Zap className="w-8 h-8 text-emerald-500 fill-emerald-500" />
             </div>
-
-            <div className="mb-8">
-              <span className="text-5xl font-bold tracking-tighter">${pkg.price}</span>
-              <span className="text-zinc-500 ml-2">USD</span>
+            <div>
+              <p className="text-xs font-bold uppercase tracking-widest text-zinc-500">Your Balance</p>
+              <p className="text-3xl font-black">{tokens} <span className="text-sm font-normal text-zinc-600 uppercase">Tokens</span></p>
             </div>
-
-            <ul className="space-y-4 mb-12 flex-1">
-              <li className="flex items-center gap-3 text-zinc-300">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                <span>{pkg.tokens} AI Generations</span>
-              </li>
-              <li className="flex items-center gap-3 text-zinc-300">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                <span>High-Resolution Output</span>
-              </li>
-              <li className="flex items-center gap-3 text-zinc-300">
-                <CheckCircle2 className="w-5 h-5 text-emerald-500" />
-                <span>Commercial Rights</span>
-              </li>
-            </ul>
-
-            <button
-              onClick={() => handlePurchase(pkg)}
-              className={`w-full py-4 font-bold uppercase tracking-widest rounded-xl transition-all ${
-                pkg.popular 
-                  ? 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-[0_0_30px_rgba(99,102,241,0.3)]' 
-                  : 'bg-zinc-100 hover:bg-white text-zinc-900'
-              }`}
-            >
-              Purchase Now
-            </button>
-          </motion.div>
-        ))}
-      </div>
-
-      {user && (
-        <div className="mt-16 text-center p-8 bg-zinc-900/50 border border-zinc-800 rounded-2xl max-w-md mx-auto">
-          <p className="text-zinc-400 uppercase tracking-widest text-sm mb-2">Current Balance</p>
-          <p className="text-4xl font-mono font-bold text-indigo-400">{user.tokens} Tokens</p>
+          </div>
+          <div className="hidden md:block h-12 w-px bg-zinc-800" />
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-600 mb-1">Status</p>
+            <p className="text-xs font-bold text-emerald-500 uppercase">Verified Creator</p>
+          </div>
         </div>
-      )}
+
+        {/* Paketler Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          {TOKEN_PACKS.map((pack) => (
+            <div 
+              key={pack.id} 
+              className={`relative bg-zinc-900 border ${pack.popular ? 'border-emerald-500 ring-1 ring-emerald-500/50' : 'border-zinc-800'} p-6 rounded-[2rem] flex flex-col items-center group hover:bg-zinc-800/50 transition-all cursor-pointer`}
+              onClick={() => handlePurchase(pack.id)}
+            >
+              <h3 className="text-3xl font-black mb-1">{pack.amount}</h3>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-4">Tokens</p>
+              <div className="text-2xl font-black mb-6 text-emerald-500">${pack.price}</div>
+              
+              <button className="w-full py-3 bg-zinc-100 hover:bg-white text-black text-[10px] font-black uppercase rounded-xl transition-all">
+                Buy Now
+              </button>
+            </div>
+          ))}
+        </div>
+
+        {/* Bilgi Kutuları */}
+        <footer className="mt-20 grid grid-cols-1 md:grid-cols-3 gap-8 border-t border-zinc-900 pt-12">
+          <div className="flex flex-col gap-3">
+            <ShieldCheck className="w-6 h-6 text-emerald-500" />
+            <h4 className="font-bold text-xs uppercase italic">100% Ownership</h4>
+            <p className="text-[11px] text-zinc-500 leading-relaxed">Ürettiğiniz her şeyi ticari amaçla kullanabilirsiniz. Private opsiyonu ile tasarımı sadece kendinize saklayın.</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <Check className="w-6 h-6 text-blue-500" />
+            <h4 className="font-bold text-xs uppercase italic">Digital Downloads</h4>
+            <p className="text-[11px] text-zinc-500 leading-relaxed">Tüm boyutlar için (8x10'dan 24x36'ya) dijital baskı dosyalarını profilinizden anında indirin.</p>
+          </div>
+          <div className="flex flex-col gap-3">
+            <ShoppingBag className="w-6 h-6 text-purple-500" />
+            <h4 className="font-bold text-xs uppercase italic">Sell & Earn</h4>
+            <p className="text-[11px] text-zinc-500 leading-relaxed">Public bıraktığınız tasarımlar mağazamızda satıldıkça komisyon kazanın (Yakında).</p>
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }
