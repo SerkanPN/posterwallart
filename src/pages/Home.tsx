@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout } from 'lucide-react';
+import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout, Lock } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 
@@ -38,7 +38,9 @@ const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'B
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 export function Home() {
-  const { user, addToCart } = useStore();
+  // Store'dan kullanıcı ve jeton bilgilerini alıyoruz
+  const { user, tokens, useToken, addToCart } = useStore();
+  
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -55,6 +57,12 @@ export function Home() {
   const [analysisData, setAnalysisData] = useState<any>(null);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
+    // Giriş yapmamış kullanıcı analiz bile yapamasın
+    if (!user) {
+      alert("Lütfen önce giriş yapın.");
+      return;
+    }
+
     const file = acceptedFiles[0];
     if (file) {
       const reader = new FileReader();
@@ -65,7 +73,7 @@ export function Home() {
       };
       reader.readAsDataURL(file);
     }
-  }, []);
+  }, [user]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -88,7 +96,7 @@ export function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [
-            { text: "Analyze room. Estimate PPI for focal wall (scale 5-10). Estimate perspective (rotateY -15 to 15). Detect style. Return ONLY JSON: { \"ppi\": number, \"rotateY\": number, \"skewY\": number, \"detectedStyle\": \"string\" }" },
+            { text: "Analyze room for scale. Return PPI (5-10) and perspective. Return ONLY JSON: { \"ppi\": number, \"rotateY\": number, \"skewY\": number, \"detectedStyle\": \"string\" }" },
             { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
           ]}]
         })
@@ -100,19 +108,31 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
+    // GÜVENLİK KONTROLLERİ
+    if (!user) {
+      alert("Yapay zekayı kullanmak için giriş yapmalısınız.");
+      return;
+    }
+    if (tokens <= 0) {
+      alert("Yetersiz jeton! Lütfen jeton satın alın.");
+      return;
+    }
     if (!analysisData || isGenerating) return;
+
     setIsGenerating(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
+      // Jetonu harca
+      useToken();
+
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
       const prompt = `Act as a world-class 4K abstract painter. 
       OBJECTIVE: Create a high-end, aesthetic, modern digital painting that EXACTLY fits a ${ar} aspect ratio. 
-      MANDATORY: Fill the entire frame. Do NOT leave any borders, paddings, or blank spaces on the sides.
-      USER PREFERENCES: Style: ${selectedStyle}, Theme: ${selectedTheme}, Text: ${includeText ? 'Add aesthetic minimal typography' : 'Strictly NO text, NO letters, NO numbers'}.
-      Resolution: 4K (Ultra High Definition). Pinterest-worthy masterpiece.
-      ${refImage ? 'INSPIRED BY: User provided a reference image, match its color vibe and composition.' : ''}
-      OUTPUT: High-end digital art file only.`;
+      MANDATORY: Fill the entire frame. No borders.
+      USER PREFERENCES: Style: ${selectedStyle}, Theme: ${selectedTheme}, Text: ${includeText ? 'Add minimal typography' : 'Strictly NO text'}.
+      Resolution: 4K.
+      ${refImage ? 'INSPIRED BY: Match color vibe of reference image.' : ''}`;
 
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
@@ -130,21 +150,21 @@ export function Home() {
         const newArt = `data:image/png;base64,${imgPart.inlineData.data}`;
         const product = { 
           id: Date.now().toString(), 
-          title: `Custom ${selectedTheme}`, 
+          title: `AI Masterpiece - ${selectedTheme}`, 
           image: newArt, 
           basePrice: selectedSize.price, 
           category: selectedStyle,
-          description: `Custom ${selectedStyle} design.`,
+          description: `Custom AI designed art.`,
           isGenerated: true 
         };
         setRecommendations([product, ...recommendations.slice(0, 2)]);
         setSelectedProduct(product);
       }
-    } catch (e) { console.error(e); } finally { setIsGenerating(false); }
-  };
-
-  const calculatePrice = (product: Product) => {
-    return product.basePrice;
+    } catch (e) { 
+      console.error(e); 
+    } finally { 
+      setIsGenerating(false); 
+    }
   };
 
   const [pw, ph] = selectedSize.value.split('x').map(Number);
@@ -173,8 +193,11 @@ export function Home() {
           ) : (
             <div {...roomDrop.getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 border-2 border-dashed border-zinc-800 m-8 rounded-3xl transition-all">
               <input {...roomDrop.getInputProps()} />
+              {!user && <Lock className="w-8 h-8 text-zinc-600 mb-2" />}
               <Upload className="w-12 h-12 opacity-20 mb-4" />
-              <p className="font-mono text-xs uppercase opacity-30 tracking-widest px-12 text-center">Step 1: Upload Room Image</p>
+              <p className="font-mono text-xs uppercase opacity-30 tracking-widest px-12 text-center">
+                {user ? "Step 1: Upload Room Image" : "Please login to upload room"}
+              </p>
             </div>
           )}
         </div>
@@ -182,13 +205,20 @@ export function Home() {
 
       <div className="w-[480px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
         <div className="p-6 space-y-8 pb-24">
-          <button 
-            onClick={handleCreateForMe}
-            disabled={isGenerating || !roomImage}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-20"
-          >
-            {isGenerating ? 'DESIGNING...' : 'MAKE ME FEEL SPECIAL'}
-          </button>
+          <div className="space-y-2">
+            <button 
+              onClick={handleCreateForMe}
+              disabled={isGenerating || !roomImage || tokens <= 0}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-20"
+            >
+              {isGenerating ? 'DESIGNING...' : 'MAKE ME FEEL SPECIAL'}
+            </button>
+            {user && (
+              <p className="text-center text-[10px] text-zinc-500 font-mono uppercase tracking-tighter">
+                Available Tokens: <span className={tokens > 0 ? "text-emerald-500" : "text-red-500"}>{tokens}</span>
+              </p>
+            )}
+          </div>
 
           <div className="space-y-6">
             <div className="space-y-4">
@@ -259,7 +289,7 @@ export function Home() {
                       <img src={p.image} className="w-14 h-14 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold truncate">{p.title}</h4>
-                        <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: calculatePrice(p) }); }} className="text-[10px] text-emerald-500 font-bold mt-1">ADD TO CART • ${p.basePrice}</button>
+                        <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice }); }} className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider">Add to cart • ${p.basePrice}</button>
                       </div>
                     </div>
                   </div>
