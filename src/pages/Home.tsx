@@ -18,7 +18,6 @@ interface Product {
   isGenerated?: boolean;
 }
 
-// Mağaza Veritabanı (Statik Örnekler)
 const STORE_INVENTORY: Product[] = [
   { id: 'rec1', title: 'Dark Side of the Moon - Prism', basePrice: 45, image: 'https://picsum.photos/seed/cyberpunk/800/1200', category: 'Cyberpunk', description: 'Strong music theme match.' },
   { id: 'rec2', title: 'Pulp Fiction - The Dance', basePrice: 35, image: 'https://picsum.photos/seed/minimalist/800/1200', category: 'Minimalist', description: 'Retro vibe match.' },
@@ -35,7 +34,7 @@ export function Home() {
   const { user, useToken, addToCart } = useStore();
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [recommendations, setRecommendations] = useState<Product[]>([]); // Başlangıçta boş!
+  const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   
   const [analysisData, setAnalysisData] = useState<{ 
@@ -67,21 +66,28 @@ export function Home() {
 
   const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 } as any);
 
-  // AŞAMA 1: ANALİZ VE MAĞAZADAN EŞLEŞTİRME
+  // AŞAMA 1: EVRENSEL ANALİZ (Görseldeki tüm objeleri ve mimariyi kullanır)
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
     setAnalysisData(null);
-    setRecommendations([]); // Analiz başlarken listeyi boşalt
+    setRecommendations([]);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
+      const prompt = `Analyze this room for architectural scale and placement.
+      1. Identify all recognizable objects (furniture, doors, windows, outlets) to estimate the physical scale and depth of the focal wall.
+      2. Calculate the PPI (pixels-per-inch) so a chosen frame (like 12x18") matches the real-world scale of the surrounding environment.
+      3. Determine perspective: rotateY (-15 to 15) and skewY (-5 to 5) to align a frame perfectly with the wall.
+      4. Detect style, color palette (hex codes), and mood for matching.
+      Return ONLY JSON: { "pixelsPerInch": number, "rotateY": number, "skewY": number, "style": "string", "colors": ["hex"], "mood": "string" }`;
+
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{
             parts: [
-              { text: "Analyze room. 1. PPI scale (4-10). 2. rotateY (-15 to 15). 3. style, mood, hex colors. Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number, \"style\": \"string\", \"colors\": [\"hex\"], \"mood\": \"string\" }" },
+              { text: prompt },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]
           }]
@@ -100,13 +106,12 @@ export function Home() {
         mood: data.mood
       });
       
-      // Analiz sonucuna göre mağazadan en yakın 3 posteri seç
       const matches = STORE_INVENTORY
-        .sort(() => Math.random() - 0.5) // Şimdilik rastgele ama mantık hazır
+        .sort(() => Math.random() - 0.5) 
         .slice(0, 3);
       
       setRecommendations(matches);
-      setSelectedProduct(null); // Başlangıçta boş çerçeve kalsın
+      setSelectedProduct(null); 
 
     } catch (e) {
       console.error("Analiz patladı:", e);
@@ -115,14 +120,18 @@ export function Home() {
     }
   };
 
-  // AŞAMA 2: ÖZEL SANAT ÜRETİMİ
+  // AŞAMA 2: SAF TASARIM ÜRETİMİ (Sadece poster, oda/çerçeve yok)
   const handleCreateForMe = async () => {
     if (!roomImage || !analysisData || isGenerating) return;
     setIsGenerating(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      const prompt = `Generate a UNIQUE poster artwork. Style: ${analysisData.style}. Palette: ${analysisData.colors.join(', ')}. Mood: ${analysisData.mood}. Orientation: ${orientation}. Output only the artwork, no background.`;
+      const prompt = `Act as a world-class AI artist. Create a UNIQUE, high-end poster artwork based on this room context: Style ${analysisData.style}, Palette ${analysisData.colors.join(', ')}, Mood ${analysisData.mood}.
+      CRITICAL: Output ONLY the artwork image itself. Do NOT include walls, rooms, background furniture, or frames. 
+      The image must be a clean, flat, digital poster design. 
+      Guidelines: aesthetic, Pinterest-worthy, Instagrammable. 
+      Orientation: ${orientation}.`;
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
@@ -192,7 +201,7 @@ export function Home() {
           <button 
             onClick={handleCreateForMe}
             disabled={isGenerating || isAnalyzing || !roomImage}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-30"
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase rounded-xl mb-10 text-xs tracking-widest transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-30"
           >
             {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> WEAVING ART...</> : <><Sparkles className="w-5 h-5" /> MAKE ME FEEL SPECIAL</>}
           </button>
