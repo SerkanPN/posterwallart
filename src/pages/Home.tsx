@@ -96,15 +96,26 @@ export function Home() {
         const data = JSON.parse(res.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
         setAnalysisData(data);
       }
-    } catch (e) { console.error("Room analysis failed:", e); } finally { setIsAnalyzing(false); }
+    } catch (e) { 
+      console.error("Room analysis failed:", e); 
+      // Analiz çökse bile engellememesi için state'i null bırakıyoruz, aşağıda fallback var.
+    } finally { 
+      setIsAnalyzing(false); 
+    }
   };
 
   const handleCreateForMe = async () => {
+    console.log("Make Me Feel Special butonuna tıklandı!"); // SESSİZ HATAYI İZLEMEK İÇİN
+
     if (!user) { setAuthModalOpen(true); return; }
     if (tokens <= 0) { alert("Insufficient tokens! Please refill your balance."); return; }
-    if (!analysisData || isGenerating) return;
+    
+    // DÜZELTME: !analysisData şartı kaldırıldı, artık sessizce iptal olmayacak.
+    if (isGenerating) return; 
 
     setIsGenerating(true);
+    console.log("Üretim süreci başlatılıyor...");
+
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
@@ -121,15 +132,18 @@ export function Home() {
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
+      console.log("Görsel için Gemini API'ye istek atılıyor...");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents })
       });
 
-      if (!response.ok) throw new Error("Image generation failed");
+      if (!response.ok) throw new Error("Image generation API returned an error: " + response.status);
 
       const res = await response.json();
+      console.log("Görsel yanıtı alındı!");
+
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
       if (imgPart?.inlineData) {
@@ -163,6 +177,7 @@ export function Home() {
           };
 
           try {
+            console.log("SEO verileri için Gemini API'ye istek atılıyor...");
             const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -175,6 +190,7 @@ export function Home() {
               const seoData = await seoRes.json();
               if (seoData.candidates && seoData.candidates[0]) {
                  aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+                 console.log("SEO verileri başarıyla oluşturuldu.");
               }
             }
           } catch (e) { console.error("SEO Gen failed, using defaults", e); }
@@ -185,6 +201,7 @@ export function Home() {
           const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
           const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
+          console.log("Supabase'e kayıt yapılıyor...");
           const { data: newProduct, error: supabaseError } = await supabase
             .from('products')
             .insert([{
@@ -205,6 +222,7 @@ export function Home() {
           if (supabaseError) {
              console.error("Supabase Insert Error:", supabaseError);
           } else if (newProduct) {
+             console.log("Ürün Supabase'e başarıyla eklendi!");
              // Veritabanı kaydı bittiğinde, geçici ürünü gerçek bilgilerle sessizce güncelle
              const finalProduct = { 
                 id: newProduct.id, 
@@ -222,11 +240,12 @@ export function Home() {
           }
         })(); // Asenkron fonksiyon bitti
       } else {
+        console.error("Görsel datası alınamadı.");
         setIsGenerating(false); // Görsel verisi gelmezse de spinner'ı kapat
       }
     } catch (e) { 
-      console.error(e); 
-      alert("Failed to generate image. Please check your API token or try again.");
+      console.error("Üretim sırasında hata oluştu:", e); 
+      alert("Failed to generate image. Please check your console for details.");
       setIsGenerating(false);
     } 
   };
@@ -246,15 +265,15 @@ export function Home() {
               <Loader2 className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
               <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-500">Architectural Analysis...</p>
             </div>
-          ) : roomImage && analysisData ? (
+          ) : roomImage ? (
             <InteractiveCanvas 
               backgroundImage={roomImage} 
               mountedArt={selectedProduct?.image || null} 
               physicalWidth={physicalWidth}
               physicalHeight={physicalHeight}
-              naturalPixelsPerInch={analysisData.ppi}
+              naturalPixelsPerInch={analysisData?.ppi || 6} 
               frameColor={(FRAME_COLORS as any)[selectedFrame]}
-              perspective={{ rotateY: analysisData.rotateY, skewY: analysisData.skewY }}
+              perspective={{ rotateY: analysisData?.rotateY || 0, skewY: analysisData?.skewY || 0 }}
             />
           ) : (
             <div {...roomDrop.getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 border-2 border-dashed border-zinc-800 m-8 rounded-3xl transition-all group">
