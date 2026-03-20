@@ -40,7 +40,10 @@ export const useStore = create<StoreState>()(
       loginWithGoogle: async () => {
         set({ isLoading: true });
         const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google'
+          provider: 'google',
+          options: {
+            redirectTo: `${window.location.origin}/`,
+          }
         });
         if (error) alert(error.message);
         set({ isLoading: false });
@@ -48,7 +51,12 @@ export const useStore = create<StoreState>()(
 
       login: async (email: string) => {
         set({ isLoading: true });
-        const { error } = await supabase.auth.signInWithOtp({ email });
+        const { error } = await supabase.auth.signInWithOtp({ 
+          email,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+          }
+        });
         if (error) alert(error.message);
         else {
           alert('Magic link sent to your email! Please check your inbox.');
@@ -67,11 +75,24 @@ export const useStore = create<StoreState>()(
 
         const syncProfile = async (authSession: any) => {
           if (!authSession) return;
-          let { data: profile, error } = await supabase.from('profiles').select('*').eq('id', authSession.user.id).single();
-          if (!profile && !error) {
-            const { data: newProfile } = await supabase.from('profiles').insert([{ id: authSession.user.id, email: authSession.user.email, tokens: 5 }]).select().single();
+          
+          // İŞTE SENİ DELİRTEN HATANIN KESİN ÇÖZÜMÜ: maybeSingle()
+          let { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authSession.user.id)
+            .maybeSingle();
+
+          // Eğer Auth'ta olup profiles tablosunda yoksa (eski hesaplar), çökme, yeni oluştur
+          if (!profile) {
+            const { data: newProfile } = await supabase
+              .from('profiles')
+              .insert([{ id: authSession.user.id, email: authSession.user.email, tokens: 5 }])
+              .select()
+              .single();
             profile = newProfile;
           }
+
           if (profile) {
             set({ 
               user: { 
@@ -82,13 +103,20 @@ export const useStore = create<StoreState>()(
                 isSeller: false 
               } 
             });
+            set({ isAuthModalOpen: false });
           }
         };
 
         if (session) await syncProfile(session);
         
         supabase.auth.onAuthStateChange(async (_event, session) => {
-          if (session) await syncProfile(session);
+          if (session) {
+            await syncProfile(session);
+            // Giriş sonrası URL'deki çirkin access_token hash'lerini temizler
+            if (window.location.hash.includes('access_token')) {
+              window.history.replaceState(null, '', window.location.pathname);
+            }
+          }
           else set({ user: null });
         });
       },
