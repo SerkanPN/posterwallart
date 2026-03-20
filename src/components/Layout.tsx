@@ -2,6 +2,12 @@ import { Link, Outlet, useNavigate } from 'react-router-dom';
 import { ShoppingCart, Heart, User, Sparkles, Menu, X, LogOut } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useState } from 'react';
+import { clsx, type ClassValue } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+export function cn(...inputs: ClassValue[]) {
+  return twMerge(clsx(inputs));
+}
 
 export function Layout() {
   const { cart, wishlist, user, logout } = useStore();
@@ -27,6 +33,7 @@ export function Layout() {
           <nav className="hidden md:flex items-center gap-8 text-sm font-medium text-zinc-400">
             <Link to="/shop" className="hover:text-zinc-50 transition-colors">Shop</Link>
             <Link to="/" className="hover:text-zinc-50 transition-colors">AI Studio</Link>
+            <Link to="/blog" className="hover:text-zinc-50 transition-colors">Blog</Link>
           </nav>
 
           <div className="hidden md:flex items-center gap-6">
@@ -56,15 +63,33 @@ export function Layout() {
                 <User className="w-5 h-5" />
               </Link>
               {user && (
-                <button onClick={handleLogout} className="text-zinc-500 hover:text-red-500 transition-colors">
+                <button onClick={handleLogout} className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer">
                   <LogOut className="w-5 h-5" />
                 </button>
               )}
             </div>
           </div>
+
+          <button className="md:hidden text-zinc-400 hover:text-zinc-50" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+            {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+          </button>
         </div>
+
+        {isMenuOpen && (
+          <div className="md:hidden border-t border-zinc-800 bg-zinc-950 p-4 flex flex-col gap-4">
+            <Link to="/shop" className="text-zinc-400 hover:text-zinc-50" onClick={() => setIsMenuOpen(false)}>Shop</Link>
+            <Link to="/" className="text-zinc-400 hover:text-zinc-50" onClick={() => setIsMenuOpen(false)}>AI Studio</Link>
+            <Link to="/tokens" className="text-zinc-400 hover:text-zinc-50" onClick={() => setIsMenuOpen(false)}>Tokens ({user?.tokens || 0})</Link>
+            <Link to="/cart" className="text-zinc-400 hover:text-zinc-50" onClick={() => setIsMenuOpen(false)}>Cart ({cartCount})</Link>
+            <Link to="/profile" className="text-zinc-400 hover:text-zinc-50" onClick={() => setIsMenuOpen(false)}>Profile</Link>
+            {user && <button onClick={handleLogout} className="text-left text-red-500 uppercase text-sm font-bold">Logout</button>}
+          </div>
+        )}
       </header>
-      <main className="flex-1 flex flex-col"><Outlet /></main>
+
+      <main className="flex-1 flex flex-col">
+        <Outlet />
+      </main>
     </div>
   );
 }
