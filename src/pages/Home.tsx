@@ -62,22 +62,26 @@ export function Home() {
     }
   }, []);
 
-  const { getRootProps, getInputProps } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 } as any);
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 } as any);
 
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
-    setAnalysisData(null);
-    setRecommendations([]);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
+      const prompt = `Analyze this room image for architectural scale. 
+      1. Reference recognizable objects (windows, doors, outlets) to find real-world scale. 
+      2. Calculate PPI (scale 5-10) so a 24x36 inch poster looks realistically large on the wall. 
+      3. Estimate 3D perspective (rotateY -15 to 15). 
+      Return ONLY JSON: { "pixelsPerInch": number, "rotateY": number, "skewY": number, "style": "string", "colors": ["hex"], "mood": "string" }`;
+
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{
             parts: [
-              { text: "Analyze room. 1. PPI scale for realistic wall art (3-6). 2. rotateY (-15 to 15). 3. style, mood, hex colors. Return ONLY JSON: { \"pixelsPerInch\": number, \"rotateY\": number, \"skewY\": number, \"style\": \"string\", \"colors\": [\"hex\"], \"mood\": \"string\" }" },
+              { text: prompt },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]
           }]
@@ -88,7 +92,7 @@ export function Home() {
       const data = JSON.parse(result.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
 
       setAnalysisData({
-        ppi: data.pixelsPerInch || 4,
+        ppi: data.pixelsPerInch || 6,
         rotateY: data.rotateY || 0,
         skewY: data.skewY || 0,
         style: data.style,
@@ -100,7 +104,7 @@ export function Home() {
       setSelectedProduct(null); 
 
     } catch (e) {
-      console.error("Analiz patladı:", e);
+      console.error("Analysis Error:", e);
     } finally {
       setIsAnalyzing(false);
     }
@@ -112,12 +116,15 @@ export function Home() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      const prompt = `Generate a UNIQUE, high-end poster artwork. Style: ${analysisData.style}. Palette: ${analysisData.colors.join(', ')}. Orientation: ${orientation}. Output ONLY the flat poster artwork image. No walls, frames, or background. Pinterest-worthy.`;
+      const genPrompt = `Act as a world-class abstract painter. Create a high-end, aesthetic modern digital painting. 
+      Style: ${analysisData.style}. Palette: ${analysisData.colors.join(', ')}. 
+      CRITICAL: NO TEXT, NO LETTERS, NO NUMBERS. Pure visual art only. 
+      The image must be a flat digital poster design. Orientation: ${orientation}. Pinterest-worthy.`;
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+        body: JSON.stringify({ contents: [{ parts: [{ text: genPrompt }] }] })
       });
 
       const result = await response.json();
@@ -131,14 +138,14 @@ export function Home() {
           basePrice: 65,
           image: newArt,
           category: analysisData.style,
-          description: `Custom designed for your ${analysisData.mood} space.`,
+          description: `Custom designed for your space.`,
           isGenerated: true
         };
         setRecommendations([newProduct, ...recommendations.slice(0, 2)]);
         setSelectedProduct(newProduct);
       }
     } catch (error) {
-      console.error('Üretim hatası:', error);
+      console.error('Generation failed:', error);
     } finally {
       setIsGenerating(false);
     }
@@ -155,7 +162,7 @@ export function Home() {
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-20 backdrop-blur-md">
               <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-[10px] uppercase tracking-widest opacity-50">Architectural Analysis...</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest">Architectural Analysis...</p>
             </div>
           ) : roomImage && analysisData ? (
             <InteractiveCanvas 
@@ -168,10 +175,10 @@ export function Home() {
               perspective={analysisData}
             />
           ) : (
-            <div {...getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 transition-all border-2 border-dashed border-zinc-800 m-8 rounded-3xl">
+            <div {...getRootProps()} className={`absolute inset-0 flex flex-col items-center justify-center cursor-pointer transition-all border-2 border-dashed border-zinc-800 m-8 rounded-3xl ${isDragActive ? 'bg-emerald-500/10' : 'hover:bg-zinc-800/50'}`}>
               <input {...getInputProps()} />
               <ImageIcon className="w-12 h-12 opacity-20 mb-4" />
-              <p className="font-mono text-xs uppercase opacity-30 tracking-widest text-center px-12">Upload room photo</p>
+              <p className="font-mono text-xs uppercase opacity-30 tracking-widest text-center px-12">Upload room photo to begin</p>
             </div>
           )}
         </div>
@@ -182,14 +189,19 @@ export function Home() {
           <button 
             onClick={handleCreateForMe}
             disabled={isGenerating || isAnalyzing || !roomImage}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all flex items-center justify-center gap-3 disabled:opacity-30 shadow-[0_0_30px_rgba(16,185,129,0.3)]"
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-30"
           >
-            {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> WEAVING ART...</> : <><Sparkles className="w-5 h-5" /> MAKE ME FEEL SPECIAL</>}
+            {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> WEAVING MAGIC...</> : <><Sparkles className="w-5 h-5" /> MAKE ME FEEL SPECIAL</>}
           </button>
         </div>
 
         <div className="p-6 space-y-4">
           <h2 className="text-lg font-bold tracking-tight flex items-center gap-2 mb-4"><Sparkles className="w-5 h-5 text-indigo-400" /> Top Matches</h2>
+          
+          {recommendations.length === 0 && !isAnalyzing && (
+            <div className="text-center py-12 opacity-20 font-mono text-[10px] uppercase tracking-widest">Upload photo to see matches</div>
+          )}
+
           {recommendations.map((product) => {
             const isSelected = selectedProduct?.id === product.id;
             return (
