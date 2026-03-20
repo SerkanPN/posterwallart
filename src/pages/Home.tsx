@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout, Lock } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
+import { supabase } from '../lib/supabase'; // Supabase eklendi
 
 type SizeType = '8x10' | '11x14' | '16x20' | '18x24' | '20x30' | '24x36';
 type FrameType = 'unframed' | 'black' | 'oak';
@@ -38,7 +39,6 @@ const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'B
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 export function Home() {
-  // Store'dan kullanıcı ve jeton bilgilerini alıyoruz
   const { user, tokens, useToken, addToCart } = useStore();
   
   const [roomImage, setRoomImage] = useState<string | null>(null);
@@ -57,7 +57,6 @@ export function Home() {
   const [analysisData, setAnalysisData] = useState<any>(null);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    // Giriş yapmamış kullanıcı analiz bile yapamasın
     if (!user) {
       alert("Lütfen önce giriş yapın.");
       return;
@@ -108,7 +107,6 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    // GÜVENLİK KONTROLLERİ
     if (!user) {
       alert("Yapay zekayı kullanmak için giriş yapmalısınız.");
       return;
@@ -123,7 +121,6 @@ export function Home() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      // Jetonu harca
       useToken();
 
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
@@ -147,11 +144,25 @@ export function Home() {
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
       if (imgPart?.inlineData) {
-        const newArt = `data:image/png;base64,${imgPart.inlineData.data}`;
+        const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
+        
+        // SONSUZ STOK KAYIT MANTIĞI EKLENDİ
+        const { data: newProduct } = await supabase
+          .from('products')
+          .insert([{
+            creator_id: user.id,
+            title: `AI Masterpiece - ${selectedTheme}`,
+            image_url: base64Image,
+            price: 49.00, 
+            stock: -1, 
+            is_private: false
+          }])
+          .select().single();
+
         const product = { 
-          id: Date.now().toString(), 
+          id: newProduct?.id || Date.now().toString(), 
           title: `AI Masterpiece - ${selectedTheme}`, 
-          image: newArt, 
+          image: base64Image, 
           basePrice: selectedSize.price, 
           category: selectedStyle,
           description: `Custom AI designed art.`,
