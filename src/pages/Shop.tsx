@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase';
 import { ShoppingCart, Search, Filter, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-const CATEGORIES = ['All', 'Abstract', 'Music', 'Nature', 'Cyberpunk', 'Minimalist', 'Movie'];
+const CATEGORIES = ['All', 'Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Japandi', 'Industrial', 'Pop Art', 'Vintage Poster'];
 
 export function Shop() {
   const { addToCart } = useStore();
@@ -80,16 +80,19 @@ export function Shop() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {filteredProducts.map((product) => (
-              <div key={product.id} className="group bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all">
+              <div key={product.id} className="relative group bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all">
+                {/* Tüm kartı kaplayan link */}
+                <Link to={`/product/${product.id}`} className="absolute inset-0 z-10" />
+                
                 <div className="aspect-[3/4] relative overflow-hidden bg-black">
                   <img src={product.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.title} />
-                  <div className="absolute top-4 left-4 bg-emerald-500/10 backdrop-blur-md border border-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-2">
+                  <div className="absolute top-4 left-4 bg-emerald-500/10 backdrop-blur-md border border-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-2 z-20">
                     <Sparkles className="w-3 h-3 text-emerald-500" />
                     <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">AI Masterpiece</span>
                   </div>
                 </div>
 
-                <div className="p-6">
+                <div className="p-6 relative z-20">
                   <div className="flex justify-between items-start mb-4">
                     <div className="min-w-0">
                       <h3 className="font-bold text-sm uppercase italic truncate tracking-tight">{product.title}</h3>
@@ -99,10 +102,10 @@ export function Shop() {
                   </div>
 
                   <button 
-                    onClick={() => addToCart({ ...product, image: product.image_url, basePrice: product.price })}
-                    className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-black uppercase rounded-xl flex items-center justify-center gap-2 transition-all"
+                    disabled
+                    className="w-full py-3 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl flex items-center justify-center gap-2 transition-all opacity-50"
                   >
-                    <ShoppingCart className="w-4 h-4" /> Add to Cart
+                    View Details
                   </button>
                 </div>
               </div>
