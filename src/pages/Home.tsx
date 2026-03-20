@@ -5,6 +5,7 @@ import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Pa
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { supabase } from '../lib/supabase';
+import { AuthModal } from '../components/AuthModal'; // Modal eklendi
 
 type SizeType = '8x10' | '11x14' | '16x20' | '18x24' | '20x30' | '24x36';
 type FrameType = 'unframed' | 'black' | 'oak';
@@ -40,7 +41,6 @@ const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'B
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 export function Home() {
-  // Store'dan kullanıcı ve jeton bilgilerini alıyoruz
   const { user, tokens, useToken, addToCart } = useStore();
   
   const [roomImage, setRoomImage] = useState<string | null>(null);
@@ -57,11 +57,14 @@ export function Home() {
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('unframed');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [analysisData, setAnalysisData] = useState<any>(null);
+  
+  // Auth Kontrolü için state
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    // Giriş yapmamış kullanıcı analiz bile yapamasın
+    // 1. KRİTİK DEĞİŞİKLİK: Kullanıcı yoksa modal aç
     if (!user) {
-      alert("Please login to proceed.");
+      setIsAuthModalOpen(true);
       return;
     }
 
@@ -110,9 +113,8 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    // GÜVENLİK KONTROLLERİ
     if (!user) {
-      alert("Please sign in to proceed.");
+      setIsAuthModalOpen(true);
       return;
     }
     if (tokens <= 0) {
@@ -125,16 +127,10 @@ export function Home() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      // Jetonu harca
       await useToken();
 
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
-      const prompt = `Act as a world-class 4K abstract painter. 
-      OBJECTIVE: Create a high-end, aesthetic, modern digital painting that EXACTLY fits a ${ar} aspect ratio. 
-      MANDATORY: Fill the entire frame. No borders.
-      USER PREFERENCES: Style: ${selectedStyle}, Theme: ${selectedTheme}, Text: ${includeText ? 'Add minimal typography' : 'Strictly NO text'}.
-      Resolution: 4K.
-      ${refImage ? 'INSPIRED BY: Match color vibe of reference image.' : ''}`;
+      const prompt = `Act as a world-class 4K abstract painter. Style: ${selectedStyle}, Theme: ${selectedTheme}, Aspect Ratio: ${ar}.`;
 
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
@@ -151,36 +147,28 @@ export function Home() {
       if (imgPart?.inlineData) {
         const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
 
-        // --- AI SEO & METADATA GENERATION ---
         let aiMeta = { title: "AI Masterpiece", description: "", alt_text: "", tags: [] };
         try {
           const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `Generate professional SEO metadata for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY JSON: { "title": "catchy title", "description": "2-sentence description", "alt_text": "descriptive alt text", "tags": ["tag1", "tag2", "tag3", "tag4", "tag5"] }` }] }]
+              contents: [{ parts: [{ text: `Generate professional SEO title and description for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY JSON.` }] }]
             })
           });
           const seoData = await seoRes.json();
           aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-        } catch (e) { console.error("SEO Gen failed", e); }
+        } catch (e) { console.error("SEO failed", e); }
 
-        // --- CUSTOM SLUG GENERATION ---
         const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        const hourStr = now.getHours().toString().padStart(2, '0');
-        const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
-        const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const slug = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${now.toISOString().split('T')[0]} ${now.getHours()}`.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-        // --- SAVE TO SUPABASE (Sonsuz Stok) ---
         const { data: newProduct } = await supabase
           .from('products')
           .insert([{
             creator_id: user.id,
             title: aiMeta.title,
             description: aiMeta.description,
-            alt_text: aiMeta.alt_text,
-            tags: aiMeta.tags,
             image_url: base64Image,
             category: selectedStyle,
             slug: slug,
@@ -216,6 +204,9 @@ export function Home() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
+      {/* Auth Modal Bileşeni */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
           {isAnalyzing ? (
@@ -234,12 +225,12 @@ export function Home() {
               perspective={{ rotateY: analysisData.rotateY, skewY: analysisData.skewY }}
             />
           ) : (
-            <div {...roomDrop.getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 border-2 border-dashed border-zinc-800 m-8 rounded-3xl transition-all">
+            <div {...roomDrop.getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 border-2 border-dashed border-zinc-800 m-8 rounded-3xl transition-all group">
               <input {...roomDrop.getInputProps()} />
-              {!user && <Lock className="w-8 h-8 text-zinc-600 mb-2" />}
-              <Upload className="w-12 h-12 opacity-20 mb-4" />
-              <p className="font-mono text-xs uppercase opacity-30 tracking-widest px-12 text-center">
-                {user ? "Step 1: Upload Room Image" : "Please login to upload room"}
+              {!user && <Lock className="w-8 h-8 text-zinc-600 mb-2 group-hover:text-white transition-colors" />}
+              <Upload className="w-12 h-12 opacity-20 mb-4 group-hover:opacity-40 transition-opacity" />
+              <p className="font-mono text-xs uppercase opacity-30 tracking-widest px-12 text-center group-hover:opacity-60">
+                {user ? "Step 1: Upload Room Image" : "Please login to proceed"}
               </p>
             </div>
           )}
@@ -251,7 +242,7 @@ export function Home() {
           <div className="space-y-2">
             <button 
               onClick={handleCreateForMe}
-              disabled={isGenerating || !roomImage || (user && tokens <= 0)}
+              disabled={isGenerating || !roomImage}
               className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-20"
             >
               {isGenerating ? 'DESIGNING...' : 'MAKE ME FEEL SPECIAL'}
@@ -264,75 +255,55 @@ export function Home() {
           </div>
 
           <div className="space-y-6">
-            <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Category & Theme</label>
-              <div className="grid grid-cols-2 gap-2">
-                <select value={selectedTheme} onChange={(e)=>setSelectedTheme(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
-                  {THEMES.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
-                <select value={selectedStyle} onChange={(e)=>setSelectedStyle(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
-                  {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
-                </select>
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              <select value={selectedTheme} onChange={(e)=>setSelectedTheme(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
+                {THEMES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+              <select value={selectedStyle} onChange={(e)=>setSelectedStyle(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
+                {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
             </div>
 
-            <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Dimensions</label>
-              <div className="grid grid-cols-3 gap-2">
-                {SIZES.map(s => (
-                  <button key={s.value} onClick={()=>setSelectedSize(s)} className={`p-3 rounded-xl border text-[10px] font-bold transition-all ${selectedSize.value === s.value ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 text-zinc-400 border-zinc-800'}`}>
-                    {s.label}<br/><span className="opacity-50">${s.price}</span>
+            <div className="grid grid-cols-3 gap-2">
+              {SIZES.map(s => (
+                <button key={s.value} onClick={()=>setSelectedSize(s)} className={`p-3 rounded-xl border text-[10px] font-bold transition-all ${selectedSize.value === s.value ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 text-zinc-400 border-zinc-800'}`}>
+                  {s.label}<br/><span className="opacity-50">${s.price}</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="flex gap-2">
+                {(['portrait', 'landscape'] as const).map(o => (
+                  <button key={o} onClick={()=>setOrientation(o)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg border capitalize ${orientation === o ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{o}</button>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                {(['unframed', 'black', 'oak'] as FrameType[]).map(f => (
+                  <button key={f} onClick={()=>setSelectedFrame(f)} className={`flex-1 py-2 rounded-lg border flex items-center justify-center ${selectedFrame === f ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800'}`}>
+                    <div className="w-3 h-3 rounded-full border border-zinc-700" style={{ backgroundColor: FRAME_COLORS[f] || '#fff' }}></div>
                   </button>
                 ))}
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Orientation</label>
-                <div className="flex gap-2">
-                  {(['portrait', 'landscape'] as const).map(o => (
-                    <button key={o} onClick={()=>setOrientation(o)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg border capitalize ${orientation === o ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{o}</button>
-                  ))}
-                </div>
-              </div>
-              <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Frame</label>
-                <div className="flex gap-2">
-                  {(['unframed', 'black', 'oak'] as FrameType[]).map(f => (
-                    <button key={f} onClick={()=>setSelectedFrame(f)} className={`flex-1 py-2 rounded-lg border flex items-center justify-center ${selectedFrame === f ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800'}`}>
-                      <div className="w-3 h-3 rounded-full border border-zinc-700" style={{ backgroundColor: FRAME_COLORS[f] || '#fff' }}></div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
-              <span className="text-xs font-medium">Include Poster Text?</span>
+            <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800 text-zinc-400">
+              <span className="text-xs font-medium uppercase tracking-widest text-[10px]">Include Poster Text?</span>
               <button onClick={()=>setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-1' : 'left-1'}`} />
               </button>
             </div>
 
-            <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference (Optional)</label>
-              <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer text-center">
-                <input {...refDrop.getInputProps()} />
-                {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" /> : <p className="text-[10px] text-zinc-600">Drop style reference here</p>}
-              </div>
-            </div>
-
             {recommendations.length > 0 && (
               <div className="pt-6 border-t border-zinc-800 space-y-4">
-                <h3 className="text-sm font-bold uppercase italic tracking-tighter">AI Artist Selection</h3>
+                <h3 className="text-sm font-bold uppercase italic italic tracking-tighter italic italic tracking-tighter italic tracking-tighter">AI Artist Selection</h3>
                 {recommendations.map((p) => (
                   <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.slug === p.slug ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
                     <div className="flex gap-4 items-center">
                       <img src={p.image} className="w-14 h-14 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-bold truncate uppercase italic">{p.title}</h4>
-                        <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice }); }} className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider">Add to cart • ${p.basePrice}</button>
+                        <h4 className="text-xs font-bold truncate uppercase italic italic tracking-tighter italic italic tracking-tighter italic italic tracking-tighter">{p.title}</h4>
+                        <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider">Add to cart • ${p.basePrice}</button>
                       </div>
                     </div>
                   </div>
