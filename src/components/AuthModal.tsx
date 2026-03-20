@@ -17,7 +17,6 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     e.preventDefault();
     if (!email) return;
     await login(email);
-    // OTP gönderildiği için modal kapanabilir veya bilgi mesajı kalabilir
   };
 
   return (
@@ -58,7 +57,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         </form>
 
         <p className="text-[9px] text-zinc-600 text-center mt-6 uppercase tracking-wider">
-          By continuing, you agree to our Terms of Service.
+          A login link will be sent to your inbox.
         </p>
       </div>
     </div>
