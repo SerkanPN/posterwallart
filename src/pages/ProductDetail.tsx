@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
-import { ShoppingCart, ShieldCheck, Zap, ArrowLeft, Tag } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { ShoppingCart, ShieldCheck, Zap, ArrowLeft, Tag, AlertTriangle } from 'lucide-react';
 
 const VARIANTS = [
   { id: 'digi', label: 'Digital Download', price: 1 },
@@ -20,23 +19,59 @@ export function ProductDetail() {
   const { slug } = useParams();
   const { addToCart } = useStore();
   const [product, setProduct] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   const [selectedVariant, setSelectedVariant] = useState(VARIANTS[0]);
   const [isFramed, setIsFramed] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
-      const { data } = await supabase.from('products').select('*').eq('slug', slug).single();
-      if (data) setProduct(data);
+      if (!slug) {
+        setError("Invalid product link.");
+        return;
+      }
+
+      // Hata yakalama ve maybeSingle ile çökme engellendi
+      const { data, error: fetchError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('slug', slug)
+        .limit(1)
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error("Fetch error:", fetchError);
+        setError("Failed to load product details.");
+      } else if (!data) {
+        setError("Product not found. It might be deleted or private.");
+      } else {
+        setProduct(data);
+      }
     };
+    
     fetchProduct();
   }, [slug]);
 
+  // Hata varsa sonsuz döngü yerine şık bir hata ekranı göster
+  if (error) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center text-white p-4 font-sans">
+        <AlertTriangle className="w-12 h-12 text-red-500 mb-4" />
+        <h2 className="text-2xl font-black uppercase italic tracking-tighter mb-2">Artwork Not Found</h2>
+        <p className="text-zinc-500 font-mono text-[10px] uppercase tracking-widest mb-8">{error}</p>
+        <Link to="/shop" className="px-8 py-4 bg-white text-black font-black uppercase tracking-widest text-[10px] rounded-2xl hover:bg-zinc-200 transition-all flex items-center gap-2">
+          <ArrowLeft className="w-4 h-4" /> Back to Collection
+        </Link>
+      </div>
+    );
+  }
+
+  // Veri gelene kadar yükleme ekranı
   if (!product) return <div className="min-h-screen bg-black flex items-center justify-center font-mono text-[10px] uppercase tracking-widest opacity-20 animate-pulse">Syncing Dimensions...</div>;
 
   const finalPrice = isFramed && selectedVariant.price >= 24 ? selectedVariant.price * 2 : selectedVariant.price;
 
   return (
-    <div className="min-h-screen bg-zinc-950 text-white p-8">
+    <div className="min-h-screen bg-zinc-950 text-white p-8 font-sans">
       <div className="max-w-7xl mx-auto pt-10">
         <Link to="/shop" className="inline-flex items-center gap-2 text-zinc-500 hover:text-white transition-colors text-[10px] uppercase font-bold tracking-widest mb-12">
           <ArrowLeft className="w-3 h-3" /> Back to Collection
@@ -58,7 +93,7 @@ export function ProductDetail() {
               </div>
               <p className="text-zinc-400 text-sm leading-relaxed max-w-xl mb-8">{product.description}</p>
               
-              {product.tags && (
+              {product.tags && product.tags.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                   {product.tags.map((tag: string) => (
                     <span key={tag} className="text-[9px] text-zinc-600 font-bold uppercase tracking-tighter flex items-center gap-1">
