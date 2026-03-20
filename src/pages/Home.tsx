@@ -121,7 +121,6 @@ export function Home() {
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
-      // GÖRSEL ÜRETİMİ İÇİN 3.1-flash-image-preview (SENİN KURALIN)
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -144,7 +143,6 @@ export function Home() {
         };
 
         try {
-          // SEO ÜRETİMİ İÇİN 2.0-flash (SENİN KURALIN)
           const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -215,7 +213,8 @@ export function Home() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
-      <AuthModal isOpen={isAuthModalOpen} onClose={() => setIsAuthModalOpen(false)} />
+      {/* SIKINTIYI ÇÖZEN TEK SATIR: Parametreleri sildim */}
+      <AuthModal />
       
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
