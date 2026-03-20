@@ -1,55 +1,52 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2 } from 'lucide-react';
+import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 
-type SizeType = '12x18' | '18x24' | '24x36';
-type FrameType = 'unframed' | 'black' | 'oak';
-
-interface Product {
-  id: string;
-  title: string;
-  basePrice: number;
-  image: string;
-  category: string;
-  description: string;
-  isGenerated?: boolean;
-}
-
-const STORE_INVENTORY: Product[] = [
-  { id: 'rec1', title: 'Dark Side of the Moon - Prism', basePrice: 45, image: 'https://picsum.photos/seed/cyberpunk/800/1200', category: 'Cyberpunk', description: 'Strong music theme match.' },
-  { id: 'rec2', title: 'Pulp Fiction - The Dance', basePrice: 35, image: 'https://picsum.photos/seed/minimalist/800/1200', category: 'Minimalist', description: 'Retro vibe match.' },
-  { id: 'rec3', title: 'Electric Stripe Symphony', basePrice: 55, image: 'https://picsum.photos/seed/renaissance/800/1200', category: 'Renaissance', description: 'Stylized match for your space.' },
+// VERİ SETLERİ
+const SIZES = [
+  { label: '8x10"', price: 22, value: '8x10' },
+  { label: '11x14"', price: 24, value: '11x14' },
+  { label: '16x20"', price: 26, value: '16x20' },
+  { label: '18x24"', price: 26, value: '18x24' },
+  { label: '20x30"', price: 39, value: '20x30' },
+  { label: '24x36"', price: 49, value: '24x36' },
 ];
 
-const SIZE_MULTIPLIERS = { '12x18': 1, '18x24': 1.5, '24x36': 2.2 };
-const FRAME_PRICES = { 'unframed': 0, 'black': 20, 'oak': 25 };
+const STYLES = [
+  'Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Century Modern', 
+  'Japandi', 'Industrial', 'Boho Chic', 'Art Deco', 'Vaporwave', 
+  'Surrealism', 'Pop Art', 'Abstract Expressionism', 'Impressionism', 'Nordic',
+  'Street Art', 'Futurism', 'Vintage Poster', 'Line Art', 'Watercolor'
+];
+
+const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
+
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 export function Home() {
-  const { user, useToken, addToCart } = useStore();
+  const { user, addToCart } = useStore();
   const [roomImage, setRoomImage] = useState<string | null>(null);
+  const [refImage, setRefImage] = useState<string | null>(null); // Örnek poster
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  
-  const [analysisData, setAnalysisData] = useState<{ 
-    ppi: number; 
-    rotateY: number; 
-    skewY: number;
-    style: string;
-    colors: string[];
-    mood: string;
-  } | null>(null);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedSize, setSelectedSize] = useState<SizeType>('12x18');
-  const [selectedFrame, setSelectedFrame] = useState<FrameType>('unframed');
+  // KULLANICI SEÇİMLERİ (UI)
+  const [selectedSize, setSelectedSize] = useState(SIZES[SIZES.length-1]); // Varsayılan 24x36
+  const [selectedStyle, setSelectedStyle] = useState('Minimalist');
+  const [selectedTheme, setSelectedTheme] = useState('Abstract');
+  const [includeText, setIncludeText] = useState(false);
+  const [selectedFrame, setSelectedFrame] = useState('unframed');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
 
-  const onDrop = useCallback((acceptedFiles: File[]) => {
+  const [analysisData, setAnalysisData] = useState<any>(null);
+
+  // ODA FOTOĞRAFI YÜKLEME
+  const onDropRoom = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
       const reader = new FileReader();
@@ -62,101 +59,76 @@ export function Home() {
     }
   }, []);
 
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { 'image/*': [] }, maxFiles: 1 } as any);
+  // ÖRNEK POSTER YÜKLEME
+  const onDropRef = useCallback((acceptedFiles: File[]) => {
+    const file = acceptedFiles[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (e) => setRefImage(e.target?.result as string);
+      reader.readAsDataURL(file);
+    }
+  }, []);
+
+  const roomDrop = useDropzone({ onDrop: onDropRoom, accept: { 'image/*': [] }, maxFiles: 1 });
+  const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
     try {
-      const prompt = `Analyze this room image for architectural scale. 
-      1. Reference recognizable objects (windows, doors, outlets) to find real-world scale. 
-      2. Calculate PPI (scale 5-10) so a 24x36 inch poster looks realistically large on the wall. 
-      3. Estimate 3D perspective (rotateY -15 to 15). 
-      Return ONLY JSON: { "pixelsPerInch": number, "rotateY": number, "skewY": number, "style": "string", "colors": ["hex"], "mood": "string" }`;
-
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{
-            parts: [
-              { text: prompt },
-              { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
-            ]
-          }]
+          contents: [{ parts: [
+            { text: "Analyze room objects for scale. Return PPI for the focal wall (range 4-10) and perspective (rotateY -15 to 15). Detect style and mood. Return ONLY JSON: { \"ppi\": number, \"rotateY\": number, \"skewY\": number, \"detectedStyle\": \"string\" }" },
+            { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
+          ]}]
         })
       });
-
-      const result = await response.json();
-      const data = JSON.parse(result.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-
-      setAnalysisData({
-        ppi: data.pixelsPerInch || 6,
-        rotateY: data.rotateY || 0,
-        skewY: data.skewY || 0,
-        style: data.style,
-        colors: data.colors,
-        mood: data.mood
-      });
-      
-      setRecommendations(STORE_INVENTORY.slice(0, 3));
-      setSelectedProduct(null); 
-
-    } catch (e) {
-      console.error("Analysis Error:", e);
-    } finally {
-      setIsAnalyzing(false);
-    }
+      const res = await response.json();
+      const data = JSON.parse(res.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+      setAnalysisData(data);
+    } catch (e) { console.error(e); } finally { setIsAnalyzing(false); }
   };
 
   const handleCreateForMe = async () => {
-    if (!roomImage || !analysisData || isGenerating) return;
+    if (!analysisData || isGenerating) return;
     setIsGenerating(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      const genPrompt = `Act as a world-class abstract painter. Create a high-end, aesthetic modern digital painting. 
-      Style: ${analysisData.style}. Palette: ${analysisData.colors.join(', ')}. 
-      CRITICAL: NO TEXT, NO LETTERS, NO NUMBERS. Pure visual art only. 
-      The image must be a flat digital poster design. Orientation: ${orientation}. Pinterest-worthy.`;
+      const prompt = `Act as a professional poster designer.
+      OBJECTIVE: Create a ${orientation} artwork.
+      USER PREFERENCES: Style: ${selectedStyle}, Theme: ${selectedTheme}, metin: ${includeText ? 'Add aesthetic minimal typography' : 'Strictly NO text'}.
+      COMPOSITION: Leave a 'safe area' (padding) around the main elements so it fits any aspect ratio.
+      ${refImage ? 'INSPIRED BY: User provided an example image, match its vibe and composition style.' : ''}
+      OUTPUT: High-end, Pinterest-worthy digital art file only.`;
+
+      const contents = [{ parts: [{ text: prompt }] }];
+      if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } } as any);
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents: [{ parts: [{ text: genPrompt }] }] })
+        body: JSON.stringify({ contents })
       });
 
-      const result = await response.json();
-      const imgPart = result.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
+      const res = await response.json();
+      const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
       if (imgPart?.inlineData) {
         const newArt = `data:image/png;base64,${imgPart.inlineData.data}`;
-        const newProduct: Product = {
-          id: `gen_${Date.now()}`,
-          title: 'Custom AI Masterpiece',
-          basePrice: 65,
-          image: newArt,
-          category: analysisData.style,
-          description: `Custom designed for your space.`,
-          isGenerated: true
-        };
-        setRecommendations([newProduct, ...recommendations.slice(0, 2)]);
-        setSelectedProduct(newProduct);
+        const product = { id: Date.now().toString(), title: `Custom ${selectedTheme}`, image: newArt, basePrice: selectedSize.price, description: `${selectedStyle} masterpiece.` };
+        setRecommendations([product, ...recommendations]);
+        setSelectedProduct(product);
       }
-    } catch (error) {
-      console.error('Generation failed:', error);
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  const calculatePrice = (product: Product) => {
-    return (product.basePrice * SIZE_MULTIPLIERS[selectedSize]) + FRAME_PRICES[selectedFrame];
+    } catch (e) { console.error(e); } finally { setIsGenerating(false); }
   };
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
+      {/* SOL: CANVAS ALANI */}
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
           {isAnalyzing ? (
@@ -168,94 +140,99 @@ export function Home() {
             <InteractiveCanvas 
               backgroundImage={roomImage} 
               mountedArt={selectedProduct?.image || null} 
-              physicalWidth={orientation === 'portrait' ? Number(selectedSize.split('x')[0]) : Number(selectedSize.split('x')[1])}
-              physicalHeight={orientation === 'portrait' ? Number(selectedSize.split('x')[1]) : Number(selectedSize.split('x')[0])}
+              physicalWidth={orientation === 'portrait' ? Number(selectedSize.value.split('x')[0]) : Number(selectedSize.value.split('x')[1])}
+              physicalHeight={orientation === 'portrait' ? Number(selectedSize.value.split('x')[1]) : Number(selectedSize.value.split('x')[0])}
               naturalPixelsPerInch={analysisData.ppi}
               frameColor={(FRAME_COLORS as any)[selectedFrame]}
-              perspective={analysisData}
+              perspective={{ rotateY: analysisData.rotateY, skewY: analysisData.skewY }}
             />
           ) : (
-            <div {...getRootProps()} className={`absolute inset-0 flex flex-col items-center justify-center cursor-pointer transition-all border-2 border-dashed border-zinc-800 m-8 rounded-3xl ${isDragActive ? 'bg-emerald-500/10' : 'hover:bg-zinc-800/50'}`}>
-              <input {...getInputProps()} />
-              <ImageIcon className="w-12 h-12 opacity-20 mb-4" />
-              <p className="font-mono text-xs uppercase opacity-30 tracking-widest text-center px-12">Upload room photo to begin</p>
+            <div {...roomDrop.getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-800/50 border-2 border-dashed border-zinc-800 m-8 rounded-3xl transition-all">
+              <input {...roomDrop.getInputProps()} />
+              <Upload className="w-12 h-12 opacity-20 mb-4" />
+              <p className="font-mono text-xs uppercase opacity-30 tracking-widest px-12 text-center">Step 1: Upload Room Image</p>
             </div>
           )}
         </div>
       </div>
 
-      <div className="w-[450px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
-        <div className="p-6 border-b border-zinc-800 sticky top-0 bg-zinc-950/90 backdrop-blur-md z-10">
-          <button 
-            onClick={handleCreateForMe}
-            disabled={isGenerating || isAnalyzing || !roomImage}
-            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white text-base font-bold uppercase tracking-widest rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-30"
-          >
-            {isGenerating ? <><Sparkles className="w-5 h-5 animate-spin" /> WEAVING MAGIC...</> : <><Sparkles className="w-5 h-5" /> MAKE ME FEEL SPECIAL</>}
-          </button>
-        </div>
+      {/* SAĞ: KONTROL PANELİ */}
+      <div className="w-[480px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto custom-scrollbar">
+        <div className="p-6 space-y-8">
+          <div className="flex flex-col gap-4">
+            <button 
+              onClick={handleCreateForMe}
+              disabled={isGenerating || !roomImage}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-20"
+            >
+              {isGenerating ? 'DESIGNING...' : 'MAKE ME FEEL SPECIAL'}
+            </button>
+          </div>
 
-        <div className="p-6 space-y-4">
-          <h2 className="text-lg font-bold tracking-tight flex items-center gap-2 mb-4"><Sparkles className="w-5 h-5 text-indigo-400" /> Top Matches</h2>
-          
-          {recommendations.length === 0 && !isAnalyzing && (
-            <div className="text-center py-12 opacity-20 font-mono text-[10px] uppercase tracking-widest">Upload photo to see matches</div>
-          )}
+          <div className="grid grid-cols-1 gap-6 pb-20">
+            {/* STİL & TEMA SEÇİMİ */}
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500"><Layout className="w-3 h-3"/> Category & Theme</label>
+              <div className="grid grid-cols-2 gap-2">
+                <select value={selectedTheme} onChange={(e)=>setSelectedTheme(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
+                  {THEMES.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <select value={selectedStyle} onChange={(e)=>setSelectedStyle(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
+                  {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            </div>
 
-          {recommendations.map((product) => {
-            const isSelected = selectedProduct?.id === product.id;
-            return (
-              <div key={product.id} className={`rounded-xl border transition-all overflow-hidden ${isSelected ? 'border-indigo-500 bg-zinc-900/50' : 'border-zinc-800 hover:border-zinc-700 cursor-pointer'}`} onClick={() => setSelectedProduct(product)}>
-                <div className="p-4 flex gap-4">
-                  <img src={product.image} className="w-20 h-20 rounded-lg object-cover border border-zinc-800 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-bold text-sm truncate">{product.title}</h3>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-zinc-400">
-                      <span className="flex items-center gap-1 font-medium text-zinc-200">${calculatePrice(product).toFixed(2)}</span>
+            {/* BOYUT SEÇİMİ */}
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500"><Maximize2 className="w-3 h-3"/> Choose Dimensions</label>
+              <div className="grid grid-cols-3 gap-2">
+                {SIZES.map(s => (
+                  <button key={s.value} onClick={()=>setSelectedSize(s)} className={`p-3 rounded-xl border text-[10px] font-bold transition-all ${selectedSize.value === s.value ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 text-zinc-400 border-zinc-800'}`}>
+                    {s.label}<br/><span className="opacity-50">${s.price}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* TYPOGRAPHY CONTROL */}
+            <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
+              <div className="flex items-center gap-3">
+                <Type className="w-4 h-4 text-zinc-400" />
+                <span className="text-xs font-medium">Include Poster Text?</span>
+              </div>
+              <button onClick={()=>setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
+                <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-1' : 'left-1'}`} />
+              </button>
+            </div>
+
+            {/* REFERANS GÖRSEL YÜKLEME */}
+            <div className="space-y-4">
+              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500"><ImageIcon className="w-3 h-3"/> Reference (Optional)</label>
+              <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer transition-all text-center">
+                <input {...refDrop.getInputProps()} />
+                {refImage ? <img src={refImage} className="h-20 mx-auto rounded-lg shadow-xl" /> : <p className="text-[10px] text-zinc-600">Drop an image to match its style</p>}
+              </div>
+            </div>
+
+            {/* ÖNERİLER (ANALİZDEN SONRA) */}
+            {recommendations.length > 0 && (
+              <div className="pt-6 border-t border-zinc-800 space-y-4">
+                <h3 className="text-sm font-bold flex items-center gap-2"><Sparkles className="w-4 h-4 text-indigo-400"/> AI Artist Selection</h3>
+                {recommendations.map((p) => (
+                  <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
+                    <div className="flex gap-4 items-center">
+                      <img src={p.image} className="w-16 h-16 rounded-xl object-cover border border-zinc-800" />
+                      <div>
+                        <h4 className="text-xs font-bold">{p.title}</h4>
+                        <p className="text-[10px] text-zinc-500 mt-1">${(p.basePrice).toFixed(2)} - Free Shipping</p>
+                      </div>
                     </div>
                   </div>
-                </div>
-
-                <AnimatePresence>
-                  {isSelected && (
-                    <motion.div initial={{ height: 0 }} animate={{ height: 'auto' }} exit={{ height: 0 }} className="px-4 pb-4 pt-2 border-t border-zinc-800/50 space-y-4 bg-zinc-900/30 overflow-hidden">
-                      <div>
-                        <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2 block">Size</label>
-                        <div className="grid grid-cols-3 gap-2">
-                          {(['12x18', '18x24', '24x36'] as SizeType[]).map(size => (
-                            <button key={size} onClick={(e) => { e.stopPropagation(); setSelectedSize(size); }} className={`py-2 text-[10px] font-bold rounded-lg border ${selectedSize === size ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{size}"</button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2 block">Orientation</label>
-                          <div className="flex gap-2">
-                            {(['portrait', 'landscape'] as const).map(o => (
-                              <button key={o} onClick={(e) => { e.stopPropagation(); setOrientation(o); }} className={`flex-1 py-2 text-[10px] font-bold rounded-lg border capitalize ${orientation === o ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{o}</button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 mb-2 block">Frame</label>
-                          <div className="flex gap-2">
-                            {(['unframed', 'black', 'oak'] as FrameType[]).map(f => (
-                              <button key={f} onClick={(e) => { e.stopPropagation(); setSelectedFrame(f); }} className={`flex-1 py-2 rounded-lg border flex items-center justify-center ${selectedFrame === f ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800'}`}>
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: FRAME_COLORS[f] || '#fff' }}></div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                      <button onClick={(e) => { e.stopPropagation(); addToCart({ ...product, price: calculatePrice(product) }); }} className="w-full py-3 bg-zinc-100 text-zinc-900 font-bold text-xs rounded-xl flex items-center justify-center gap-2">
-                        <ShoppingBag className="w-4 h-4" /> Buy Now - ${calculatePrice(product).toFixed(2)}
-                      </button>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                ))}
               </div>
-            );
-          })}
+            )}
+          </div>
         </div>
       </div>
     </div>
