@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout, Lock } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
-import { supabase } from '../lib/supabase'; // Supabase eklendi
+import { supabase } from '../lib/supabase';
 
 type SizeType = '8x10' | '11x14' | '16x20' | '18x24' | '20x30' | '24x36';
 type FrameType = 'unframed' | 'black' | 'oak';
@@ -58,7 +58,7 @@ export function Home() {
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
     if (!user) {
-      alert("Lütfen önce giriş yapın.");
+      alert("Please login to proceed.");
       return;
     }
 
@@ -108,11 +108,11 @@ export function Home() {
 
   const handleCreateForMe = async () => {
     if (!user) {
-      alert("Yapay zekayı kullanmak için giriş yapmalısınız.");
+      alert("Please sign in to use the AI Generator.");
       return;
     }
     if (tokens <= 0) {
-      alert("Yetersiz jeton! Lütfen jeton satın alın.");
+      alert("Insufficient tokens! Please refill your balance.");
       return;
     }
     if (!analysisData || isGenerating) return;
@@ -121,7 +121,7 @@ export function Home() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      useToken();
+      await useToken();
 
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
       const prompt = `Act as a world-class 4K abstract painter. 
@@ -146,13 +146,31 @@ export function Home() {
       if (imgPart?.inlineData) {
         const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         
-        // SONSUZ STOK KAYIT MANTIĞI EKLENDİ
+        let seoTitle = `AI Masterpiece - ${selectedTheme}`;
+        let seoDescription = `Custom AI designed art in ${selectedStyle} style.`;
+        
+        try {
+          const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `Create a professional SEO title and a 2-sentence artistic description for a ${selectedStyle} style poster with theme ${selectedTheme}. Return ONLY JSON: { "title": "...", "description": "..." }` }] }]
+            })
+          });
+          const seoData = await seoRes.json();
+          const parsedSeo = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+          seoTitle = parsedSeo.title;
+          seoDescription = parsedSeo.description;
+        } catch (e) { console.error("SEO failed", e); }
+
         const { data: newProduct } = await supabase
           .from('products')
           .insert([{
             creator_id: user.id,
-            title: `AI Masterpiece - ${selectedTheme}`,
+            title: seoTitle,
+            description: seoDescription,
             image_url: base64Image,
+            category: selectedStyle,
             price: 49.00, 
             stock: -1, 
             is_private: false
@@ -161,11 +179,11 @@ export function Home() {
 
         const product = { 
           id: newProduct?.id || Date.now().toString(), 
-          title: `AI Masterpiece - ${selectedTheme}`, 
+          title: seoTitle, 
           image: base64Image, 
           basePrice: selectedSize.price, 
           category: selectedStyle,
-          description: `Custom AI designed art.`,
+          description: seoDescription,
           isGenerated: true 
         };
         setRecommendations([product, ...recommendations.slice(0, 2)]);
