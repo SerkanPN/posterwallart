@@ -40,10 +40,7 @@ export const useStore = create<StoreState>()(
       loginWithGoogle: async () => {
         set({ isLoading: true });
         const { error } = await supabase.auth.signInWithOAuth({
-          provider: 'google',
-          options: {
-            redirectTo: `${window.location.origin}/`,
-          }
+          provider: 'google'
         });
         if (error) alert(error.message);
         set({ isLoading: false });
@@ -51,12 +48,7 @@ export const useStore = create<StoreState>()(
 
       login: async (email: string) => {
         set({ isLoading: true });
-        const { error } = await supabase.auth.signInWithOtp({ 
-          email,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-          }
-        });
+        const { error } = await supabase.auth.signInWithOtp({ email });
         if (error) alert(error.message);
         else {
           alert('Magic link sent to your email! Please check your inbox.');
