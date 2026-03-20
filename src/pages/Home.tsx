@@ -33,7 +33,6 @@ const STYLES = [
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
-// Eklentileri çökertmeyen Blob dönüştürücü
 const base64ToBlob = (base64Data: string, contentType: string = 'image/png') => {
   const byteCharacters = atob(base64Data.split(',')[1]);
   const byteArrays = [];
@@ -129,41 +128,112 @@ export function Home() {
     if (isGenerating) return; 
 
     setIsGenerating(true);
-    console.log("2. Üretim süreci başlatılıyor, Supabase'den jeton düşülecek...");
+    let tokenDeducted = false;
 
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      await useToken();
+      console.log("2. Üretim süreci başlatılıyor, Supabase'den jeton düşülecek...");
+      const success = await useToken();
+      if (!success) throw new Error("Jeton düşülemedi!");
+      
+      tokenDeducted = true;
       console.log("3. Jeton başarıyla düşüldü!");
 
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
       
       const prompt = `You are a world-class master artist and elite visual designer specializing in premium wall art.
+
 Your task is to create a high-end, commercially viable poster design that people would proudly hang in their homes. This is NOT a generic image — it must feel like a masterpiece artwork.
+
+---
 
 CORE OBJECTIVE:
 Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders.
 
+---
+
 MANDATORY RULES (STRICTLY ENFORCED):
-1. EDGE-TO-EDGE COMPOSITION: The artwork MUST completely fill the entire ${ar} canvas. NO white borders, NO margins, NO frames, NO padding, NO empty edges.
+
+1. EDGE-TO-EDGE COMPOSITION:
+The artwork MUST completely fill the entire canvas.
+NO white borders, NO margins, NO frames, NO padding, NO empty edges.
+
 2. NO TEXT / TYPOGRAPHY CONTROL:
 ${includeText ? '- Include minimal, elegant, stylistically appropriate typography integrated naturally into the composition.' : '- ABSOLUTELY NO text, letters, signatures, watermarks, logos, or random characters anywhere in the image.'}
-3. ULTRA HIGH DETAIL FOR UPSCALING: The image MUST be ultra-detailed, hyper-realistic or hyper-illustrative, extremely sharp, high contrast, crisp edges, rich textures, fine details, professional lighting, masterpiece quality, 8k-level detailing. Avoid blurry areas, muddy textures, low-detail regions, washed colors.
-4. STYLE + THEME FUSION: Seamlessly blend the ${selectedStyle} style and ${selectedTheme} theme into a single cohesive artistic vision. They must NOT conflict — instead they must enhance each other like a professional art direction.
-${refImage ? '5. REFERENCE IMAGE INFLUENCE: DO NOT copy or replicate the reference image. ONLY extract and reinterpret color palette, lighting style, mood / atmosphere, contrast balance. Transform these into a completely new, original composition.' : ''}
-6. PERFECT COMPOSITION & FRAMING: Respect the selected orientation: ${orientation}. Use strong composition principles, clear subject focus, balanced negative space (without empty borders).
-7. VISUAL IMPACT: The result must feel premium, gallery-worthy, emotionally engaging, highly decorative.
+
+3. ULTRA HIGH DETAIL FOR UPSCALING:
+The image MUST be:
+ultra-detailed, hyper-realistic or hyper-illustrative (depending on style),
+extremely sharp, high contrast, crisp edges,
+rich textures, fine details, professional lighting,
+masterpiece quality, 8k-level detailing (even if rendered lower resolution).
+
+Avoid:
+blurry areas, muddy textures, low-detail regions, washed colors.
+
+4. STYLE + THEME FUSION:
+Seamlessly blend the selected STYLE and THEME into a single cohesive artistic vision.
+They must NOT conflict — instead they must enhance each other like a professional art direction.
+
+5. REFERENCE IMAGE INFLUENCE (IF PROVIDED):
+DO NOT copy or replicate the reference image.
+ONLY extract and reinterpret:
+- color palette
+- lighting style
+- mood / atmosphere
+- contrast balance
+
+Transform these into a completely new, original composition.
+
+6. PERFECT COMPOSITION & FRAMING:
+- Respect the selected orientation: ${orientation}
+- Use strong composition principles (rule of thirds, depth, focal hierarchy)
+- Clear subject focus, balanced negative space (without empty borders)
+
+7. VISUAL IMPACT:
+The result must feel:
+premium, gallery-worthy, emotionally engaging, highly decorative.
+
+---
+
+DYNAMIC INPUTS:
+
+STYLE: ${selectedStyle}
+THEME: ${selectedTheme}
+ORIENTATION: ${orientation}
+COLOR MOOD: ${refImage ? 'Match reference image' : 'Auto'}
+INCLUDE_TEXT: ${includeText ? 'TRUE' : 'FALSE'}
+TEXT_CONTENT: ${includeText ? 'Minimal typography' : 'NONE'}
+
+---
 
 FINAL PROMPT CONSTRUCTION:
+
 Create an original artwork in the style of ${selectedStyle}, centered around ${selectedTheme}.
+
 The composition must be cinematic, visually striking, and deeply detailed, with a strong focal point and immersive depth.
+
 Lighting should be dramatic and professional, with rich contrast and refined color harmony.
+
+${refImage ? 'If a reference image is provided, subtly incorporate its color palette and atmosphere while keeping the composition entirely original.' : ''}
+
+Ensure the artwork is:
+ultra-detailed, hyper-crisp, sharp focus, high texture fidelity, masterpiece quality.
+
 The image MUST fill the entire canvas edge-to-edge with no borders or empty space.
-Resolution: 1024px.
+
+${includeText ? 'Add minimal, elegant typography perfectly integrated into the design.' : 'Do NOT include any text, letters, signature, watermark, or symbols.'}
+
+---
 
 OUTPUT STYLE TAGS (ALWAYS INCLUDE):
-masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 8k detail, gallery artwork, premium poster design`;
+masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 8k detail, gallery artwork, premium poster design
+
+Avoid:
+low quality, blurry, distorted anatomy, bad composition, flat lighting, dull colors, empty areas
+
+The artwork should be highly appealing for modern interior decoration, suitable for living rooms, bedrooms, and office spaces.`;
 
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
@@ -186,7 +256,7 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         let finalImageUrl = base64Image; 
 
-        console.log("5.5. Görsel Supabase Storage'a yükleniyor (Blob kullanılıyor)...");
+        console.log("5.5. Görsel Supabase Storage'a yükleniyor...");
         try {
           const blob = base64ToBlob(base64Image);
           const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
@@ -198,9 +268,7 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
           if (!uploadError) {
             const { data: publicUrlData } = supabase.storage.from('artworks').getPublicUrl(fileName);
             finalImageUrl = publicUrlData.publicUrl;
-            console.log("5.6. Storage yüklemesi başarılı! Hızlı link alındı.");
-          } else {
-             console.error("Storage yükleme hatası:", uploadError);
+            console.log("5.6. Storage yüklemesi başarılı!");
           }
         } catch (e) {
           console.error("Blob dönüştürme/yükleme hatası:", e);
@@ -231,7 +299,7 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
           };
 
           try {
-            console.log("6. Arka planda SEO verileri için Gemini API'ye (flash-latest) istek atılıyor...");
+            console.log("6. Arka planda SEO verileri için Gemini API'ye istek atılıyor...");
             const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -244,10 +312,9 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
               const seoData = await seoRes.json();
               if (seoData.candidates && seoData.candidates[0]) {
                  aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-                 console.log("7. SEO verileri başarıyla oluşturuldu.");
               }
             }
-          } catch (e) { console.error("SEO Gen failed, using defaults", e); }
+          } catch (e) { console.error("SEO Gen failed", e); }
 
           const now = new Date();
           const dateStr = now.toISOString().split('T')[0];
@@ -273,10 +340,8 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
             }])
             .select().single();
 
-          if (supabaseError) {
-             console.error("Supabase Insert Error:", supabaseError);
-          } else if (newProduct) {
-             console.log("9. Ürün Supabase'e başarıyla eklendi ve işlem tamamlandı!");
+          if (newProduct) {
+             console.log("9. İşlem tamamlandı!");
              const finalProduct = { 
                 id: newProduct.id, 
                 title: aiMeta.title, 
@@ -293,12 +358,20 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
           }
         })(); 
       } else {
-        console.error("Görsel datası API'den boş döndü.");
-        setIsGenerating(false); 
+        throw new Error("Görsel datası API'den boş döndü.");
       }
     } catch (e) { 
       console.error("Üretim sırasında hata oluştu:", e); 
-      alert("Failed to generate image. Please check your console for details.");
+      
+      if (tokenDeducted) {
+        const { addTokens } = useStore.getState();
+        addTokens(1);
+        console.log("Sunucu hatası nedeniyle 1 jeton iade edildi.");
+        alert("API sunucuları meşgul veya hata oluştu. Jetonunuz iade edildi, lütfen tekrar deneyin.");
+      } else {
+        alert("Bir hata oluştu. Lütfen tekrar deneyin.");
+      }
+      
       setIsGenerating(false);
     } 
   };
