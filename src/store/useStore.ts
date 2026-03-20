@@ -35,7 +35,7 @@ interface StoreState {
   checkUser: () => Promise<void>;
   
   addTokens: (amount: number) => void;
-  useToken: () => boolean;
+  useToken: () => Promise<boolean>; // Veritabanı güncellemesi için Promise oldu
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
@@ -57,7 +57,7 @@ export const useStore = create<StoreState>()(
         if (error) {
           alert(error.message);
         } else {
-          alert('Giriş linki e-posta adresine gönderildi! Lütfen kontrol et.');
+          alert('Login link sent to your email! Please check your inbox.');
         }
         set({ isLoading: false });
       },
@@ -65,39 +65,51 @@ export const useStore = create<StoreState>()(
       logout: async () => {
         await supabase.auth.signOut();
         set({ user: null });
-        // Çıkış yapınca sepeti temizlemek istersen: set({ cart: [], wishlist: [] });
       },
 
       checkUser: async () => {
         const { data: { session } } = await supabase.auth.getSession();
-        const currentUser = get().user;
 
-        if (session) {
-          // Eğer zaten bir kullanıcı varsa ve jetonları güncellenmişse, 
-          // 5 jetonla üzerine yazma (Kalıcılık anahtarı burası)
-          set({ 
-            user: { 
-              id: session.user.id, 
-              name: session.user.email?.split('@')[0] || 'User', 
-              email: session.user.email || '', 
-              tokens: currentUser?.id === session.user.id ? currentUser.tokens : 5, 
-              isSeller: false 
-            } 
-          });
-        }
-        
-        supabase.auth.onAuthStateChange((_event, session) => {
-          if (session) {
-            const updatedUser = get().user;
+        const syncProfile = async (authSession: any) => {
+          if (!authSession) return;
+
+          // Veritabanından profili çek
+          let { data: profile, error } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', authSession.user.id)
+            .single();
+
+          // Profil yoksa oluştur (İlk giriş)
+          if (!profile && !error) {
+            const { data: newProfile } = await supabase
+              .from('profiles')
+              .insert([{ id: authSession.user.id, email: authSession.user.email, tokens: 5 }])
+              .select()
+              .single();
+            profile = newProfile;
+          }
+
+          if (profile) {
             set({ 
               user: { 
-                id: session.user.id, 
-                name: session.user.email?.split('@')[0] || 'User', 
-                email: session.user.email || '', 
-                tokens: updatedUser?.id === session.user.id ? updatedUser.tokens : 5, 
+                id: authSession.user.id, 
+                name: authSession.user.email?.split('@')[0] || 'User', 
+                email: authSession.user.email || '', 
+                tokens: profile.tokens, 
                 isSeller: false 
               } 
             });
+          }
+        };
+
+        if (session) {
+          await syncProfile(session);
+        }
+        
+        supabase.auth.onAuthStateChange(async (_event, session) => {
+          if (session) {
+            await syncProfile(session);
           } else {
             set({ user: null });
           }
@@ -108,11 +120,24 @@ export const useStore = create<StoreState>()(
         user: state.user ? { ...state.user, tokens: state.user.tokens + amount } : null 
       })),
 
-      useToken: () => {
+      useToken: async () => {
         const { user } = get();
         if (user && user.tokens > 0) {
-          set({ user: { ...user, tokens: user.tokens - 1 } });
-          return true;
+          const newTokenCount = user.tokens - 1;
+
+          // Veritabanını güncelle
+          const { error } = await supabase
+            .from('profiles')
+            .update({ tokens: newTokenCount })
+            .eq('id', user.id);
+
+          if (!error) {
+            set({ user: { ...user, tokens: newTokenCount } });
+            return true;
+          } else {
+            console.error("Token update error:", error);
+            return false;
+          }
         }
         return false;
       },
@@ -144,12 +169,12 @@ export const useStore = create<StoreState>()(
       clearCart: () => set({ cart: [] }),
     }),
     {
-      name: 'posterwall-storage', // LocalStorage'da bu isimle saklanır
+      name: 'posterwall-storage',
       partialize: (state) => ({ 
         user: state.user, 
         cart: state.cart, 
         wishlist: state.wishlist 
-      }), // Sadece bu alanları kaydet, isLoading gibi geçici şeyleri kaydetme
+      }),
     }
   )
 );
