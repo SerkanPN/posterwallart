@@ -5,7 +5,19 @@ import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Pa
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 
-// VERİ SETLERİ
+type SizeType = '8x10' | '11x14' | '16x20' | '18x24' | '20x30' | '24x36';
+type FrameType = 'unframed' | 'black' | 'oak';
+
+interface Product {
+  id: string;
+  title: string;
+  basePrice: number;
+  image: string;
+  category: string;
+  description: string;
+  isGenerated?: boolean;
+}
+
 const SIZES = [
   { label: '8x10"', price: 22, value: '8x10' },
   { label: '11x14"', price: 24, value: '11x14' },
@@ -23,29 +35,25 @@ const STYLES = [
 ];
 
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
-
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 export function Home() {
   const { user, addToCart } = useStore();
   const [roomImage, setRoomImage] = useState<string | null>(null);
-  const [refImage, setRefImage] = useState<string | null>(null); // Örnek poster
+  const [refImage, setRefImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<any>(null);
+  const [recommendations, setRecommendations] = useState<Product[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  // KULLANICI SEÇİMLERİ (UI)
-  const [selectedSize, setSelectedSize] = useState(SIZES[SIZES.length-1]); // Varsayılan 24x36
+  const [selectedSize, setSelectedSize] = useState(SIZES[SIZES.length-1]);
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [selectedTheme, setSelectedTheme] = useState('Abstract');
   const [includeText, setIncludeText] = useState(false);
-  const [selectedFrame, setSelectedFrame] = useState('unframed');
+  const [selectedFrame, setSelectedFrame] = useState<FrameType>('unframed');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
-
   const [analysisData, setAnalysisData] = useState<any>(null);
 
-  // ODA FOTOĞRAFI YÜKLEME
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
@@ -59,7 +67,6 @@ export function Home() {
     }
   }, []);
 
-  // ÖRNEK POSTER YÜKLEME
   const onDropRef = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
     if (file) {
@@ -81,7 +88,7 @@ export function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [
-            { text: "Analyze room objects for scale. Return PPI for the focal wall (range 4-10) and perspective (rotateY -15 to 15). Detect style and mood. Return ONLY JSON: { \"ppi\": number, \"rotateY\": number, \"skewY\": number, \"detectedStyle\": \"string\" }" },
+            { text: "Analyze room. Estimate PPI for focal wall (scale 5-10). Estimate perspective (rotateY -15 to 15). Detect style. Return ONLY JSON: { \"ppi\": number, \"rotateY\": number, \"skewY\": number, \"detectedStyle\": \"string\" }" },
             { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
           ]}]
         })
@@ -98,15 +105,17 @@ export function Home() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      const prompt = `Act as a professional poster designer.
-      OBJECTIVE: Create a ${orientation} artwork.
-      USER PREFERENCES: Style: ${selectedStyle}, Theme: ${selectedTheme}, metin: ${includeText ? 'Add aesthetic minimal typography' : 'Strictly NO text'}.
-      COMPOSITION: Leave a 'safe area' (padding) around the main elements so it fits any aspect ratio.
-      ${refImage ? 'INSPIRED BY: User provided an example image, match its vibe and composition style.' : ''}
-      OUTPUT: High-end, Pinterest-worthy digital art file only.`;
+      const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
+      const prompt = `Act as a world-class 4K abstract painter. 
+      OBJECTIVE: Create a high-end, aesthetic, modern digital painting that EXACTLY fits a ${ar} aspect ratio. 
+      MANDATORY: Fill the entire frame. Do NOT leave any borders, paddings, or blank spaces on the sides.
+      USER PREFERENCES: Style: ${selectedStyle}, Theme: ${selectedTheme}, Text: ${includeText ? 'Add aesthetic minimal typography' : 'Strictly NO text, NO letters, NO numbers'}.
+      Resolution: 4K (Ultra High Definition). Pinterest-worthy masterpiece.
+      ${refImage ? 'INSPIRED BY: User provided a reference image, match its color vibe and composition.' : ''}
+      OUTPUT: High-end digital art file only.`;
 
-      const contents = [{ parts: [{ text: prompt }] }];
-      if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } } as any);
+      const contents: any = [{ parts: [{ text: prompt }] }];
+      if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
@@ -119,16 +128,31 @@ export function Home() {
 
       if (imgPart?.inlineData) {
         const newArt = `data:image/png;base64,${imgPart.inlineData.data}`;
-        const product = { id: Date.now().toString(), title: `Custom ${selectedTheme}`, image: newArt, basePrice: selectedSize.price, description: `${selectedStyle} masterpiece.` };
-        setRecommendations([product, ...recommendations]);
+        const product = { 
+          id: Date.now().toString(), 
+          title: `Custom ${selectedTheme}`, 
+          image: newArt, 
+          basePrice: selectedSize.price, 
+          category: selectedStyle,
+          description: `Custom ${selectedStyle} design.`,
+          isGenerated: true 
+        };
+        setRecommendations([product, ...recommendations.slice(0, 2)]);
         setSelectedProduct(product);
       }
     } catch (e) { console.error(e); } finally { setIsGenerating(false); }
   };
 
+  const calculatePrice = (product: Product) => {
+    return product.basePrice;
+  };
+
+  const [pw, ph] = selectedSize.value.split('x').map(Number);
+  const physicalWidth = orientation === 'portrait' ? pw : ph;
+  const physicalHeight = orientation === 'portrait' ? ph : pw;
+
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
-      {/* SOL: CANVAS ALANI */}
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
           {isAnalyzing ? (
@@ -140,8 +164,8 @@ export function Home() {
             <InteractiveCanvas 
               backgroundImage={roomImage} 
               mountedArt={selectedProduct?.image || null} 
-              physicalWidth={orientation === 'portrait' ? Number(selectedSize.value.split('x')[0]) : Number(selectedSize.value.split('x')[1])}
-              physicalHeight={orientation === 'portrait' ? Number(selectedSize.value.split('x')[1]) : Number(selectedSize.value.split('x')[0])}
+              physicalWidth={physicalWidth}
+              physicalHeight={physicalHeight}
               naturalPixelsPerInch={analysisData.ppi}
               frameColor={(FRAME_COLORS as any)[selectedFrame]}
               perspective={{ rotateY: analysisData.rotateY, skewY: analysisData.skewY }}
@@ -156,23 +180,19 @@ export function Home() {
         </div>
       </div>
 
-      {/* SAĞ: KONTROL PANELİ */}
-      <div className="w-[480px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto custom-scrollbar">
-        <div className="p-6 space-y-8">
-          <div className="flex flex-col gap-4">
-            <button 
-              onClick={handleCreateForMe}
-              disabled={isGenerating || !roomImage}
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-20"
-            >
-              {isGenerating ? 'DESIGNING...' : 'MAKE ME FEEL SPECIAL'}
-            </button>
-          </div>
+      <div className="w-[480px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
+        <div className="p-6 space-y-8 pb-24">
+          <button 
+            onClick={handleCreateForMe}
+            disabled={isGenerating || !roomImage}
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-20"
+          >
+            {isGenerating ? 'DESIGNING...' : 'MAKE ME FEEL SPECIAL'}
+          </button>
 
-          <div className="grid grid-cols-1 gap-6 pb-20">
-            {/* STİL & TEMA SEÇİMİ */}
+          <div className="space-y-6">
             <div className="space-y-4">
-              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500"><Layout className="w-3 h-3"/> Category & Theme</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Category & Theme</label>
               <div className="grid grid-cols-2 gap-2">
                 <select value={selectedTheme} onChange={(e)=>setSelectedTheme(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
                   {THEMES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -183,9 +203,8 @@ export function Home() {
               </div>
             </div>
 
-            {/* BOYUT SEÇİMİ */}
             <div className="space-y-4">
-              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500"><Maximize2 className="w-3 h-3"/> Choose Dimensions</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Dimensions</label>
               <div className="grid grid-cols-3 gap-2">
                 {SIZES.map(s => (
                   <button key={s.value} onClick={()=>setSelectedSize(s)} className={`p-3 rounded-xl border text-[10px] font-bold transition-all ${selectedSize.value === s.value ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 text-zinc-400 border-zinc-800'}`}>
@@ -195,37 +214,52 @@ export function Home() {
               </div>
             </div>
 
-            {/* TYPOGRAPHY CONTROL */}
-            <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
-              <div className="flex items-center gap-3">
-                <Type className="w-4 h-4 text-zinc-400" />
-                <span className="text-xs font-medium">Include Poster Text?</span>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-4">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Orientation</label>
+                <div className="flex gap-2">
+                  {(['portrait', 'landscape'] as const).map(o => (
+                    <button key={o} onClick={()=>setOrientation(o)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg border capitalize ${orientation === o ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{o}</button>
+                  ))}
+                </div>
               </div>
+              <div className="space-y-4">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Frame</label>
+                <div className="flex gap-2">
+                  {(['unframed', 'black', 'oak'] as FrameType[]).map(f => (
+                    <button key={f} onClick={()=>setSelectedFrame(f)} className={`flex-1 py-2 rounded-lg border flex items-center justify-center ${selectedFrame === f ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800'}`}>
+                      <div className="w-3 h-3 rounded-full border border-zinc-700" style={{ backgroundColor: FRAME_COLORS[f] || '#fff' }}></div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
+              <span className="text-xs font-medium">Include Poster Text?</span>
               <button onClick={()=>setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-1' : 'left-1'}`} />
               </button>
             </div>
 
-            {/* REFERANS GÖRSEL YÜKLEME */}
             <div className="space-y-4">
-              <label className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500"><ImageIcon className="w-3 h-3"/> Reference (Optional)</label>
-              <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer transition-all text-center">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference (Optional)</label>
+              <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer text-center">
                 <input {...refDrop.getInputProps()} />
-                {refImage ? <img src={refImage} className="h-20 mx-auto rounded-lg shadow-xl" /> : <p className="text-[10px] text-zinc-600">Drop an image to match its style</p>}
+                {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" /> : <p className="text-[10px] text-zinc-600">Drop style reference here</p>}
               </div>
             </div>
 
-            {/* ÖNERİLER (ANALİZDEN SONRA) */}
             {recommendations.length > 0 && (
               <div className="pt-6 border-t border-zinc-800 space-y-4">
-                <h3 className="text-sm font-bold flex items-center gap-2"><Sparkles className="w-4 h-4 text-indigo-400"/> AI Artist Selection</h3>
+                <h3 className="text-sm font-bold">AI Artist Selection</h3>
                 {recommendations.map((p) => (
                   <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
                     <div className="flex gap-4 items-center">
-                      <img src={p.image} className="w-16 h-16 rounded-xl object-cover border border-zinc-800" />
-                      <div>
-                        <h4 className="text-xs font-bold">{p.title}</h4>
-                        <p className="text-[10px] text-zinc-500 mt-1">${(p.basePrice).toFixed(2)} - Free Shipping</p>
+                      <img src={p.image} className="w-14 h-14 rounded-lg object-cover" />
+                      <div className="flex-1 min-w-0">
+                        <h4 className="text-xs font-bold truncate">{p.title}</h4>
+                        <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: calculatePrice(p) }); }} className="text-[10px] text-emerald-500 font-bold mt-1">ADD TO CART • ${p.basePrice}</button>
                       </div>
                     </div>
                   </div>
