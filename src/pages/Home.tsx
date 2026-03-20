@@ -33,6 +33,22 @@ const STYLES = [
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
+// Eklentileri çökertmeyen Blob dönüştürücü
+const base64ToBlob = (base64Data: string, contentType: string = 'image/png') => {
+  const byteCharacters = atob(base64Data.split(',')[1]);
+  const byteArrays = [];
+  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+    const slice = byteCharacters.slice(offset, offset + 512);
+    const byteNumbers = new Array(slice.length);
+    for (let i = 0; i < slice.length; i++) {
+      byteNumbers[i] = slice.charCodeAt(i);
+    }
+    const byteArray = new Uint8Array(byteNumbers);
+    byteArrays.push(byteArray);
+  }
+  return new Blob(byteArrays, { type: contentType });
+};
+
 export function Home() {
   const { user, tokens, useToken, addToCart, setAuthModalOpen } = useStore();
   
@@ -170,10 +186,9 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         let finalImageUrl = base64Image; 
 
-        console.log("5.5. Görsel Supabase Storage'a yükleniyor (Işık hızında mağaza için)...");
+        console.log("5.5. Görsel Supabase Storage'a yükleniyor (Blob kullanılıyor)...");
         try {
-          const fetchRes = await fetch(base64Image);
-          const blob = await fetchRes.blob();
+          const blob = base64ToBlob(base64Image);
           const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
 
           const { error: uploadError } = await supabase.storage
