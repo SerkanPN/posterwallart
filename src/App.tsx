@@ -13,7 +13,10 @@ import { useStore } from './store/useStore';
 
 export default function App() {
   const { checkUser } = useStore();
-  useEffect(() => { checkUser(); }, [checkUser]);
+
+  useEffect(() => {
+    checkUser();
+  }, [checkUser]);
 
   return (
     <BrowserRouter>
@@ -27,7 +30,8 @@ export default function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="seller" element={<SellerDashboard />} />
           <Route path="wishlist" element={<Wishlist />} />
-          <Route path="*" element={<div className="container mx-auto px-4 py-24 text-center h-screen flex flex-col justify-center"><h1 className="text-4xl font-bold uppercase tracking-tighter italic">404 - Dimension Not Found</h1></div>} />
+          {/* Fallbacks for other routes */}
+          <Route path="*" element={<div className="container mx-auto px-4 py-24 text-center"><h1 className="text-4xl font-bold uppercase">Coming Soon</h1></div>} />
         </Route>
       </Routes>
     </BrowserRouter>
