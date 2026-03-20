@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware'; // Verileri hafızada tutmak için eklendi
+import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
 
 export interface Product {
@@ -9,7 +9,7 @@ export interface Product {
   image: string;
   category: string;
   type: 'physical' | 'digital';
-  isGenerated?: boolean; // AI tasarımları için eklendi
+  isGenerated?: boolean;
 }
 
 interface CartItem extends Product {
@@ -35,7 +35,7 @@ interface StoreState {
   checkUser: () => Promise<void>;
   
   addTokens: (amount: number) => void;
-  useToken: () => Promise<boolean>; // Veritabanı güncellemesi için Promise oldu
+  useToken: () => Promise<boolean>;
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
@@ -57,7 +57,7 @@ export const useStore = create<StoreState>()(
         if (error) {
           alert(error.message);
         } else {
-          alert('Login link sent to your email! Please check your inbox.');
+          alert('Magic link sent to your email! Please check your inbox.');
         }
         set({ isLoading: false });
       },
@@ -73,15 +73,13 @@ export const useStore = create<StoreState>()(
         const syncProfile = async (authSession: any) => {
           if (!authSession) return;
 
-          // Veritabanından profili çek
-          let { data: profile, error } = await supabase
+          let { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', authSession.user.id)
             .single();
 
-          // Profil yoksa oluştur (İlk giriş)
-          if (!profile && !error) {
+          if (!profile) {
             const { data: newProfile } = await supabase
               .from('profiles')
               .insert([{ id: authSession.user.id, email: authSession.user.email, tokens: 5 }])
@@ -100,12 +98,11 @@ export const useStore = create<StoreState>()(
                 isSeller: false 
               } 
             });
+            // Eğer profil yeni oluştuktan sonra yönlendirme gerekiyorsa buraya eklenebilir
           }
         };
 
-        if (session) {
-          await syncProfile(session);
-        }
+        if (session) await syncProfile(session);
         
         supabase.auth.onAuthStateChange(async (_event, session) => {
           if (session) {
@@ -124,8 +121,6 @@ export const useStore = create<StoreState>()(
         const { user } = get();
         if (user && user.tokens > 0) {
           const newTokenCount = user.tokens - 1;
-
-          // Veritabanını güncelle
           const { error } = await supabase
             .from('profiles')
             .update({ tokens: newTokenCount })
@@ -134,9 +129,6 @@ export const useStore = create<StoreState>()(
           if (!error) {
             set({ user: { ...user, tokens: newTokenCount } });
             return true;
-          } else {
-            console.error("Token update error:", error);
-            return false;
           }
         }
         return false;
