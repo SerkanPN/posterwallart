@@ -17,6 +17,7 @@ interface Product {
   category: string;
   description: string;
   isGenerated?: boolean;
+  slug?: string;
 }
 
 const SIZES = [
@@ -40,14 +41,12 @@ const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 export function Home() {
   const { user, tokens, useToken, addToCart } = useStore();
-  
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-
   const [selectedSize, setSelectedSize] = useState(SIZES[SIZES.length-1]);
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [selectedTheme, setSelectedTheme] = useState('Abstract');
@@ -57,11 +56,7 @@ export function Home() {
   const [analysisData, setAnalysisData] = useState<any>(null);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    if (!user) {
-      alert("Please login to proceed.");
-      return;
-    }
-
+    if (!user) { alert("Please login to proceed."); return; }
     const file = acceptedFiles[0];
     if (file) {
       const reader = new FileReader();
@@ -107,30 +102,15 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    if (!user) {
-      alert("Please sign in to use the AI Generator.");
-      return;
-    }
-    if (tokens <= 0) {
-      alert("Insufficient tokens! Please refill your balance.");
-      return;
-    }
+    if (!user) { alert("Please sign in to use the AI Generator."); return; }
+    if (tokens <= 0) { alert("Insufficient tokens! Please refill your balance."); return; }
     if (!analysisData || isGenerating) return;
-
     setIsGenerating(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
     try {
       await useToken();
-
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
-      const prompt = `Act as a world-class 4K abstract painter. 
-      OBJECTIVE: Create a high-end, aesthetic, modern digital painting that EXACTLY fits a ${ar} aspect ratio. 
-      MANDATORY: Fill the entire frame. No borders.
-      USER PREFERENCES: Style: ${selectedStyle}, Theme: ${selectedTheme}, Text: ${includeText ? 'Add minimal typography' : 'Strictly NO text'}.
-      Resolution: 4K.
-      ${refImage ? 'INSPIRED BY: Match color vibe of reference image.' : ''}`;
-
+      const prompt = `Act as a world-class 4K abstract painter. Style: ${selectedStyle}, Theme: ${selectedTheme}.`;
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
@@ -139,29 +119,34 @@ export function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents })
       });
-
       const res = await response.json();
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
       if (imgPart?.inlineData) {
         const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         
-        let seoTitle = `AI Masterpiece - ${selectedTheme}`;
-        let seoDescription = `Custom AI designed art in ${selectedStyle} style.`;
-        
+        let seoTitle = "AI Masterpiece";
+        let seoDescription = "";
         try {
           const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `Create a professional SEO title and a 2-sentence artistic description for a ${selectedStyle} style poster with theme ${selectedTheme}. Return ONLY JSON: { "title": "...", "description": "..." }` }] }]
+              contents: [{ parts: [{ text: `Create a professional SEO title and a 2-sentence description for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY JSON: { "title": "...", "description": "..." }` }] }]
             })
           });
           const seoData = await seoRes.json();
           const parsedSeo = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
           seoTitle = parsedSeo.title;
           seoDescription = parsedSeo.description;
-        } catch (e) { console.error("SEO failed", e); }
+        } catch (e) { seoTitle = `${selectedStyle} ${selectedTheme} Poster`; }
+
+        // URL SLUG: title+category+poster+wall-art+date+hour
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        const hourStr = now.getHours().toString().padStart(2, '0');
+        const slugBase = `${seoTitle} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
+        const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
         const { data: newProduct } = await supabase
           .from('products')
@@ -171,8 +156,9 @@ export function Home() {
             description: seoDescription,
             image_url: base64Image,
             category: selectedStyle,
-            price: 49.00, 
-            stock: -1, 
+            slug: slug,
+            price: 49.00,
+            stock: -1,
             is_private: false
           }])
           .select().single();
@@ -184,16 +170,13 @@ export function Home() {
           basePrice: selectedSize.price, 
           category: selectedStyle,
           description: seoDescription,
-          isGenerated: true 
+          isGenerated: true,
+          slug: slug
         };
         setRecommendations([product, ...recommendations.slice(0, 2)]);
         setSelectedProduct(product);
       }
-    } catch (e) { 
-      console.error(e); 
-    } finally { 
-      setIsGenerating(false); 
-    }
+    } catch (e) { console.error(e); } finally { setIsGenerating(false); }
   };
 
   const [pw, ph] = selectedSize.value.split('x').map(Number);
@@ -248,7 +231,6 @@ export function Home() {
               </p>
             )}
           </div>
-
           <div className="space-y-6">
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Category & Theme</label>
@@ -261,7 +243,6 @@ export function Home() {
                 </select>
               </div>
             </div>
-
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Dimensions</label>
               <div className="grid grid-cols-3 gap-2">
@@ -272,7 +253,6 @@ export function Home() {
                 ))}
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-4">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Orientation</label>
@@ -293,14 +273,12 @@ export function Home() {
                 </div>
               </div>
             </div>
-
             <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
               <span className="text-xs font-medium">Include Poster Text?</span>
               <button onClick={()=>setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-1' : 'left-1'}`} />
               </button>
             </div>
-
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference (Optional)</label>
               <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer text-center">
@@ -308,7 +286,6 @@ export function Home() {
                 {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" /> : <p className="text-[10px] text-zinc-600">Drop style reference here</p>}
               </div>
             </div>
-
             {recommendations.length > 0 && (
               <div className="pt-6 border-t border-zinc-800 space-y-4">
                 <h3 className="text-sm font-bold">AI Artist Selection</h3>
