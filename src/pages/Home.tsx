@@ -81,7 +81,7 @@ export function Home() {
     setIsAnalyzing(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -121,7 +121,7 @@ export function Home() {
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents })
@@ -135,76 +135,100 @@ export function Home() {
       if (imgPart?.inlineData) {
         const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         
-        let aiMeta = { 
-          title: `${selectedStyle} Masterpiece`, 
-          description: "A beautiful AI-generated artwork.", 
-          alt_text: "AI poster", 
-          tags: ["art", selectedStyle.toLowerCase()] 
-        };
-
-        try {
-          const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `Create a professional SEO title, a 2-sentence description, alt text, and tags for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY valid JSON: { "title": "...", "description": "...", "alt_text": "...", "tags": ["..."] }` }] }]
-            })
-          });
-          
-          if (seoRes.ok) {
-            const seoData = await seoRes.json();
-            if (seoData.candidates && seoData.candidates[0]) {
-               aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-            }
-          }
-        } catch (e) { console.error("SEO Gen failed, using defaults", e); }
-
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        const hourStr = now.getHours().toString().padStart(2, '0');
-        const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
-        const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-
-        const { data: newProduct, error: supabaseError } = await supabase
-          .from('products')
-          .insert([{
-            creator_id: user.id,
-            title: aiMeta.title,
-            description: aiMeta.description,
-            alt_text: aiMeta.alt_text,
-            tags: aiMeta.tags,
-            image_url: base64Image,
-            category: selectedStyle,
-            slug: slug,
-            price: 49.00,
-            stock: -1,
-            is_private: false
-          }])
-          .select().single();
-
-        if (supabaseError) {
-           console.error("Supabase Insert Error:", supabaseError);
-        }
-
-        const product = { 
-          id: newProduct?.id || Date.now().toString(), 
-          title: aiMeta.title, 
+        // --- HIZLI EKRAN GÜNCELLEMESİ (UX İYİLEŞTİRMESİ) ---
+        const tempId = `temp-${Date.now()}`;
+        const tempProduct = { 
+          id: tempId, 
+          title: "Crafting details...", 
           image: base64Image, 
           basePrice: selectedSize.price, 
           category: selectedStyle,
-          description: aiMeta.description,
+          description: "AI is writing the story...",
           isGenerated: true,
-          slug: slug
+          slug: tempId
         };
-        setRecommendations([product, ...recommendations.slice(0, 2)]);
-        setSelectedProduct(product);
+
+        // Görseli hemen ekrana bas ve spinner'ı durdur
+        setRecommendations(prev => [tempProduct, ...prev.slice(0, 2)]);
+        setSelectedProduct(tempProduct);
+        setIsGenerating(false);
+
+        // --- ARKA PLANDA SEO ÜRETİMİ VE VERİTABANI KAYDI ---
+        (async () => {
+          let aiMeta = { 
+            title: `${selectedStyle} Masterpiece`, 
+            description: "A beautiful AI-generated artwork.", 
+            alt_text: "AI poster", 
+            tags: ["art", selectedStyle.toLowerCase()] 
+          };
+
+          try {
+            const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                contents: [{ parts: [{ text: `Create a professional SEO title, a 2-sentence description, alt text, and tags for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY valid JSON: { "title": "...", "description": "...", "alt_text": "...", "tags": ["..."] }` }] }]
+              })
+            });
+            
+            if (seoRes.ok) {
+              const seoData = await seoRes.json();
+              if (seoData.candidates && seoData.candidates[0]) {
+                 aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+              }
+            }
+          } catch (e) { console.error("SEO Gen failed, using defaults", e); }
+
+          const now = new Date();
+          const dateStr = now.toISOString().split('T')[0];
+          const hourStr = now.getHours().toString().padStart(2, '0');
+          const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
+          const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+          const { data: newProduct, error: supabaseError } = await supabase
+            .from('products')
+            .insert([{
+              creator_id: user.id,
+              title: aiMeta.title,
+              description: aiMeta.description,
+              alt_text: aiMeta.alt_text,
+              tags: aiMeta.tags,
+              image_url: base64Image,
+              category: selectedStyle,
+              slug: slug,
+              price: 49.00,
+              stock: -1,
+              is_private: false
+            }])
+            .select().single();
+
+          if (supabaseError) {
+             console.error("Supabase Insert Error:", supabaseError);
+          } else if (newProduct) {
+             // Veritabanı kaydı bittiğinde, geçici ürünü gerçek bilgilerle sessizce güncelle
+             const finalProduct = { 
+                id: newProduct.id, 
+                title: aiMeta.title, 
+                image: base64Image, 
+                basePrice: selectedSize.price, 
+                category: selectedStyle,
+                description: aiMeta.description,
+                isGenerated: true,
+                slug: slug
+             };
+             
+             setRecommendations(prev => prev.map(p => p.id === tempId ? finalProduct : p));
+             setSelectedProduct(current => current?.id === tempId ? finalProduct : current);
+          }
+        })(); // Asenkron fonksiyon bitti
+      } else {
+        setIsGenerating(false); // Görsel verisi gelmezse de spinner'ı kapat
       }
     } catch (e) { 
       console.error(e); 
       alert("Failed to generate image. Please check your API token or try again.");
-    } finally { 
-      setIsGenerating(false); 
-    }
+      setIsGenerating(false);
+    } 
   };
 
   const [pw, ph] = selectedSize.value.split('x').map(Number);
@@ -213,7 +237,6 @@ export function Home() {
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
-      {/* SIKINTIYI ÇÖZEN TEK SATIR: Parametreleri sildim */}
       <AuthModal />
       
       <div className="flex-1 p-6 flex flex-col relative">
@@ -325,14 +348,14 @@ export function Home() {
 
             {recommendations.length > 0 && (
               <div className="pt-6 border-t border-zinc-800 space-y-4">
-                <h3 className="text-sm font-bold">AI Artist Selection</h3>
+                <h3 className="text-sm font-bold uppercase italic tracking-tighter">AI Artist Selection</h3>
                 {recommendations.map((p) => (
-                  <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
+                  <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.slug === p.slug ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
                     <div className="flex gap-4 items-center">
                       <img src={p.image} className="w-14 h-14 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-bold truncate">{p.title}</h4>
-                        <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice }); }} className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider">Add to cart • ${p.basePrice}</button>
+                        <h4 className="text-xs font-bold truncate uppercase italic">{p.title}</h4>
+                        <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider">Add to cart • ${p.basePrice}</button>
                       </div>
                     </div>
                   </div>
