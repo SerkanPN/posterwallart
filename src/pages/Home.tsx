@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout, Lock } from 'lucide-react';
+import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { supabase } from '../lib/supabase';
@@ -18,8 +18,6 @@ interface Product {
   description: string;
   isGenerated?: boolean;
   slug?: string;
-  alt_text?: string;
-  tags?: string[];
 }
 
 const SIZES = [
@@ -42,13 +40,16 @@ const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'B
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 export function Home() {
+  // Store'dan kullanıcı ve jeton bilgilerini alıyoruz
   const { user, tokens, useToken, addToCart } = useStore();
+  
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+
   const [selectedSize, setSelectedSize] = useState(SIZES[SIZES.length-1]);
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [selectedTheme, setSelectedTheme] = useState('Abstract');
@@ -58,7 +59,12 @@ export function Home() {
   const [analysisData, setAnalysisData] = useState<any>(null);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    if (!user) { alert("Please login to proceed."); return; }
+    // Giriş yapmamış kullanıcı analiz bile yapamasın
+    if (!user) {
+      alert("Please login to proceed.");
+      return;
+    }
+
     const file = acceptedFiles[0];
     if (file) {
       const reader = new FileReader();
@@ -104,15 +110,32 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    if (!user) { alert("Please sign in to proceed."); return; }
-    if (tokens <= 0) { alert("Insufficient tokens! Please refill your balance."); return; }
+    // GÜVENLİK KONTROLLERİ
+    if (!user) {
+      alert("Please sign in to proceed.");
+      return;
+    }
+    if (tokens <= 0) {
+      alert("Insufficient tokens! Please refill your balance.");
+      return;
+    }
     if (!analysisData || isGenerating) return;
+
     setIsGenerating(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
+      // Jetonu harca
       await useToken();
-      const prompt = `Create a high-end 4K aesthetic digital painting. Style: ${selectedStyle}, Theme: ${selectedTheme}. Orientation: ${orientation}.`;
+
+      const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
+      const prompt = `Act as a world-class 4K abstract painter. 
+      OBJECTIVE: Create a high-end, aesthetic, modern digital painting that EXACTLY fits a ${ar} aspect ratio. 
+      MANDATORY: Fill the entire frame. No borders.
+      USER PREFERENCES: Style: ${selectedStyle}, Theme: ${selectedTheme}, Text: ${includeText ? 'Add minimal typography' : 'Strictly NO text'}.
+      Resolution: 4K.
+      ${refImage ? 'INSPIRED BY: Match color vibe of reference image.' : ''}`;
+
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
@@ -121,12 +144,13 @@ export function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents })
       });
+
       const res = await response.json();
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
       if (imgPart?.inlineData) {
         const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
-        
+
         // --- AI SEO & METADATA GENERATION ---
         let aiMeta = { title: "AI Masterpiece", description: "", alt_text: "", tags: [] };
         try {
@@ -148,7 +172,7 @@ export function Home() {
         const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
         const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-        // --- SAVE TO SUPABASE ---
+        // --- SAVE TO SUPABASE (Sonsuz Stok) ---
         const { data: newProduct } = await supabase
           .from('products')
           .insert([{
@@ -179,7 +203,11 @@ export function Home() {
         setRecommendations([product, ...recommendations.slice(0, 2)]);
         setSelectedProduct(product);
       }
-    } catch (e) { console.error(e); } finally { setIsGenerating(false); }
+    } catch (e) { 
+      console.error(e); 
+    } finally { 
+      setIsGenerating(false); 
+    }
   };
 
   const [pw, ph] = selectedSize.value.split('x').map(Number);
@@ -192,8 +220,8 @@ export function Home() {
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-20 backdrop-blur-md">
-              <div className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-[10px] uppercase tracking-widest">Architectural Analysis...</p>
+              <Loader2 className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+              <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-500">Architectural Analysis...</p>
             </div>
           ) : roomImage && analysisData ? (
             <InteractiveCanvas 
@@ -223,7 +251,7 @@ export function Home() {
           <div className="space-y-2">
             <button 
               onClick={handleCreateForMe}
-              disabled={isGenerating || !roomImage || tokens <= 0}
+              disabled={isGenerating || !roomImage || (user && tokens <= 0)}
               className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-20"
             >
               {isGenerating ? 'DESIGNING...' : 'MAKE ME FEEL SPECIAL'}
@@ -234,6 +262,7 @@ export function Home() {
               </p>
             )}
           </div>
+
           <div className="space-y-6">
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Category & Theme</label>
@@ -246,6 +275,7 @@ export function Home() {
                 </select>
               </div>
             </div>
+
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Dimensions</label>
               <div className="grid grid-cols-3 gap-2">
@@ -256,6 +286,7 @@ export function Home() {
                 ))}
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-4">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Orientation</label>
@@ -276,12 +307,14 @@ export function Home() {
                 </div>
               </div>
             </div>
+
             <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
               <span className="text-xs font-medium">Include Poster Text?</span>
               <button onClick={()=>setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-1' : 'left-1'}`} />
               </button>
             </div>
+
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference (Optional)</label>
               <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer text-center">
@@ -289,15 +322,16 @@ export function Home() {
                 {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" /> : <p className="text-[10px] text-zinc-600">Drop style reference here</p>}
               </div>
             </div>
+
             {recommendations.length > 0 && (
               <div className="pt-6 border-t border-zinc-800 space-y-4">
-                <h3 className="text-sm font-bold">AI Artist Selection</h3>
+                <h3 className="text-sm font-bold uppercase italic tracking-tighter">AI Artist Selection</h3>
                 {recommendations.map((p) => (
-                  <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
+                  <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.slug === p.slug ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
                     <div className="flex gap-4 items-center">
                       <img src={p.image} className="w-14 h-14 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-bold truncate">{p.title}</h4>
+                        <h4 className="text-xs font-bold truncate uppercase italic">{p.title}</h4>
                         <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice }); }} className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider">Add to cart • ${p.basePrice}</button>
                       </div>
                     </div>
