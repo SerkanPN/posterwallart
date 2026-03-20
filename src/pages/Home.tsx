@@ -81,6 +81,7 @@ export function Home() {
     setIsAnalyzing(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     try {
+      console.log("Oda analizi için Gemini API'ye istek atılıyor...");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -95,31 +96,30 @@ export function Home() {
         const res = await response.json();
         const data = JSON.parse(res.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
         setAnalysisData(data);
+        console.log("Oda analizi tamamlandı:", data);
       }
     } catch (e) { 
       console.error("Room analysis failed:", e); 
-      // Analiz çökse bile engellememesi için state'i null bırakıyoruz, aşağıda fallback var.
     } finally { 
       setIsAnalyzing(false); 
     }
   };
 
   const handleCreateForMe = async () => {
-    console.log("Make Me Feel Special butonuna tıklandı!"); // SESSİZ HATAYI İZLEMEK İÇİN
+    console.log("1. Make Me Feel Special butonuna tıklandı!");
 
     if (!user) { setAuthModalOpen(true); return; }
     if (tokens <= 0) { alert("Insufficient tokens! Please refill your balance."); return; }
-    
-    // DÜZELTME: !analysisData şartı kaldırıldı, artık sessizce iptal olmayacak.
     if (isGenerating) return; 
 
     setIsGenerating(true);
-    console.log("Üretim süreci başlatılıyor...");
+    console.log("2. Üretim süreci başlatılıyor, Supabase'den jeton düşülecek...");
 
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
       await useToken();
+      console.log("3. Jeton başarıyla düşüldü!");
 
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
       const prompt = `Act as a world-class 4K abstract painter. 
@@ -132,7 +132,7 @@ export function Home() {
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
-      console.log("Görsel için Gemini API'ye istek atılıyor...");
+      console.log("4. Görsel için Gemini API'ye (3.1-flash-image) istek atılıyor...");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -142,7 +142,7 @@ export function Home() {
       if (!response.ok) throw new Error("Image generation API returned an error: " + response.status);
 
       const res = await response.json();
-      console.log("Görsel yanıtı alındı!");
+      console.log("5. Görsel API'den başarıyla alındı!");
 
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
@@ -177,7 +177,7 @@ export function Home() {
           };
 
           try {
-            console.log("SEO verileri için Gemini API'ye istek atılıyor...");
+            console.log("6. Arka planda SEO verileri için Gemini API'ye (flash-latest) istek atılıyor...");
             const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -190,7 +190,7 @@ export function Home() {
               const seoData = await seoRes.json();
               if (seoData.candidates && seoData.candidates[0]) {
                  aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-                 console.log("SEO verileri başarıyla oluşturuldu.");
+                 console.log("7. SEO verileri başarıyla oluşturuldu.");
               }
             }
           } catch (e) { console.error("SEO Gen failed, using defaults", e); }
@@ -201,7 +201,7 @@ export function Home() {
           const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
           const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
-          console.log("Supabase'e kayıt yapılıyor...");
+          console.log("8. Supabase veritabanına kayıt yapılıyor...");
           const { data: newProduct, error: supabaseError } = await supabase
             .from('products')
             .insert([{
@@ -222,7 +222,7 @@ export function Home() {
           if (supabaseError) {
              console.error("Supabase Insert Error:", supabaseError);
           } else if (newProduct) {
-             console.log("Ürün Supabase'e başarıyla eklendi!");
+             console.log("9. Ürün Supabase'e başarıyla eklendi ve işlem tamamlandı!");
              // Veritabanı kaydı bittiğinde, geçici ürünü gerçek bilgilerle sessizce güncelle
              const finalProduct = { 
                 id: newProduct.id, 
@@ -240,7 +240,7 @@ export function Home() {
           }
         })(); // Asenkron fonksiyon bitti
       } else {
-        console.error("Görsel datası alınamadı.");
+        console.error("Görsel datası API'den boş döndü.");
         setIsGenerating(false); // Görsel verisi gelmezse de spinner'ı kapat
       }
     } catch (e) { 
@@ -369,7 +369,7 @@ export function Home() {
               <div className="pt-6 border-t border-zinc-800 space-y-4">
                 <h3 className="text-sm font-bold uppercase italic tracking-tighter">AI Artist Selection</h3>
                 {recommendations.map((p) => (
-                  <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.slug === p.slug ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
+                  <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
                     <div className="flex gap-4 items-center">
                       <img src={p.image} className="w-14 h-14 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
