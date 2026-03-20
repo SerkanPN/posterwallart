@@ -38,7 +38,7 @@ export function Profile() {
       document.body.removeChild(link);
     } catch (error) {
       console.error(error);
-      alert("İndirme hatası.");
+      alert("Download failed.");
     } finally {
       setProcessingId(null);
     }
@@ -55,7 +55,7 @@ export function Profile() {
       .eq('id', productId);
 
     if (!error) {
-      alert("Tasarım artık sadece size ait! Mağazadan gizlendi.");
+      alert("Success! This masterpiece is now exclusive to you and removed from the shop.");
       fetchMyGallery();
     }
   };
