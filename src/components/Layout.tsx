@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate } from 'react-router-dom';
-import { ShoppingCart, Heart, User, Sparkles, Menu, X, LogOut } from 'lucide-react';
+import { ShoppingCart, Heart, User, Sparkles, Menu, X, LogOut, LogIn } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { useState } from 'react';
 import { clsx, type ClassValue } from 'clsx';
@@ -74,12 +74,20 @@ export function Layout() {
                   </span>
                 )}
               </button>
-              <button onClick={() => handleProtectedNavigation('/profile')} className="text-zinc-400 hover:text-zinc-50 transition-colors cursor-pointer">
-                <User className="w-5 h-5" />
-              </button>
-              {user && (
-                <button onClick={handleLogout} className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer" title="Logout">
-                  <LogOut className="w-5 h-5" />
+
+              {/* DÜZELTİLEN VE EKLENEN GİRİŞ/ÇIKIŞ ALANI */}
+              {user ? (
+                <>
+                  <button onClick={() => handleProtectedNavigation('/profile')} className="text-zinc-400 hover:text-zinc-50 transition-colors cursor-pointer" title="Profile">
+                    <User className="w-5 h-5" />
+                  </button>
+                  <button onClick={handleLogout} className="text-zinc-500 hover:text-red-500 transition-colors cursor-pointer ml-2" title="Logout">
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                </>
+              ) : (
+                <button onClick={() => setAuthModalOpen(true)} className="flex items-center gap-2 px-4 py-1.5 bg-white text-black text-[10px] font-black uppercase tracking-widest rounded-full hover:bg-zinc-200 transition-colors ml-2">
+                  <LogIn className="w-4 h-4" /> Sign In
                 </button>
               )}
             </div>
@@ -99,8 +107,15 @@ export function Layout() {
             <Link to="/blog" className="text-zinc-400 hover:text-zinc-50" onClick={() => setIsMenuOpen(false)}>Blog</Link>
             <button onClick={() => handleProtectedNavigation('/tokens')} className="text-left text-zinc-400 hover:text-zinc-50">Tokens ({user?.tokens || 0})</button>
             <button onClick={() => handleProtectedNavigation('/cart')} className="text-left text-zinc-400 hover:text-zinc-50">Cart ({cartCount})</button>
-            <button onClick={() => handleProtectedNavigation('/profile')} className="text-left text-zinc-400 hover:text-zinc-50">Profile</button>
-            {user && <button onClick={handleLogout} className="text-left text-red-500 hover:text-red-400 mt-4 font-bold uppercase tracking-wider text-xs">Logout</button>}
+            
+            {user ? (
+              <>
+                <button onClick={() => handleProtectedNavigation('/profile')} className="text-left text-zinc-400 hover:text-zinc-50">Profile</button>
+                <button onClick={handleLogout} className="text-left text-red-500 hover:text-red-400 mt-4 font-bold uppercase tracking-wider text-xs">Logout</button>
+              </>
+            ) : (
+              <button onClick={() => { setIsMenuOpen(false); setAuthModalOpen(true); }} className="text-left text-emerald-500 hover:text-emerald-400 mt-4 font-bold uppercase tracking-wider text-xs">Sign In</button>
+            )}
           </div>
         )}
       </header>
