@@ -1,17 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { ShoppingCart, Search, Filter, Sparkles, LayoutGrid, List } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { ShoppingCart, Search, Filter, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 const CATEGORIES = ['All', 'Abstract', 'Music', 'Nature', 'Cyberpunk', 'Minimalist', 'Movie'];
 
 export function Shop() {
-  const { recommendations, addToCart } = useStore();
+  const { addToCart } = useStore();
+  const [allProducts, setAllProducts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Sadece Public (isGenerated olanlar dahil) ve Mağaza ürünlerini birleştir
-  const allProducts = recommendations.filter(p => {
+  useEffect(() => {
+    fetchShopProducts();
+  }, []);
+
+  const fetchShopProducts = async () => {
+    const { data, error } = await supabase
+      .from('products')
+      .select('*')
+      .eq('is_private', false)
+      .neq('stock', 0)
+      .order('created_at', { ascending: false });
+    
+    if (!error) setAllProducts(data || []);
+    setLoading(false);
+  };
+
+  const filteredProducts = allProducts.filter(p => {
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
     const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
@@ -20,10 +38,9 @@ export function Shop() {
   return (
     <div className="min-h-screen bg-zinc-950 text-white p-8 font-sans">
       <div className="max-w-7xl mx-auto">
-        {/* Header & Search */}
         <header className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12">
           <div>
-            <h1 className="text-4xl font-black uppercase italic tracking-tighter italic">The Collection</h1>
+            <h1 className="text-4xl font-black uppercase italic tracking-tighter">The Collection</h1>
             <p className="text-zinc-500 text-[10px] uppercase tracking-widest mt-1">Unique AI Art & Curated Prints</p>
           </div>
           
@@ -44,7 +61,6 @@ export function Shop() {
           </div>
         </header>
 
-        {/* Kategoriler */}
         <div className="flex flex-wrap gap-2 mb-10">
           {CATEGORIES.map(cat => (
             <button 
@@ -57,52 +73,33 @@ export function Shop() {
           ))}
         </div>
 
-        {/* Ürün Listesi */}
-        {allProducts.length === 0 ? (
-          <div className="text-center py-32 opacity-20 uppercase font-mono tracking-[0.5em] text-xs">
-            No art found in this dimension
-          </div>
+        {loading ? (
+          <div className="flex justify-center py-20"><Sparkles className="animate-pulse text-emerald-500" /></div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-32 opacity-20 uppercase font-mono tracking-[0.5em] text-xs">No art found</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-            {allProducts.map((product) => (
+            {filteredProducts.map((product) => (
               <div key={product.id} className="group bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all">
-                {/* Image Container */}
                 <div className="aspect-[3/4] relative overflow-hidden bg-black">
-                  <img src={product.image} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.title} />
-                  
-                  {/* AI Badge */}
-                  {product.isGenerated && (
-                    <div className="absolute top-4 left-4 bg-emerald-500/10 backdrop-blur-md border border-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-2">
-                      <Sparkles className="w-3 h-3 text-emerald-500" />
-                      <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">AI Masterpiece</span>
-                    </div>
-                  )}
-
-                  {/* Hover Actions */}
-                  <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center backdrop-blur-sm">
-                    <Link 
-                      to={`/product/${product.id}`}
-                      className="w-40 py-3 bg-white text-black text-[10px] font-black uppercase rounded-xl flex items-center justify-center gap-2 hover:bg-zinc-200"
-                    >
-                      View Details
-                    </Link>
+                  <img src={product.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.title} />
+                  <div className="absolute top-4 left-4 bg-emerald-500/10 backdrop-blur-md border border-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-2">
+                    <Sparkles className="w-3 h-3 text-emerald-500" />
+                    <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">AI Masterpiece</span>
                   </div>
                 </div>
 
-                {/* Product Info */}
                 <div className="p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div className="min-w-0">
                       <h3 className="font-bold text-sm uppercase italic truncate tracking-tight">{product.title}</h3>
-                      <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-widest">{product.category}</p>
+                      <p className="text-[10px] text-zinc-500 mt-1 uppercase tracking-widest">{product.category || 'AI ART'}</p>
                     </div>
-                    <div className="text-emerald-500 font-black text-sm">
-                      ${product.basePrice}
-                    </div>
+                    <div className="text-emerald-500 font-black text-sm">${product.price}</div>
                   </div>
 
                   <button 
-                    onClick={() => addToCart(product)}
+                    onClick={() => addToCart({ ...product, image: product.image_url, basePrice: product.price })}
                     className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white text-[10px] font-black uppercase rounded-xl flex items-center justify-center gap-2 transition-all"
                   >
                     <ShoppingCart className="w-4 h-4" /> Add to Cart
