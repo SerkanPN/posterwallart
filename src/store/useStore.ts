@@ -18,7 +18,7 @@ interface StoreState {
   user: User | null; cart: CartItem[]; wishlist: Product[]; isLoading: boolean; isAuthModalOpen: boolean;
   setAuthModalOpen: (isOpen: boolean) => void;
   login: (email: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>; // GOOGLE GİRİŞİ EKLENDİ
+  loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   checkUser: () => Promise<void>;
   addTokens: (amount: number) => void;
@@ -37,13 +37,12 @@ export const useStore = create<StoreState>()(
 
       setAuthModalOpen: (isOpen: boolean) => set({ isAuthModalOpen: isOpen }),
 
-      // GOOGLE GİRİŞ FONKSİYONU
       loginWithGoogle: async () => {
         set({ isLoading: true });
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
           options: {
-            redirectTo: window.location.origin,
+            redirectTo: `${window.location.origin}/`,
           }
         });
         if (error) alert(error.message);
@@ -52,7 +51,12 @@ export const useStore = create<StoreState>()(
 
       login: async (email: string) => {
         set({ isLoading: true });
-        const { error } = await supabase.auth.signInWithOtp({ email });
+        const { error } = await supabase.auth.signInWithOtp({ 
+          email,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+          }
+        });
         if (error) alert(error.message);
         else {
           alert('Magic link sent to your email! Please check your inbox.');
