@@ -44,6 +44,15 @@ const base64ToUint8Array = (base64Data: string) => {
   return bytes;
 };
 
+// Yükleme için Blob desteği
+const base64ToBlob = (base64: string) => {
+  const byteString = atob(base64.split(',')[1]);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+  return new Blob([ab], { type: 'image/png' });
+};
+
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -73,7 +82,7 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
 };
 
 export function Home() {
-  const { user, tokens, useToken, addToCart, setAuthModalOpen } = useStore();
+  const { user, tokens, setTokens, addToCart, setAuthModalOpen } = useStore();
   
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
@@ -152,53 +161,17 @@ export function Home() {
     if (isGenerating) return; 
 
     setIsGenerating(true);
-    let tokenDeducted = false;
-
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      console.log("2. Üretim süreci başlatılıyor, Supabase'den jeton düşülecek...");
-      const success = await useToken();
-      if (!success) throw new Error("Jeton düşülemedi!");
-      
-      tokenDeducted = true;
-      console.log("3. Jeton başarıyla düşüldü!");
-
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
       
-      const prompt = `You are a world-class master artist and elite visual designer specializing in premium wall art.
-
-Your task is to create a high-end, commercially viable poster design that people would proudly hang in their homes. This is NOT a generic image — it must feel like a masterpiece artwork.
-
----
-
-CORE OBJECTIVE:
-Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders.
-
-MANDATORY RULES (STRICTLY ENFORCED):
-1. EDGE-TO-EDGE COMPOSITION: The artwork MUST completely fill the entire ${ar} canvas. NO white borders, NO margins, NO frames, NO padding, NO empty edges.
-2. NO TEXT / TYPOGRAPHY CONTROL:
-${includeText ? '- Include minimal, elegant, stylistically appropriate typography integrated naturally into the composition.' : '- ABSOLUTELY NO text, letters, signatures, watermarks, logos, or random characters anywhere in the image.'}
-3. ULTRA HIGH DETAIL FOR UPSCALING: The image MUST be ultra-detailed, hyper-realistic or hyper-illustrative, extremely sharp, high contrast, crisp edges, rich textures, fine details, professional lighting, masterpiece quality, 8k-level detailing. Avoid blurry areas, muddy textures, low-detail regions, washed colors.
-4. STYLE + THEME FUSION: Seamlessly blend the ${selectedStyle} style and ${selectedTheme} theme into a single cohesive artistic vision. They must NOT conflict — instead they must enhance each other like a professional art direction.
-${refImage ? '5. REFERENCE IMAGE INFLUENCE: DO NOT copy or replicate the reference image. ONLY extract and reinterpret color palette, lighting style, mood / atmosphere, contrast balance. Transform these into a completely new, original composition.' : ''}
-6. PERFECT COMPOSITION & FRAMING: Respect the selected orientation: ${orientation}. Use strong composition principles, clear subject focus, balanced negative space (without empty borders).
-7. VISUAL IMPACT: The result must feel premium, gallery-worthy, emotionally engaging, highly decorative.
-
-FINAL PROMPT CONSTRUCTION:
-Create an original artwork in the style of ${selectedStyle}, centered around ${selectedTheme}.
-The composition must be cinematic, visually striking, and deeply detailed, with a strong focal point and immersive depth.
-Lighting should be dramatic and professional, with rich contrast and refined color harmony.
-The image MUST fill the entire canvas edge-to-edge with no borders or empty space.
-Resolution: 1024px.
-
-OUTPUT STYLE TAGS (ALWAYS INCLUDE):
-masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 8k detail, gallery artwork, premium poster design`;
+      const prompt = `You are a world-class master artist. Create a high-end ${selectedStyle} poster with theme ${selectedTheme}. 8k detail, edge-to-edge. ${includeText ? 'Include typography.' : 'No text.'}`;
 
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
-      console.log("4. Görsel için Gemini API'ye (3.1-flash-image) istek atılıyor...");
+      console.log("4. Görsel için Gemini API'ye istek atılıyor...");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -215,137 +188,56 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
       if (imgPart?.inlineData) {
         let base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         
-        console.log("5.1. Thumbnail (Küçük resim) tarayıcıda oluşturuluyor...");
+        console.log("5.1. Thumbnail tarayıcıda oluşturuluyor...");
         let thumbnailBase64 = await createThumbnail(base64Image);
 
-        console.log("5.5. Görseller Supabase Storage'a Güvenli Yöntemle Yükleniyor...");
-        
-        const mainBytes = base64ToUint8Array(base64Image);
-        const thumbBytes = base64ToUint8Array(thumbnailBase64);
-        
-        base64Image = "";
-        thumbnailBase64 = "";
-
-        const fileBaseName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        const mainFileName = `${fileBaseName}.png`;
-        const thumbFileName = `${fileBaseName}-thumb.jpg`;
-
-        const mainUpload = await supabase.storage.from('artworks').upload(mainFileName, mainBytes, { contentType: 'image/png', upsert: true });
-        if (mainUpload.error) {
-          throw new Error("Supabase Storage ana görsel yüklemesi başarısız oldu.");
-        }
-
-        const thumbUpload = await supabase.storage.from('artworks').upload(thumbFileName, thumbBytes, { contentType: 'image/jpeg', upsert: true });
-        if (thumbUpload.error) {
-          throw new Error("Supabase Storage thumbnail yüklemesi başarısız oldu.");
-        }
-
-        const finalImageUrl = supabase.storage.from('artworks').getPublicUrl(mainFileName).data.publicUrl;
-        const finalThumbnailUrl = supabase.storage.from('artworks').getPublicUrl(thumbFileName).data.publicUrl;
-
-        console.log("5.6. Storage yüklemeleri başarılı!");
-        
-        const tempId = `temp-${Date.now()}`;
-        const tempProduct = { 
-          id: tempId, 
-          title: "Crafting details...", 
-          image: finalImageUrl, 
-          thumbnail: finalThumbnailUrl,
-          basePrice: selectedSize.price, 
-          category: selectedStyle,
-          description: "AI is writing the story...",
-          isGenerated: true,
-          slug: tempId
-        };
-
-        setRecommendations(prev => [tempProduct, ...prev.slice(0, 2)]);
-        setSelectedProduct(tempProduct);
-        // DİKKAT: Artık burada setIsGenerating(false) demiyoruz. Sonuna kadar bekliyoruz.
-
-        let aiMeta = { 
-          title: `${selectedStyle} Masterpiece`, 
-          description: "A beautiful AI-generated artwork.", 
-          alt_text: "AI poster", 
-          tags: ["art", selectedStyle.toLowerCase()] 
-        };
-
+        // SEO Metaları üret
+        let aiMeta = { title: `${selectedStyle} Masterpiece`, description: "Elite AI art.", alt_text: "AI poster", tags: ["art"] };
         try {
-          console.log("6. Arka planda SEO verileri için Gemini API'ye istek atılıyor...");
           const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `Create a professional SEO title, a 2-sentence description, alt text, and tags for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY valid JSON: { "title": "...", "description": "...", "alt_text": "...", "tags": ["..."] }` }] }]
+              contents: [{ parts: [{ text: `Create professional SEO title and description for a ${selectedStyle} poster. Return JSON.` }] }]
             })
           });
-          
           if (seoRes.ok) {
             const seoData = await seoRes.json();
-            if (seoData.candidates && seoData.candidates[0]) {
-               aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-            }
+            aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
           }
-        } catch (e) { console.error("SEO Gen failed", e); }
+        } catch (e) {}
 
-        const now = new Date();
-        const dateStr = now.toISOString().split('T')[0];
-        const hourStr = now.getHours().toString().padStart(2, '0');
-        const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
-        const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        console.log("5.5. Sunucuya (api.php) veri gönderiliyor...");
+        
+        const formData = new FormData();
+        formData.append('action', 'generate_and_save');
+        formData.append('userId', user.id);
+        formData.append('category', selectedStyle);
+        formData.append('price', selectedSize.price.toString());
+        formData.append('metadata', JSON.stringify(aiMeta));
+        formData.append('mainImage', base64ToBlob(base64Image), 'main.png');
+        formData.append('thumbnail', base64ToBlob(thumbnailBase64), 'thumb.jpg');
 
-        console.log("8. Supabase veritabanına kayıt yapılıyor...");
-        const { data: newProduct, error: supabaseError } = await supabase
-          .from('products')
-          .insert([{
-            creator_id: user.id,
-            title: aiMeta.title,
-            description: aiMeta.description,
-            alt_text: aiMeta.alt_text,
-            tags: aiMeta.tags,
-            image_url: finalImageUrl, 
-            thumbnail_url: finalThumbnailUrl,
-            category: selectedStyle,
-            slug: slug,
-            price: 49.00,
-            stock: -1,
-            is_private: false
-          }])
-          .select().single();
+        const uploadRes = await fetch('https://posterwallart.shop/api.php', {
+          method: 'POST',
+          body: formData
+        });
 
-        if (newProduct) {
-           console.log("9. İşlem tamamlandı!");
-           const finalProduct = { 
-              id: newProduct.id, 
-              title: aiMeta.title, 
-              image: finalImageUrl, 
-              thumbnail: finalThumbnailUrl,
-              basePrice: selectedSize.price, 
-              category: selectedStyle,
-              description: aiMeta.description,
-              isGenerated: true,
-              slug: slug
-           };
-           
-           setRecommendations(prev => prev.map(p => p.id === tempId ? finalProduct : p));
-           setSelectedProduct(current => current?.id === tempId ? finalProduct : current);
+        const result = await uploadRes.json();
+
+        if (result.success) {
+          console.log("9. İşlem tamamlandı!");
+          setRecommendations(prev => [result.product, ...prev.slice(0, 2)]);
+          setSelectedProduct(result.product);
+          setTokens(tokens - 1); // Jetonu senkronize et
+        } else {
+          throw new Error(result.error);
         }
-      } else {
-        throw new Error("Görsel datası API'den boş döndü.");
       }
-    } catch (e) { 
-      console.error("Üretim sırasında hata oluştu:", e); 
-      
-      if (tokenDeducted) {
-        setTimeout(() => {
-            useStore.getState().addTokens(1);
-            console.log("Hata nedeniyle 1 jeton iade edildi.");
-            alert("Bir hata oluştu. Jetonunuz iade edildi.");
-        }, 100);
-      } else {
-        alert("Bir hata oluştu. Lütfen tekrar deneyin.");
-      }
+    } catch (e: any) { 
+      console.error("Üretim hatası:", e); 
+      alert(e.message || "An error occurred.");
     } finally {
-      // TÜM İŞLEMLER (VERİTABANI KAYDI DAHİL) BİTTİĞİNDE BUTON KİLİDİNİ AÇ
       setIsGenerating(false);
     }
   };
@@ -467,7 +359,7 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
 
             {recommendations.length > 0 && (
               <div className="pt-6 border-t border-zinc-800 space-y-4">
-                <h3 className="text-sm font-bold uppercase italic tracking-tighter">AI Artist Selection</h3>
+                <h3 className="text-sm font-bold uppercase italic tracking-tighter text-emerald-500">AI Artist Selection</h3>
                 {recommendations.map((p) => (
                   <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.slug === p.slug ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
                     <div className="flex gap-4 items-center">
