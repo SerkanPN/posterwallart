@@ -70,9 +70,9 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8)); // 0.8 kalite ile çok hafif bir JPEG
+        resolve(canvas.toDataURL('image/jpeg', 0.8)); 
       } else {
-        resolve(base64); // Hata olursa orijinalini dön
+        resolve(base64); 
       }
     };
     img.src = base64;
@@ -89,11 +89,12 @@ export function Home() {
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  const [selectedSize, setSelectedSize] = useState(SIZES[SIZES.length-1]);
+  // VARSAYILAN DEĞERLER (18x24 ve Siyah Çerçeve)
+  const [selectedSize, setSelectedSize] = useState(SIZES[3]); 
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [selectedTheme, setSelectedTheme] = useState('Abstract');
   const [includeText, setIncludeText] = useState(false);
-  const [selectedFrame, setSelectedFrame] = useState<FrameType>('unframed');
+  const [selectedFrame, setSelectedFrame] = useState<FrameType>('black');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [analysisData, setAnalysisData] = useState<any>(null);
 
@@ -231,7 +232,7 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         console.log("5.5. Görseller Supabase Storage'a yükleniyor...");
         
         const mainBlob = base64ToBlob(base64Image);
-        const thumbBlob = base64ToBlob(thumbnailBase64, 'image/jpeg');
+        const thumbBlob = base64ToBlob(thumbnailBase64);
         
         const fileBaseName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const mainFileName = `${fileBaseName}.png`;
@@ -345,7 +346,6 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
       console.error("Üretim sırasında hata oluştu:", e); 
       
       if (tokenDeducted) {
-        // Hata durumunda jetonu iade et ama state'i bozmamak için güvenli yolla yap
         setTimeout(() => {
             useStore.getState().addTokens(1);
             console.log("Hata nedeniyle 1 jeton iade edildi.");
@@ -432,7 +432,7 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
               <div className="grid grid-cols-3 gap-2">
                 {SIZES.map(s => (
                   <button key={s.value} onClick={()=>setSelectedSize(s)} className={`p-3 rounded-xl border text-[10px] font-bold transition-all ${selectedSize.value === s.value ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 text-zinc-400 border-zinc-800'}`}>
-                    {s.label}<br/><span className="opacity-50">${s.price}</span>
+                    {s.label}
                   </button>
                 ))}
               </div>
