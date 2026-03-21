@@ -32,6 +32,14 @@ const STYLES = [
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
+// HELPER: CALCULATE ASPECT RATIO DYNAMICALLY
+const getGCD = (a: number, b: number): number => (b === 0 ? a : getGCD(b, a % b));
+const calculateAspectRatio = (sizeValue: string, orientation: 'portrait' | 'landscape') => {
+  const [w, h] = sizeValue.split('x').map(Number);
+  const common = getGCD(w, h);
+  return orientation === 'portrait' ? `${w / common}:${h / common}` : `${h / common}:${w / common}`;
+};
+
 const base64ToUint8Array = (base64Data: string) => {
   const parts = base64Data.split(';base64,');
   const base64String = parts[1];
@@ -175,11 +183,15 @@ export function Home() {
       setAuthModalOpen(true); 
       return; 
     }
+    
+    // Check tokens before starting
+    console.log("[LOG] Current tokens in store:", tokens);
     if (tokens <= 0) { 
-      console.warn("[LOG] Insufficient tokens.");
+      console.warn("[LOG] Insufficient tokens detected in client store.");
       alert("Insufficient tokens! Please refill your balance."); 
       return; 
     }
+
     if (isGenerating || isInterfaceLocked) {
       console.warn("[LOG] Action blocked: Generating or Interface Locked.");
       return; 
@@ -190,13 +202,14 @@ export function Home() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
-      console.log("[LOG] Target Aspect Ratio:", ar);
+      // DYNAMIC ASPECT RATIO CALCULATION BASED ON SELECTED SIZE (e.g., 18x24 -> 3:4)
+      const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
+      console.log(`[LOG] Selected Size: ${selectedSize.value}, Orientation: ${orientation}, Calculated Aspect Ratio: ${dynamicAR}`);
 
       const prompt = `You are a world-class master artist and elite visual designer specializing in premium wall art.
       CORE OBJECTIVE: Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders.
-      STYLE: ${selectedStyle}, THEME: ${selectedTheme}, ORIENTATION: ${orientation}.
-      TEXT: ${includeText ? 'Include typography.' : 'NO text.'}
+      STYLE: ${selectedStyle}, THEME: ${selectedTheme}, ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}.
+      TEXT: ${includeText ? 'Include minimal typography.' : 'NO text.'}
       RESOLUTION: 1024px.`;
 
       const contents: any = [{ parts: [{ text: prompt }] }];
@@ -266,14 +279,15 @@ export function Home() {
         });
 
         const result = await uploadRes.json();
-        console.log("[LOG] Server response:", result);
+        console.log("[LOG] Server response received:", result);
 
         if (result.success) {
-          console.log("[LOG] Product saved successfully. Updating state...");
+          console.log("[LOG] Product saved successfully. New Product ID:", result.product.id);
           setRecommendations(prev => [result.product, ...prev.slice(0, 2)]);
           setSelectedProduct(result.product);
           setTokens(tokens - 1);
         } else {
+          console.error("[LOG] Server rejected the request:", result.error);
           throw new Error(result.error);
         }
       } else {
