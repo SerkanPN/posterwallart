@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
 
+const API_URL = 'https://api.posterwallart.shop/api.php';
+
 export interface Product {
   id: string; title: string; price: number; image: string; category: string; type: 'physical' | 'digital'; isGenerated?: boolean; slug?: string; description?: string;
 }
@@ -28,12 +30,20 @@ interface StoreState {
   updateQuantity: (productId: string, quantity: number) => void;
   toggleWishlist: (product: Product) => void;
   clearCart: () => void;
+  tokens: number;
+  setTokens: (tokens: number) => void;
 }
 
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
       user: null, cart: [], wishlist: [], isLoading: false, isAuthModalOpen: false,
+      tokens: 0,
+
+      setTokens: (tokens: number) => set((state) => ({
+        user: state.user ? { ...state.user, tokens } : null,
+        tokens,
+      })),
 
       setAuthModalOpen: (isOpen: boolean) => set({ isAuthModalOpen: isOpen }),
 
@@ -41,9 +51,7 @@ export const useStore = create<StoreState>()(
         set({ isLoading: true });
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
-          options: {
-            redirectTo: `${window.location.origin}/`,
-          }
+          options: { redirectTo: `${window.location.origin}/` }
         });
         if (error) alert(error.message);
         set({ isLoading: false });
@@ -51,11 +59,9 @@ export const useStore = create<StoreState>()(
 
       login: async (email: string) => {
         set({ isLoading: true });
-        const { error } = await supabase.auth.signInWithOtp({ 
+        const { error } = await supabase.auth.signInWithOtp({
           email,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-          }
+          options: { emailRedirectTo: `${window.location.origin}/` }
         });
         if (error) alert(error.message);
         else {
@@ -67,7 +73,7 @@ export const useStore = create<StoreState>()(
 
       logout: async () => {
         await supabase.auth.signOut();
-        set({ user: null });
+        set({ user: null, tokens: 0 });
       },
 
       checkUser: async () => {
@@ -75,62 +81,117 @@ export const useStore = create<StoreState>()(
 
         const syncProfile = async (authSession: any) => {
           if (!authSession) return;
-          
-          // İŞTE SENİ DELİRTEN HATANIN KESİN ÇÖZÜMÜ: maybeSingle()
-          let { data: profile, error } = await supabase
+
+          // 1. Supabase profiles tablosunu kontrol et / oluştur
+          let { data: profile } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', authSession.user.id)
             .maybeSingle();
 
-          // Eğer Auth'ta olup profiles tablosunda yoksa (eski hesaplar), çökme, yeni oluştur
           if (!profile) {
             const { data: newProfile } = await supabase
               .from('profiles')
-              .insert([{ id: authSession.user.id, email: authSession.user.email, tokens: 5 }])
+              .insert([{ id: authSession.user.id, email: authSession.user.email, tokens: 10 }])
               .select()
               .single();
             profile = newProfile;
           }
 
-          if (profile) {
-            set({ 
-              user: { 
-                id: authSession.user.id, 
-                name: authSession.user.email?.split('@')[0] || 'User', 
-                email: authSession.user.email || '', 
-                tokens: profile.tokens, 
-                isSeller: false 
-              } 
+          if (!profile) return;
+
+          // 2. MySQL'e senkronize et (fire & forget — hata olursa sessizce geç)
+          try {
+            await fetch(API_URL, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${authSession.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'sync_user',
+                supabase_id: authSession.user.id,
+                email: authSession.user.email,
+                name: authSession.user.user_metadata?.full_name || authSession.user.user_metadata?.name || authSession.user.email?.split('@')[0] || 'User',
+                avatar: authSession.user.user_metadata?.avatar_url || null,
+                tokens: profile.tokens,
+              }),
             });
-            set({ isAuthModalOpen: false });
+          } catch (e) {
+            console.warn('[WARN] MySQL sync failed (non-critical):', e);
           }
+
+          // 3. Store'u güncelle
+          set({
+            user: {
+              id: authSession.user.id,
+              name: authSession.user.user_metadata?.full_name || authSession.user.email?.split('@')[0] || 'User',
+              email: authSession.user.email || '',
+              tokens: profile.tokens,
+              isSeller: false,
+            },
+            tokens: profile.tokens,
+            isAuthModalOpen: false,
+          });
         };
 
         if (session) await syncProfile(session);
-        
+
         supabase.auth.onAuthStateChange(async (_event, session) => {
           if (session) {
             await syncProfile(session);
-            // Giriş sonrası URL'deki çirkin access_token hash'lerini temizler
             if (window.location.hash.includes('access_token')) {
               window.history.replaceState(null, '', window.location.pathname);
             }
+          } else {
+            set({ user: null, tokens: 0 });
           }
-          else set({ user: null });
         });
       },
 
-      addTokens: (amount) => set((state) => ({ user: state.user ? { ...state.user, tokens: state.user.tokens + amount } : null })),
+      addTokens: (amount) => set((state) => ({
+        user: state.user ? { ...state.user, tokens: state.user.tokens + amount } : null,
+        tokens: state.tokens + amount,
+      })),
 
       useToken: async () => {
         const { user } = get();
-        if (user && user.tokens > 0) {
-          const newTokenCount = user.tokens - 1;
-          const { error } = await supabase.from('profiles').update({ tokens: newTokenCount }).eq('id', user.id);
-          if (!error) { set({ user: { ...user, tokens: newTokenCount } }); return true; }
+        if (!user || user.tokens <= 0) return false;
+
+        const newCount = user.tokens - 1;
+
+        // 1. Supabase'den düş (kaynak of truth)
+        const { error } = await supabase
+          .from('profiles')
+          .update({ tokens: newCount })
+          .eq('id', user.id);
+
+        if (error) return false;
+
+        // 2. Store güncelle
+        set({ user: { ...user, tokens: newCount }, tokens: newCount });
+
+        // 3. MySQL'e de yansıt (fire & forget)
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          if (session?.access_token) {
+            await fetch(API_URL, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                action: 'update_tokens',
+                tokens: newCount,
+              }),
+            });
+          }
+        } catch (e) {
+          console.warn('[WARN] MySQL token sync failed (non-critical):', e);
         }
-        return false;
+
+        return true;
       },
 
       addToCart: (product) => set((state) => {
@@ -148,6 +209,9 @@ export const useStore = create<StoreState>()(
       }),
       clearCart: () => set({ cart: [] }),
     }),
-    { name: 'posterwall-storage', partialize: (state) => ({ user: state.user, cart: state.cart, wishlist: state.wishlist }) }
+    {
+      name: 'posterwall-storage',
+      partialize: (state) => ({ user: state.user, cart: state.cart, wishlist: state.wishlist, tokens: state.tokens })
+    }
   )
 );
