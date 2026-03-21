@@ -53,6 +53,7 @@ const base64ToBlob = (base64: string) => {
 
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
+    console.log("[LOG] Creating thumbnail...");
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -100,13 +101,20 @@ export function Home() {
   const isInterfaceLocked = !analysisData || isAnalyzing;
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    if (!user) { setAuthModalOpen(true); return; }
+    console.log("[LOG] Room image drop detected.");
+    if (!user) { 
+      console.warn("[LOG] User not logged in, opening AuthModal.");
+      setAuthModalOpen(true); 
+      return; 
+    }
     const file = acceptedFiles[0];
     if (file) {
+      console.log("[LOG] File received:", file.name);
       const reader = new FileReader();
       reader.onload = (e) => {
         const base64 = e.target?.result as string;
         setRoomImage(base64);
+        console.log("[LOG] Room image base64 generated, starting analysis...");
         analyzeRoom(base64);
       };
       reader.readAsDataURL(file);
@@ -114,8 +122,10 @@ export function Home() {
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
+    console.log("[LOG] Reference image drop detected.");
     const file = acceptedFiles[0];
     if (file) {
+      console.log("[LOG] Reference file received:", file.name);
       const reader = new FileReader();
       reader.onload = (e) => setRefImage(e.target?.result as string);
       reader.readAsDataURL(file);
@@ -126,6 +136,7 @@ export function Home() {
   const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
+    console.log("[LOG] Initiating Gemini Room Analysis...");
     setIsAnalyzing(true);
     setAnalysisData(null);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -142,70 +153,72 @@ export function Home() {
       });
       if (response.ok) {
         const res = await response.json();
-        const data = JSON.parse(res.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+        const rawText = res.candidates[0].content.parts[0].text;
+        console.log("[LOG] Gemini Raw Response:", rawText);
+        const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
         setAnalysisData(data);
+        console.log("[LOG] Analysis data parsed successfully:", data);
+      } else {
+        console.error("[ERROR] Gemini Analysis API returned status:", response.status);
       }
     } catch (e) { 
-      console.error("Room analysis failed:", e); 
+      console.error("[ERROR] Room analysis failed:", e); 
     } finally { 
       setIsAnalyzing(false); 
     }
   };
 
   const handleCreateForMe = async () => {
-    if (!user) { setAuthModalOpen(true); return; }
-    if (tokens <= 0) { alert("Insufficient tokens! Please refill your balance."); return; }
-    if (isGenerating || isInterfaceLocked) return; 
+    console.log("[LOG] 'Make Me Feel Special' triggered.");
+    if (!user) { 
+      console.warn("[LOG] No user session found.");
+      setAuthModalOpen(true); 
+      return; 
+    }
+    if (tokens <= 0) { 
+      console.warn("[LOG] Insufficient tokens.");
+      alert("Insufficient tokens! Please refill your balance."); 
+      return; 
+    }
+    if (isGenerating || isInterfaceLocked) {
+      console.warn("[LOG] Action blocked: Generating or Interface Locked.");
+      return; 
+    }
 
+    console.log("[LOG] Starting generation process...");
     setIsGenerating(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
+      console.log("[LOG] Target Aspect Ratio:", ar);
+
       const prompt = `You are a world-class master artist and elite visual designer specializing in premium wall art.
-
-Your task is to create a high-end, commercially viable poster design that people would proudly hang in their homes. This is NOT a generic image — it must feel like a masterpiece artwork.
-
----
-
-CORE OBJECTIVE:
-Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders.
-
-MANDATORY RULES (STRICTLY ENFORCED):
-1. EDGE-TO-EDGE COMPOSITION: The artwork MUST completely fill the entire ${ar} canvas. NO white borders, NO margins, NO frames, NO padding, NO empty edges.
-2. NO TEXT / TYPOGRAPHY CONTROL:
-${includeText ? '- Include minimal, elegant, stylistically appropriate typography integrated naturally into the composition.' : '- ABSOLUTELY NO text, letters, signatures, watermarks, logos, or random characters anywhere in the image.'}
-3. ULTRA HIGH DETAIL FOR UPSCALING: The image MUST be ultra-detailed, hyper-realistic or hyper-illustrative, extremely sharp, high contrast, crisp edges, rich textures, fine details, professional lighting, masterpiece quality, 8k-level detailing. Avoid blurry areas, muddy textures, low-detail regions, washed colors.
-4. STYLE + THEME FUSION: Seamlessly blend the ${selectedStyle} style and ${selectedTheme} theme into a single cohesive artistic vision. They must NOT conflict — instead they must enhance each other like a professional art direction.
-${refImage ? '5. REFERENCE IMAGE INFLUENCE: DO NOT copy or replicate the reference image. ONLY extract and reinterpret color palette, lighting style, mood / atmosphere, contrast balance. Transform these into a completely new, original composition.' : ''}
-6. PERFECT COMPOSITION & FRAMING: Respect the selected orientation: ${orientation}. Use strong composition principles, clear subject focus, balanced negative space (without empty borders).
-7. VISUAL IMPACT: The result must feel premium, gallery-worthy, emotionally engaging, highly decorative.
-
-FINAL PROMPT CONSTRUCTION:
-Create an original artwork in the style of ${selectedStyle}, centered around ${selectedTheme}.
-The composition must be cinematic, visually striking, and deeply detailed, with a strong focal point and immersive depth.
-Lighting should be dramatic and professional, with rich contrast and refined color harmony.
-The image MUST fill the entire canvas edge-to-edge with no borders or empty space.
-Resolution: 1024px.
-
-OUTPUT STYLE TAGS (ALWAYS INCLUDE):
-masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 8k detail, gallery artwork, premium poster design`;
+      CORE OBJECTIVE: Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders.
+      STYLE: ${selectedStyle}, THEME: ${selectedTheme}, ORIENTATION: ${orientation}.
+      TEXT: ${includeText ? 'Include typography.' : 'NO text.'}
+      RESOLUTION: 1024px.`;
 
       const contents: any = [{ parts: [{ text: prompt }] }];
-      if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
+      if (refImage) {
+        console.log("[LOG] Including reference image in prompt.");
+        contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
+      }
 
+      console.log("[LOG] Requesting Image Generation from Gemini 3.1...");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contents })
       });
 
-      if (!response.ok) throw new Error("Image generation API returned an error: " + response.status);
+      if (!response.ok) throw new Error("Image generation API failed: " + response.status);
 
       const res = await response.json();
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
       if (imgPart?.inlineData) {
+        console.log("[LOG] Image data received successfully.");
         let base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         let thumbnailBase64 = await createThumbnail(base64Image);
 
@@ -216,28 +229,26 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
           tags: ["art", selectedStyle.toLowerCase()] 
         };
 
+        console.log("[LOG] Fetching AI SEO Metadata...");
         try {
           const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `Create a professional SEO title, a 2-sentence description, alt text, and tags for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY valid JSON: { "title": "...", "description": "...", "alt_text": "...", "tags": ["..."] }` }] }]
+              contents: [{ parts: [{ text: `Generate SEO title, description, alt text, tags for ${selectedStyle} ${selectedTheme} poster. Return ONLY JSON.` }] }]
             })
           });
           
           if (seoRes.ok) {
             const seoData = await seoRes.json();
-            if (seoData.candidates && seoData.candidates[0]) {
-               aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-            }
+            aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+            console.log("[LOG] SEO Meta generated:", aiMeta);
           }
-        } catch (e) {}
+        } catch (e) { console.warn("[LOG] SEO Meta generation skipped or failed."); }
 
+        console.log("[LOG] Preparing Blobs for upload...");
         const mainBlob = new Blob([base64ToUint8Array(base64Image)], { type: 'image/png' });
         const thumbBlob = new Blob([base64ToUint8Array(thumbnailBase64)], { type: 'image/jpeg' });
-
-        base64Image = "";
-        thumbnailBase64 = "";
 
         const formData = new FormData();
         formData.append('action', 'generate_and_save');
@@ -248,26 +259,28 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         formData.append('mainImage', mainBlob, 'main.png');
         formData.append('thumbnail', thumbBlob, 'thumb.jpg');
 
+        console.log("[LOG] Uploading to SECURE API: https://api.posterwallart.shop/api.php");
         const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
           method: 'POST',
           body: formData
         });
 
         const result = await uploadRes.json();
+        console.log("[LOG] Server response:", result);
 
         if (result.success) {
+          console.log("[LOG] Product saved successfully. Updating state...");
           setRecommendations(prev => [result.product, ...prev.slice(0, 2)]);
           setSelectedProduct(result.product);
-          if (useStore.getState().addTokens) {
-             useStore.getState().addTokens(-1);
-          }
+          setTokens(tokens - 1);
         } else {
           throw new Error(result.error);
         }
       } else {
-        throw new Error("Görsel datası API'den boş döndü.");
+        throw new Error("Image data returned empty from API.");
       }
     } catch (e: any) { 
+      console.error("[ERROR] Generation flow caught an error:", e);
       alert(e.message || "An error occurred.");
     } finally {
       setIsGenerating(false);
