@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
-import { supabase } from '../lib/supabase';
 import { ShoppingCart, Search, Filter, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
+
+const API_URL = 'https://api.posterwallart.shop/api.php';
 
 const CATEGORIES = ['All', 'Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Japandi', 'Industrial', 'Pop Art', 'Vintage Poster'];
 
@@ -18,19 +19,22 @@ export function Shop() {
   }, []);
 
   const fetchShopProducts = async () => {
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .eq('is_private', false)
-      .neq('stock', 0)
-      .order('created_at', { ascending: false });
-    
-    if (!error) setAllProducts(data || []);
-    setLoading(false);
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_URL}?action=get_products&limit=50`);
+      const data = await res.json();
+      if (data.success) setAllProducts(data.products || []);
+    } catch (e) {
+      console.error('[Shop] Failed to fetch products:', e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const filteredProducts = allProducts.filter(p => {
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'All' ||
+      (p.category && p.category.toLowerCase() === selectedCategory.toLowerCase()) ||
+      (p.style_tags && p.style_tags.some((t: string) => t.toLowerCase() === selectedCategory.toLowerCase()));
     const matchesSearch = p.title.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
@@ -43,13 +47,13 @@ export function Shop() {
             <h1 className="text-4xl font-black uppercase italic tracking-tighter">The Collection</h1>
             <p className="text-zinc-500 text-[10px] uppercase tracking-widest mt-1">Unique AI Art & Curated Prints</p>
           </div>
-          
+
           <div className="flex w-full md:w-auto gap-4">
             <div className="relative flex-1 md:w-80">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
-              <input 
-                type="text" 
-                placeholder="Search art..." 
+              <input
+                type="text"
+                placeholder="Search art..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-zinc-900 border border-zinc-800 rounded-2xl py-3 pl-12 pr-4 text-xs outline-none focus:border-emerald-500 transition-all"
@@ -63,7 +67,7 @@ export function Shop() {
 
         <div className="flex flex-wrap gap-2 mb-10">
           {CATEGORIES.map(cat => (
-            <button 
+            <button
               key={cat}
               onClick={() => setSelectedCategory(cat)}
               className={`px-6 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all ${selectedCategory === cat ? 'bg-white text-black' : 'bg-zinc-900 text-zinc-500 border border-zinc-800 hover:border-zinc-700'}`}
@@ -81,12 +85,15 @@ export function Shop() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
             {filteredProducts.map((product) => (
               <div key={product.id} className="relative group bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all">
-                {/* Tüm kartı kaplayan link */}
                 <Link to={`/product/${product.slug}`} className="absolute inset-0 z-10" />
-                
+
                 <div className="aspect-[3/4] relative overflow-hidden bg-black">
-                  {/* HIZLANDIRMA EKLENTİSİ: Varsa thumbnail kullan, yoksa mecburen image_url kullan */}
-                  <img src={product.thumbnail_url || product.image_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.title} />
+                  <img
+                    src={product.thumbnail_url || product.image_url}
+                    loading="lazy"
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                    alt={product.title}
+                  />
                   <div className="absolute top-4 left-4 bg-emerald-500/10 backdrop-blur-md border border-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-2 z-20">
                     <Sparkles className="w-3 h-3 text-emerald-500" />
                     <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">AI Masterpiece</span>
@@ -102,7 +109,7 @@ export function Shop() {
                     <div className="text-emerald-500 font-black text-sm">${product.price}</div>
                   </div>
 
-                  <button 
+                  <button
                     disabled
                     className="w-full py-3 bg-zinc-800 text-white text-[10px] font-black uppercase rounded-xl flex items-center justify-center gap-2 transition-all opacity-50"
                   >
