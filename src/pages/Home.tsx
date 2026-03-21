@@ -33,7 +33,6 @@ const STYLES = [
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
-// KESİN ÇÖZÜM: Base64'ü ArrayBuffer'a çevirip Uint8Array dönen, eklentileri atlayan fonksiyon
 const base64ToUint8Array = (base64Data: string) => {
   const parts = base64Data.split(';base64,');
   const base64String = parts[1];
@@ -45,7 +44,6 @@ const base64ToUint8Array = (base64Data: string) => {
   return bytes;
 };
 
-// GÖRSELİ TARAYICIDA KÜÇÜLTME FONKSİYONU
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -68,6 +66,8 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
       } else {
         resolve(base64); 
       }
+      // RAM TEMİZLİĞİ
+      img.src = '';
     };
     img.src = base64;
   });
@@ -83,7 +83,6 @@ export function Home() {
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  // VARSAYILAN DEĞERLER
   const [selectedSize, setSelectedSize] = useState(SIZES[3]); 
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [selectedTheme, setSelectedTheme] = useState('Abstract');
@@ -215,22 +214,24 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
       if (imgPart?.inlineData) {
-        const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
+        let base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         
         console.log("5.1. Thumbnail (Küçük resim) tarayıcıda oluşturuluyor...");
-        const thumbnailBase64 = await createThumbnail(base64Image);
+        let thumbnailBase64 = await createThumbnail(base64Image);
 
         console.log("5.5. Görseller Supabase Storage'a Güvenli Yöntemle Yükleniyor...");
         
-        // Eklentileri aşmak için Blob değil Uint8Array (gerçek binary data) kullanıyoruz
         const mainBytes = base64ToUint8Array(base64Image);
         const thumbBytes = base64ToUint8Array(thumbnailBase64);
         
+        // RAM TEMİZLİĞİ: Devasa metinleri bellekten sil
+        base64Image = "";
+        thumbnailBase64 = "";
+
         const fileBaseName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const mainFileName = `${fileBaseName}.png`;
         const thumbFileName = `${fileBaseName}-thumb.jpg`;
 
-        // Yüklemeleri sırayla yapıyoruz ki ağ trafiği boğulmasın
         const mainUpload = await supabase.storage.from('artworks').upload(mainFileName, mainBytes, { contentType: 'image/png', upsert: true });
         if (mainUpload.error) {
           console.error("Ana görsel yükleme hatası:", mainUpload.error);
@@ -372,7 +373,7 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
           ) : roomImage ? (
             <InteractiveCanvas 
               backgroundImage={roomImage} 
-              mountedArt={selectedProduct?.image || null} 
+              mountedArt={selectedProduct?.thumbnail || selectedProduct?.image || null} 
               physicalWidth={physicalWidth}
               physicalHeight={physicalHeight}
               naturalPixelsPerInch={analysisData?.ppi || 6} 
