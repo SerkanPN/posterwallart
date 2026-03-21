@@ -273,7 +273,7 @@ export function Home() {
         formData.append('thumbnail', thumbBlob, 'thumb.jpg');
 
         console.log("[LOG] Uploading to SECURE API: https://api.posterwallart.shop/api.php");
-        const uploadRes = await fetch('https://posterwallart.shop/api.php', {
+        const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
           method: 'POST',
           body: formData
         });
