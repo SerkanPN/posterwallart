@@ -3,6 +3,7 @@ import { useDropzone } from 'react-dropzone';
 import { motion, AnimatePresence } from 'motion/react';
 import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
+import { supabase } from '../lib/supabase';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
 
@@ -32,7 +33,6 @@ const STYLES = [
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
-// HELPER: CALCULATE ASPECT RATIO DYNAMICALLY
 const getGCD = (a: number, b: number): number => (b === 0 ? a : getGCD(b, a % b));
 const calculateAspectRatio = (sizeValue: string, orientation: 'portrait' | 'landscape') => {
   const [w, h] = sizeValue.split('x').map(Number);
@@ -51,14 +51,6 @@ const base64ToUint8Array = (base64Data: string) => {
   return bytes;
 };
 
-const base64ToBlob = (base64: string) => {
-  const byteString = atob(base64.split(',')[1]);
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
-  return new Blob([ab], { type: 'image/png' });
-};
-
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
     console.log("[LOG] Creating thumbnail...");
@@ -67,20 +59,18 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-
       if (width > maxWidth) {
         height = Math.round((height * maxWidth) / width);
         width = maxWidth;
       }
-
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8)); 
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
       } else {
-        resolve(base64); 
+        resolve(base64);
       }
       img.src = '';
     };
@@ -89,7 +79,7 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
 };
 
 export function Home() {
-  const { user, tokens, setTokens, addToCart, setAuthModalOpen } = useStore();
+  const { user, tokens, setTokens, addToCart, setAuthModalOpen, useToken } = useStore();
   
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
@@ -98,7 +88,7 @@ export function Home() {
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  const [selectedSize, setSelectedSize] = useState(SIZES[3]); 
+  const [selectedSize, setSelectedSize] = useState(SIZES[3]);
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [selectedTheme, setSelectedTheme] = useState('Abstract');
   const [includeText, setIncludeText] = useState(false);
@@ -110,10 +100,10 @@ export function Home() {
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
     console.log("[LOG] Room image drop detected.");
-    if (!user) { 
+    if (!user) {
       console.warn("[LOG] User not logged in, opening AuthModal.");
-      setAuthModalOpen(true); 
-      return; 
+      setAuthModalOpen(true);
+      return;
     }
     const file = acceptedFiles[0];
     if (file) {
@@ -169,32 +159,31 @@ export function Home() {
       } else {
         console.error("[ERROR] Gemini Analysis API returned status:", response.status);
       }
-    } catch (e) { 
-      console.error("[ERROR] Room analysis failed:", e); 
-    } finally { 
-      setIsAnalyzing(false); 
+    } catch (e) {
+      console.error("[ERROR] Room analysis failed:", e);
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
   const handleCreateForMe = async () => {
     console.log("[LOG] 'Make Me Feel Special' triggered.");
-    if (!user) { 
+    if (!user) {
       console.warn("[LOG] No user session found.");
-      setAuthModalOpen(true); 
-      return; 
+      setAuthModalOpen(true);
+      return;
     }
-    
-    // Check tokens before starting
+
     console.log("[LOG] Current tokens in store:", tokens);
-    if (tokens <= 0) { 
+    if (tokens <= 0) {
       console.warn("[LOG] Insufficient tokens detected in client store.");
-      alert("Insufficient tokens! Please refill your balance."); 
-      return; 
+      alert("Insufficient tokens! Please refill your balance.");
+      return;
     }
 
     if (isGenerating || isInterfaceLocked) {
       console.warn("[LOG] Action blocked: Generating or Interface Locked.");
-      return; 
+      return;
     }
 
     console.log("[LOG] Starting generation process...");
@@ -202,7 +191,17 @@ export function Home() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      // DYNAMIC ASPECT RATIO CALCULATION BASED ON SELECTED SIZE (e.g., 18x24 -> 3:4)
+      // 1. Get Supabase session token for API authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) {
+        alert("Session expired. Please log in again.");
+        setAuthModalOpen(true);
+        return;
+      }
+      const accessToken = session.access_token;
+      console.log("[LOG] Supabase session token retrieved.");
+
+      // 2. Generate image
       const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
       console.log(`[LOG] Selected Size: ${selectedSize.value}, Orientation: ${orientation}, Calculated Aspect Ratio: ${dynamicAR}`);
 
@@ -235,11 +234,12 @@ export function Home() {
         let base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         let thumbnailBase64 = await createThumbnail(base64Image);
 
-        let aiMeta = { 
-          title: `${selectedStyle} Masterpiece`, 
-          description: "A beautiful AI-generated artwork.", 
-          alt_text: "AI poster", 
-          tags: ["art", selectedStyle.toLowerCase()] 
+        // 3. SEO metadata
+        let aiMeta: any = {
+          seo_title: `${selectedStyle} Masterpiece`,
+          seo_description: "A beautiful AI-generated artwork.",
+          alt_text: "AI poster",
+          tags: ["art", selectedStyle.toLowerCase()]
         };
 
         console.log("[LOG] Fetching AI SEO Metadata...");
@@ -248,10 +248,9 @@ export function Home() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [{ text: `Generate SEO title, description, alt text, tags for ${selectedStyle} ${selectedTheme} poster. Return ONLY JSON.` }] }]
+              contents: [{ parts: [{ text: `Generate SEO title, description, alt text, tags for ${selectedStyle} ${selectedTheme} poster. Return ONLY JSON with keys: seo_title, seo_description, alt_text, tags.` }] }]
             })
           });
-          
           if (seoRes.ok) {
             const seoData = await seoRes.json();
             aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
@@ -259,13 +258,20 @@ export function Home() {
           }
         } catch (e) { console.warn("[LOG] SEO Meta generation skipped or failed."); }
 
+        // 4. Deduct token via Supabase (useStore handles this)
+        const tokenUsed = await useToken();
+        if (!tokenUsed) {
+          throw new Error("Failed to deduct token. Please try again.");
+        }
+        console.log("[LOG] Token deducted via Supabase.");
+
+        // 5. Upload to API with Authorization header
         console.log("[LOG] Preparing Blobs for upload...");
         const mainBlob = new Blob([base64ToUint8Array(base64Image)], { type: 'image/png' });
         const thumbBlob = new Blob([base64ToUint8Array(thumbnailBase64)], { type: 'image/jpeg' });
 
         const formData = new FormData();
         formData.append('action', 'generate_and_save');
-        formData.append('userId', user.id);
         formData.append('category', selectedStyle);
         formData.append('price', selectedSize.price.toString());
         formData.append('metadata', JSON.stringify(aiMeta));
@@ -275,7 +281,10 @@ export function Home() {
         console.log("[LOG] Uploading to SECURE API: https://api.posterwallart.shop/api.php");
         const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
           method: 'POST',
-          body: formData
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          body: formData,
         });
 
         const result = await uploadRes.json();
@@ -285,7 +294,6 @@ export function Home() {
           console.log("[LOG] Product saved successfully. New Product ID:", result.product.id);
           setRecommendations(prev => [result.product, ...prev.slice(0, 2)]);
           setSelectedProduct(result.product);
-          setTokens(tokens - 1);
         } else {
           console.error("[LOG] Server rejected the request:", result.error);
           throw new Error(result.error);
@@ -293,7 +301,7 @@ export function Home() {
       } else {
         throw new Error("Image data returned empty from API.");
       }
-    } catch (e: any) { 
+    } catch (e: any) {
       console.error("[ERROR] Generation flow caught an error:", e);
       alert(e.message || "An error occurred.");
     } finally {
@@ -317,12 +325,12 @@ export function Home() {
               <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-500">Architectural Analysis...</p>
             </div>
           ) : roomImage ? (
-            <InteractiveCanvas 
-              backgroundImage={roomImage} 
-              mountedArt={selectedProduct?.thumbnail || selectedProduct?.image || null} 
+            <InteractiveCanvas
+              backgroundImage={roomImage}
+              mountedArt={selectedProduct?.thumbnail || selectedProduct?.image || null}
               physicalWidth={physicalWidth}
               physicalHeight={physicalHeight}
-              naturalPixelsPerInch={analysisData?.ppi || 6} 
+              naturalPixelsPerInch={analysisData?.ppi || 6}
               frameColor={(FRAME_COLORS as any)[selectedFrame]}
               perspective={{ rotateY: analysisData?.rotateY || 0, skewY: analysisData?.skewY || 0 }}
             />
@@ -342,7 +350,7 @@ export function Home() {
       <div className={`w-[480px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto transition-opacity duration-300 ${isInterfaceLocked ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="p-6 space-y-8 pb-24">
           <div className="space-y-2">
-            <button 
+            <button
               onClick={handleCreateForMe}
               disabled={isGenerating || !roomImage || (user && tokens <= 0) || isInterfaceLocked}
               className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-20"
@@ -360,10 +368,10 @@ export function Home() {
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Category & Theme</label>
               <div className="grid grid-cols-2 gap-2">
-                <select value={selectedTheme} onChange={(e)=>setSelectedTheme(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
+                <select value={selectedTheme} onChange={(e) => setSelectedTheme(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
                   {THEMES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
-                <select value={selectedStyle} onChange={(e)=>setSelectedStyle(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
+                <select value={selectedStyle} onChange={(e) => setSelectedStyle(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
                   {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </div>
@@ -373,7 +381,7 @@ export function Home() {
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Dimensions</label>
               <div className="grid grid-cols-3 gap-2">
                 {SIZES.map(s => (
-                  <button key={s.value} onClick={()=>setSelectedSize(s)} className={`p-3 rounded-xl border text-[10px] font-bold transition-all ${selectedSize.value === s.value ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 text-zinc-400 border-zinc-800'}`}>
+                  <button key={s.value} onClick={() => setSelectedSize(s)} className={`p-3 rounded-xl border text-[10px] font-bold transition-all ${selectedSize.value === s.value ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 text-zinc-400 border-zinc-800'}`}>
                     {s.label}
                   </button>
                 ))}
@@ -385,7 +393,7 @@ export function Home() {
                 <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Orientation</label>
                 <div className="flex gap-2">
                   {(['portrait', 'landscape'] as const).map(o => (
-                    <button key={o} onClick={()=>setOrientation(o)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg border capitalize ${orientation === o ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{o}</button>
+                    <button key={o} onClick={() => setOrientation(o)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg border capitalize ${orientation === o ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{o}</button>
                   ))}
                 </div>
               </div>
@@ -393,7 +401,7 @@ export function Home() {
                 <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Frame</label>
                 <div className="flex gap-2">
                   {(['unframed', 'black', 'oak'] as FrameType[]).map(f => (
-                    <button key={f} onClick={()=>setSelectedFrame(f)} className={`flex-1 py-2 rounded-lg border flex items-center justify-center ${selectedFrame === f ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800'}`}>
+                    <button key={f} onClick={() => setSelectedFrame(f)} className={`flex-1 py-2 rounded-lg border flex items-center justify-center ${selectedFrame === f ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800'}`}>
                       <div className="w-3 h-3 rounded-full border border-zinc-700" style={{ backgroundColor: FRAME_COLORS[f] || '#fff' }}></div>
                     </button>
                   ))}
@@ -403,7 +411,7 @@ export function Home() {
 
             <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
               <span className="text-xs font-medium">Include Poster Text?</span>
-              <button onClick={()=>setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
+              <button onClick={() => setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-1' : 'left-1'}`} />
               </button>
             </div>
@@ -420,7 +428,7 @@ export function Home() {
               <div className="pt-6 border-t border-zinc-800 space-y-4">
                 <h3 className="text-sm font-bold uppercase italic tracking-tighter">AI Artist Selection</h3>
                 {recommendations.map((p) => (
-                  <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.slug === p.slug ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
+                  <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.slug === p.slug ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={() => setSelectedProduct(p)}>
                     <div className="flex gap-4 items-center">
                       <img src={p.thumbnail || p.image} className="w-14 h-14 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
