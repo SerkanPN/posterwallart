@@ -90,7 +90,8 @@ export function Profile() {
             {myDesigns.map((design) => (
               <div key={design.id} className="group bg-zinc-900 rounded-[2.5rem] overflow-hidden border border-zinc-800 hover:border-zinc-700 transition-all">
                 <div className="aspect-[2/3] relative overflow-hidden bg-black">
-                  <img src={design.image_url} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={design.title} />
+                  {/* HIZLANDIRMA EKLENTİSİ: Varsa thumbnail kullan, yoksa image_url */}
+                  <img src={design.thumbnail_url || design.image_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt={design.title} />
                   
                   <div className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center gap-3 backdrop-blur-md">
                     <button 
