@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
-import { supabase } from '../lib/supabase';
 import { AuthModal } from '../components/AuthModal';
 
 type SizeType = '8x10' | '11x14' | '16x20' | '18x24' | '20x30' | '24x36';
@@ -44,6 +43,14 @@ const base64ToUint8Array = (base64Data: string) => {
   return bytes;
 };
 
+const base64ToBlob = (base64: string) => {
+  const byteString = atob(base64.split(',')[1]);
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) ia[i] = byteString.charCodeAt(i);
+  return new Blob([ab], { type: 'image/png' });
+};
+
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -73,7 +80,7 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
 };
 
 export function Home() {
-  const { user, tokens, useToken, addToCart, setAuthModalOpen } = useStore();
+  const { user, tokens, setTokens, addToCart, setAuthModalOpen } = useStore();
   
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
@@ -90,7 +97,6 @@ export function Home() {
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [analysisData, setAnalysisData] = useState<any>(null);
 
-  // EKLENEN KİLİT MEKANİZMASI: Analiz bitmeden arayüz kitlenir
   const isInterfaceLocked = !analysisData || isAnalyzing;
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
@@ -121,10 +127,9 @@ export function Home() {
 
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
-    setAnalysisData(null); // Yeni resim yüklenince kilidi tekrar devreye sok
+    setAnalysisData(null);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     try {
-      console.log("Oda analizi için Gemini API'ye istek atılıyor...");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -139,7 +144,6 @@ export function Home() {
         const res = await response.json();
         const data = JSON.parse(res.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
         setAnalysisData(data);
-        console.log("Oda analizi tamamlandı:", data);
       }
     } catch (e) { 
       console.error("Room analysis failed:", e); 
@@ -149,22 +153,15 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    console.log("1. Make Me Feel Special butonuna tıklandı!");
-
     if (!user) { setAuthModalOpen(true); return; }
     if (tokens <= 0) { alert("Insufficient tokens! Please refill your balance."); return; }
-    // Kilitliyse veya üretiyorsa çalışmasın
     if (isGenerating || isInterfaceLocked) return; 
 
     setIsGenerating(true);
-
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      console.log("2. Üretim süreci başlatılıyor...");
-      
       const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
-      
       const prompt = `You are a world-class master artist and elite visual designer specializing in premium wall art.
 
 Your task is to create a high-end, commercially viable poster design that people would proudly hang in their homes. This is NOT a generic image — it must feel like a masterpiece artwork.
@@ -197,7 +194,6 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
-      console.log("4. Görsel için Gemini API'ye (3.1-flash-image) istek atılıyor...");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -207,14 +203,10 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
       if (!response.ok) throw new Error("Image generation API returned an error: " + response.status);
 
       const res = await response.json();
-      console.log("5. Görsel API'den başarıyla alındı!");
-
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
       if (imgPart?.inlineData) {
         let base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
-        
-        console.log("5.1. Thumbnail (Küçük resim) tarayıcıda oluşturuluyor...");
         let thumbnailBase64 = await createThumbnail(base64Image);
 
         let aiMeta = { 
@@ -225,7 +217,6 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         };
 
         try {
-          console.log("6. Arka planda SEO verileri için Gemini API'ye istek atılıyor...");
           const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -240,11 +231,8 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
                aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
             }
           }
-        } catch (e) { console.error("SEO Gen failed", e); }
+        } catch (e) {}
 
-        console.log("5.5. Sunucuya (api.php) veri gönderiliyor...");
-
-        // BLOB DÖNÜŞÜMÜ (Güvenlik duvarlarını aşmak için)
         const mainBlob = new Blob([base64ToUint8Array(base64Image)], { type: 'image/png' });
         const thumbBlob = new Blob([base64ToUint8Array(thumbnailBase64)], { type: 'image/jpeg' });
 
@@ -260,7 +248,7 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         formData.append('mainImage', mainBlob, 'main.png');
         formData.append('thumbnail', thumbBlob, 'thumb.jpg');
 
-        const uploadRes = await fetch('https://posterwallart.shop/api.php', {
+        const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
           method: 'POST',
           body: formData
         });
@@ -268,10 +256,8 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         const result = await uploadRes.json();
 
         if (result.success) {
-          console.log("9. İşlem tamamlandı!");
           setRecommendations(prev => [result.product, ...prev.slice(0, 2)]);
           setSelectedProduct(result.product);
-          // Zustand üzerinde lokal jetonu düşürüyoruz
           if (useStore.getState().addTokens) {
              useStore.getState().addTokens(-1);
           }
@@ -281,9 +267,8 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
       } else {
         throw new Error("Görsel datası API'den boş döndü.");
       }
-    } catch (e) { 
-      console.error("Üretim sırasında hata oluştu:", e); 
-      alert("Bir hata oluştu. Lütfen tekrar deneyin.");
+    } catch (e: any) { 
+      alert(e.message || "An error occurred.");
     } finally {
       setIsGenerating(false);
     }
