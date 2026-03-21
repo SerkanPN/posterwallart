@@ -33,25 +33,19 @@ const STYLES = [
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
-// DAHA GÜVENLİ BLOB DÖNÜŞTÜRÜCÜ
-const base64ToBlob = (base64Data: string) => {
+// KESİN ÇÖZÜM: Base64'ü ArrayBuffer'a çevirip Uint8Array dönen, eklentileri atlayan fonksiyon
+const base64ToUint8Array = (base64Data: string) => {
   const parts = base64Data.split(';base64,');
-  const contentType = parts[0].split(':')[1] || 'image/png';
-  const byteCharacters = atob(parts[1]);
-  const byteArrays = [];
-  for (let offset = 0; offset < byteCharacters.length; offset += 512) {
-    const slice = byteCharacters.slice(offset, offset + 512);
-    const byteNumbers = new Array(slice.length);
-    for (let i = 0; i < slice.length; i++) {
-      byteNumbers[i] = slice.charCodeAt(i);
-    }
-    const byteArray = new Uint8Array(byteNumbers);
-    byteArrays.push(byteArray);
+  const base64String = parts[1];
+  const binaryString = atob(base64String);
+  const bytes = new Uint8Array(binaryString.length);
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
   }
-  return new Blob(byteArrays, { type: contentType });
+  return bytes;
 };
 
-// GÖRSELİ TARAYICIDA KÜÇÜLTME FONKSİYONU (MAĞAZA HIZI İÇİN)
+// GÖRSELİ TARAYICIDA KÜÇÜLTME FONKSİYONU
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -89,7 +83,7 @@ export function Home() {
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
-  // VARSAYILAN DEĞERLER (18x24 ve Siyah Çerçeve)
+  // VARSAYILAN DEĞERLER
   const [selectedSize, setSelectedSize] = useState(SIZES[3]); 
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [selectedTheme, setSelectedTheme] = useState('Abstract');
@@ -226,30 +220,31 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         console.log("5.1. Thumbnail (Küçük resim) tarayıcıda oluşturuluyor...");
         const thumbnailBase64 = await createThumbnail(base64Image);
 
-        let finalImageUrl = ""; 
-        let finalThumbnailUrl = "";
-
-        console.log("5.5. Görseller Supabase Storage'a yükleniyor...");
+        console.log("5.5. Görseller Supabase Storage'a Güvenli Yöntemle Yükleniyor...");
         
-        const mainBlob = base64ToBlob(base64Image);
-        const thumbBlob = base64ToBlob(thumbnailBase64);
+        // Eklentileri aşmak için Blob değil Uint8Array (gerçek binary data) kullanıyoruz
+        const mainBytes = base64ToUint8Array(base64Image);
+        const thumbBytes = base64ToUint8Array(thumbnailBase64);
         
         const fileBaseName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
         const mainFileName = `${fileBaseName}.png`;
         const thumbFileName = `${fileBaseName}-thumb.jpg`;
 
-        const [mainUpload, thumbUpload] = await Promise.all([
-          supabase.storage.from('artworks').upload(mainFileName, mainBlob, { contentType: 'image/png', upsert: true }),
-          supabase.storage.from('artworks').upload(thumbFileName, thumbBlob, { contentType: 'image/jpeg', upsert: true })
-        ]);
-
-        if (mainUpload.error || thumbUpload.error) {
-          console.error("Storage yükleme hatası detayları:", mainUpload.error || thumbUpload.error);
-          throw new Error("Supabase Storage yüklemesi başarısız oldu.");
+        // Yüklemeleri sırayla yapıyoruz ki ağ trafiği boğulmasın
+        const mainUpload = await supabase.storage.from('artworks').upload(mainFileName, mainBytes, { contentType: 'image/png', upsert: true });
+        if (mainUpload.error) {
+          console.error("Ana görsel yükleme hatası:", mainUpload.error);
+          throw new Error("Supabase Storage ana görsel yüklemesi başarısız oldu.");
         }
 
-        finalImageUrl = supabase.storage.from('artworks').getPublicUrl(mainFileName).data.publicUrl;
-        finalThumbnailUrl = supabase.storage.from('artworks').getPublicUrl(thumbFileName).data.publicUrl;
+        const thumbUpload = await supabase.storage.from('artworks').upload(thumbFileName, thumbBytes, { contentType: 'image/jpeg', upsert: true });
+        if (thumbUpload.error) {
+          console.error("Thumbnail yükleme hatası:", thumbUpload.error);
+          throw new Error("Supabase Storage thumbnail yüklemesi başarısız oldu.");
+        }
+
+        const finalImageUrl = supabase.storage.from('artworks').getPublicUrl(mainFileName).data.publicUrl;
+        const finalThumbnailUrl = supabase.storage.from('artworks').getPublicUrl(thumbFileName).data.publicUrl;
 
         console.log("5.6. Storage yüklemeleri başarılı!");
         
