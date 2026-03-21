@@ -85,7 +85,8 @@ export function Shop() {
                 <Link to={`/product/${product.slug}`} className="absolute inset-0 z-10" />
                 
                 <div className="aspect-[3/4] relative overflow-hidden bg-black">
-                  <img src={product.image_url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.title} />
+                  {/* HIZLANDIRMA EKLENTİSİ: Varsa thumbnail kullan, yoksa mecburen image_url kullan */}
+                  <img src={product.thumbnail_url || product.image_url} loading="lazy" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" alt={product.title} />
                   <div className="absolute top-4 left-4 bg-emerald-500/10 backdrop-blur-md border border-emerald-500/20 px-3 py-1 rounded-full flex items-center gap-2 z-20">
                     <Sparkles className="w-3 h-3 text-emerald-500" />
                     <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest">AI Masterpiece</span>
