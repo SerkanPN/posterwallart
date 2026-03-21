@@ -11,7 +11,7 @@ type SizeType = '8x10' | '11x14' | '16x20' | '18x24' | '20x30' | '24x36';
 type FrameType = 'unframed' | 'black' | 'oak';
 
 interface Product {
-  id: string; title: string; basePrice: number; image: string; category: string; description: string; isGenerated?: boolean; slug?: string;
+  id: string; title: string; basePrice: number; image: string; category: string; description: string; isGenerated?: boolean; slug?: string; thumbnail?: string;
 }
 
 const SIZES = [
@@ -33,8 +33,11 @@ const STYLES = [
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
-const base64ToBlob = (base64Data: string, contentType: string = 'image/png') => {
-  const byteCharacters = atob(base64Data.split(',')[1]);
+// DAHA GÜVENLİ BLOB DÖNÜŞTÜRÜCÜ
+const base64ToBlob = (base64Data: string) => {
+  const parts = base64Data.split(';base64,');
+  const contentType = parts[0].split(':')[1] || 'image/png';
+  const byteCharacters = atob(parts[1]);
   const byteArrays = [];
   for (let offset = 0; offset < byteCharacters.length; offset += 512) {
     const slice = byteCharacters.slice(offset, offset + 512);
@@ -46,6 +49,34 @@ const base64ToBlob = (base64Data: string, contentType: string = 'image/png') => 
     byteArrays.push(byteArray);
   }
   return new Blob(byteArrays, { type: contentType });
+};
+
+// GÖRSELİ TARAYICIDA KÜÇÜLTME FONKSİYONU (MAĞAZA HIZI İÇİN)
+const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.8)); // 0.8 kalite ile çok hafif bir JPEG
+      } else {
+        resolve(base64); // Hata olursa orijinalini dön
+      }
+    };
+    img.src = base64;
+  });
 };
 
 export function Home() {
@@ -151,89 +182,25 @@ Your task is to create a high-end, commercially viable poster design that people
 CORE OBJECTIVE:
 Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders.
 
----
-
 MANDATORY RULES (STRICTLY ENFORCED):
-
-1. EDGE-TO-EDGE COMPOSITION:
-The artwork MUST completely fill the entire canvas.
-NO white borders, NO margins, NO frames, NO padding, NO empty edges.
-
+1. EDGE-TO-EDGE COMPOSITION: The artwork MUST completely fill the entire ${ar} canvas. NO white borders, NO margins, NO frames, NO padding, NO empty edges.
 2. NO TEXT / TYPOGRAPHY CONTROL:
 ${includeText ? '- Include minimal, elegant, stylistically appropriate typography integrated naturally into the composition.' : '- ABSOLUTELY NO text, letters, signatures, watermarks, logos, or random characters anywhere in the image.'}
-
-3. ULTRA HIGH DETAIL FOR UPSCALING:
-The image MUST be:
-ultra-detailed, hyper-realistic or hyper-illustrative (depending on style),
-extremely sharp, high contrast, crisp edges,
-rich textures, fine details, professional lighting,
-masterpiece quality, 8k-level detailing (even if rendered lower resolution).
-
-Avoid:
-blurry areas, muddy textures, low-detail regions, washed colors.
-
-4. STYLE + THEME FUSION:
-Seamlessly blend the selected STYLE and THEME into a single cohesive artistic vision.
-They must NOT conflict — instead they must enhance each other like a professional art direction.
-
-5. REFERENCE IMAGE INFLUENCE (IF PROVIDED):
-DO NOT copy or replicate the reference image.
-ONLY extract and reinterpret:
-- color palette
-- lighting style
-- mood / atmosphere
-- contrast balance
-
-Transform these into a completely new, original composition.
-
-6. PERFECT COMPOSITION & FRAMING:
-- Respect the selected orientation: ${orientation}
-- Use strong composition principles (rule of thirds, depth, focal hierarchy)
-- Clear subject focus, balanced negative space (without empty borders)
-
-7. VISUAL IMPACT:
-The result must feel:
-premium, gallery-worthy, emotionally engaging, highly decorative.
-
----
-
-DYNAMIC INPUTS:
-
-STYLE: ${selectedStyle}
-THEME: ${selectedTheme}
-ORIENTATION: ${orientation}
-COLOR MOOD: ${refImage ? 'Match reference image' : 'Auto'}
-INCLUDE_TEXT: ${includeText ? 'TRUE' : 'FALSE'}
-TEXT_CONTENT: ${includeText ? 'Minimal typography' : 'NONE'}
-
----
+3. ULTRA HIGH DETAIL FOR UPSCALING: The image MUST be ultra-detailed, hyper-realistic or hyper-illustrative, extremely sharp, high contrast, crisp edges, rich textures, fine details, professional lighting, masterpiece quality, 8k-level detailing. Avoid blurry areas, muddy textures, low-detail regions, washed colors.
+4. STYLE + THEME FUSION: Seamlessly blend the ${selectedStyle} style and ${selectedTheme} theme into a single cohesive artistic vision. They must NOT conflict — instead they must enhance each other like a professional art direction.
+${refImage ? '5. REFERENCE IMAGE INFLUENCE: DO NOT copy or replicate the reference image. ONLY extract and reinterpret color palette, lighting style, mood / atmosphere, contrast balance. Transform these into a completely new, original composition.' : ''}
+6. PERFECT COMPOSITION & FRAMING: Respect the selected orientation: ${orientation}. Use strong composition principles, clear subject focus, balanced negative space (without empty borders).
+7. VISUAL IMPACT: The result must feel premium, gallery-worthy, emotionally engaging, highly decorative.
 
 FINAL PROMPT CONSTRUCTION:
-
 Create an original artwork in the style of ${selectedStyle}, centered around ${selectedTheme}.
-
 The composition must be cinematic, visually striking, and deeply detailed, with a strong focal point and immersive depth.
-
 Lighting should be dramatic and professional, with rich contrast and refined color harmony.
-
-${refImage ? 'If a reference image is provided, subtly incorporate its color palette and atmosphere while keeping the composition entirely original.' : ''}
-
-Ensure the artwork is:
-ultra-detailed, hyper-crisp, sharp focus, high texture fidelity, masterpiece quality.
-
 The image MUST fill the entire canvas edge-to-edge with no borders or empty space.
-
-${includeText ? 'Add minimal, elegant typography perfectly integrated into the design.' : 'Do NOT include any text, letters, signature, watermark, or symbols.'}
-
----
+Resolution: 1024px.
 
 OUTPUT STYLE TAGS (ALWAYS INCLUDE):
-masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 8k detail, gallery artwork, premium poster design
-
-Avoid:
-low quality, blurry, distorted anatomy, bad composition, flat lighting, dull colors, empty areas
-
-The artwork should be highly appealing for modern interior decoration, suitable for living rooms, bedrooms, and office spaces.`;
+masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 8k detail, gallery artwork, premium poster design`;
 
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
@@ -254,31 +221,43 @@ The artwork should be highly appealing for modern interior decoration, suitable 
 
       if (imgPart?.inlineData) {
         const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
-        let finalImageUrl = base64Image; 
+        
+        console.log("5.1. Thumbnail (Küçük resim) tarayıcıda oluşturuluyor...");
+        const thumbnailBase64 = await createThumbnail(base64Image);
 
-        console.log("5.5. Görsel Supabase Storage'a yükleniyor...");
-        try {
-          const blob = base64ToBlob(base64Image);
-          const fileName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}.png`;
+        let finalImageUrl = ""; 
+        let finalThumbnailUrl = "";
 
-          const { error: uploadError } = await supabase.storage
-            .from('artworks')
-            .upload(fileName, blob, { contentType: 'image/png' });
+        console.log("5.5. Görseller Supabase Storage'a yükleniyor...");
+        
+        const mainBlob = base64ToBlob(base64Image);
+        const thumbBlob = base64ToBlob(thumbnailBase64, 'image/jpeg');
+        
+        const fileBaseName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+        const mainFileName = `${fileBaseName}.png`;
+        const thumbFileName = `${fileBaseName}-thumb.jpg`;
 
-          if (!uploadError) {
-            const { data: publicUrlData } = supabase.storage.from('artworks').getPublicUrl(fileName);
-            finalImageUrl = publicUrlData.publicUrl;
-            console.log("5.6. Storage yüklemesi başarılı!");
-          }
-        } catch (e) {
-          console.error("Blob dönüştürme/yükleme hatası:", e);
+        const [mainUpload, thumbUpload] = await Promise.all([
+          supabase.storage.from('artworks').upload(mainFileName, mainBlob, { contentType: 'image/png', upsert: true }),
+          supabase.storage.from('artworks').upload(thumbFileName, thumbBlob, { contentType: 'image/jpeg', upsert: true })
+        ]);
+
+        if (mainUpload.error || thumbUpload.error) {
+          console.error("Storage yükleme hatası detayları:", mainUpload.error || thumbUpload.error);
+          throw new Error("Supabase Storage yüklemesi başarısız oldu.");
         }
+
+        finalImageUrl = supabase.storage.from('artworks').getPublicUrl(mainFileName).data.publicUrl;
+        finalThumbnailUrl = supabase.storage.from('artworks').getPublicUrl(thumbFileName).data.publicUrl;
+
+        console.log("5.6. Storage yüklemeleri başarılı!");
         
         const tempId = `temp-${Date.now()}`;
         const tempProduct = { 
           id: tempId, 
           title: "Crafting details...", 
           image: finalImageUrl, 
+          thumbnail: finalThumbnailUrl,
           basePrice: selectedSize.price, 
           category: selectedStyle,
           description: "AI is writing the story...",
@@ -332,6 +311,7 @@ The artwork should be highly appealing for modern interior decoration, suitable 
               alt_text: aiMeta.alt_text,
               tags: aiMeta.tags,
               image_url: finalImageUrl, 
+              thumbnail_url: finalThumbnailUrl,
               category: selectedStyle,
               slug: slug,
               price: 49.00,
@@ -346,6 +326,7 @@ The artwork should be highly appealing for modern interior decoration, suitable 
                 id: newProduct.id, 
                 title: aiMeta.title, 
                 image: finalImageUrl, 
+                thumbnail: finalThumbnailUrl,
                 basePrice: selectedSize.price, 
                 category: selectedStyle,
                 description: aiMeta.description,
@@ -364,10 +345,12 @@ The artwork should be highly appealing for modern interior decoration, suitable 
       console.error("Üretim sırasında hata oluştu:", e); 
       
       if (tokenDeducted) {
-        const { addTokens } = useStore.getState();
-        addTokens(1);
-        console.log("Sunucu hatası nedeniyle 1 jeton iade edildi.");
-        alert("API sunucuları meşgul veya hata oluştu. Jetonunuz iade edildi, lütfen tekrar deneyin.");
+        // Hata durumunda jetonu iade et ama state'i bozmamak için güvenli yolla yap
+        setTimeout(() => {
+            useStore.getState().addTokens(1);
+            console.log("Hata nedeniyle 1 jeton iade edildi.");
+            alert("Bir hata oluştu. Jetonunuz iade edildi.");
+        }, 100);
       } else {
         alert("Bir hata oluştu. Lütfen tekrar deneyin.");
       }
@@ -497,7 +480,7 @@ The artwork should be highly appealing for modern interior decoration, suitable 
                 {recommendations.map((p) => (
                   <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.slug === p.slug ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={()=>setSelectedProduct(p)}>
                     <div className="flex gap-4 items-center">
-                      <img src={p.image} className="w-14 h-14 rounded-lg object-cover" />
+                      <img src={p.thumbnail || p.image} className="w-14 h-14 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold truncate uppercase italic">{p.title}</h4>
                         <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider">Add to cart • ${p.basePrice}</button>
