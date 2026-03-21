@@ -66,7 +66,6 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
       } else {
         resolve(base64); 
       }
-      // RAM TEMİZLİĞİ
       img.src = '';
     };
     img.src = base64;
@@ -224,7 +223,6 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         const mainBytes = base64ToUint8Array(base64Image);
         const thumbBytes = base64ToUint8Array(thumbnailBase64);
         
-        // RAM TEMİZLİĞİ: Devasa metinleri bellekten sil
         base64Image = "";
         thumbnailBase64 = "";
 
@@ -234,13 +232,11 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
 
         const mainUpload = await supabase.storage.from('artworks').upload(mainFileName, mainBytes, { contentType: 'image/png', upsert: true });
         if (mainUpload.error) {
-          console.error("Ana görsel yükleme hatası:", mainUpload.error);
           throw new Error("Supabase Storage ana görsel yüklemesi başarısız oldu.");
         }
 
         const thumbUpload = await supabase.storage.from('artworks').upload(thumbFileName, thumbBytes, { contentType: 'image/jpeg', upsert: true });
         if (thumbUpload.error) {
-          console.error("Thumbnail yükleme hatası:", thumbUpload.error);
           throw new Error("Supabase Storage thumbnail yüklemesi başarısız oldu.");
         }
 
@@ -264,77 +260,75 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
 
         setRecommendations(prev => [tempProduct, ...prev.slice(0, 2)]);
         setSelectedProduct(tempProduct);
-        setIsGenerating(false);
+        // DİKKAT: Artık burada setIsGenerating(false) demiyoruz. Sonuna kadar bekliyoruz.
 
-        (async () => {
-          let aiMeta = { 
-            title: `${selectedStyle} Masterpiece`, 
-            description: "A beautiful AI-generated artwork.", 
-            alt_text: "AI poster", 
-            tags: ["art", selectedStyle.toLowerCase()] 
-          };
+        let aiMeta = { 
+          title: `${selectedStyle} Masterpiece`, 
+          description: "A beautiful AI-generated artwork.", 
+          alt_text: "AI poster", 
+          tags: ["art", selectedStyle.toLowerCase()] 
+        };
 
-          try {
-            console.log("6. Arka planda SEO verileri için Gemini API'ye istek atılıyor...");
-            const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                contents: [{ parts: [{ text: `Create a professional SEO title, a 2-sentence description, alt text, and tags for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY valid JSON: { "title": "...", "description": "...", "alt_text": "...", "tags": ["..."] }` }] }]
-              })
-            });
-            
-            if (seoRes.ok) {
-              const seoData = await seoRes.json();
-              if (seoData.candidates && seoData.candidates[0]) {
-                 aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-              }
+        try {
+          console.log("6. Arka planda SEO verileri için Gemini API'ye istek atılıyor...");
+          const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: `Create a professional SEO title, a 2-sentence description, alt text, and tags for a ${selectedStyle} poster with theme ${selectedTheme}. Return ONLY valid JSON: { "title": "...", "description": "...", "alt_text": "...", "tags": ["..."] }` }] }]
+            })
+          });
+          
+          if (seoRes.ok) {
+            const seoData = await seoRes.json();
+            if (seoData.candidates && seoData.candidates[0]) {
+               aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
             }
-          } catch (e) { console.error("SEO Gen failed", e); }
-
-          const now = new Date();
-          const dateStr = now.toISOString().split('T')[0];
-          const hourStr = now.getHours().toString().padStart(2, '0');
-          const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
-          const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-
-          console.log("8. Supabase veritabanına kayıt yapılıyor...");
-          const { data: newProduct, error: supabaseError } = await supabase
-            .from('products')
-            .insert([{
-              creator_id: user.id,
-              title: aiMeta.title,
-              description: aiMeta.description,
-              alt_text: aiMeta.alt_text,
-              tags: aiMeta.tags,
-              image_url: finalImageUrl, 
-              thumbnail_url: finalThumbnailUrl,
-              category: selectedStyle,
-              slug: slug,
-              price: 49.00,
-              stock: -1,
-              is_private: false
-            }])
-            .select().single();
-
-          if (newProduct) {
-             console.log("9. İşlem tamamlandı!");
-             const finalProduct = { 
-                id: newProduct.id, 
-                title: aiMeta.title, 
-                image: finalImageUrl, 
-                thumbnail: finalThumbnailUrl,
-                basePrice: selectedSize.price, 
-                category: selectedStyle,
-                description: aiMeta.description,
-                isGenerated: true,
-                slug: slug
-             };
-             
-             setRecommendations(prev => prev.map(p => p.id === tempId ? finalProduct : p));
-             setSelectedProduct(current => current?.id === tempId ? finalProduct : current);
           }
-        })(); 
+        } catch (e) { console.error("SEO Gen failed", e); }
+
+        const now = new Date();
+        const dateStr = now.toISOString().split('T')[0];
+        const hourStr = now.getHours().toString().padStart(2, '0');
+        const slugBase = `${aiMeta.title} ${selectedStyle} Poster Wall Art ${dateStr} ${hourStr}`;
+        const slug = slugBase.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+
+        console.log("8. Supabase veritabanına kayıt yapılıyor...");
+        const { data: newProduct, error: supabaseError } = await supabase
+          .from('products')
+          .insert([{
+            creator_id: user.id,
+            title: aiMeta.title,
+            description: aiMeta.description,
+            alt_text: aiMeta.alt_text,
+            tags: aiMeta.tags,
+            image_url: finalImageUrl, 
+            thumbnail_url: finalThumbnailUrl,
+            category: selectedStyle,
+            slug: slug,
+            price: 49.00,
+            stock: -1,
+            is_private: false
+          }])
+          .select().single();
+
+        if (newProduct) {
+           console.log("9. İşlem tamamlandı!");
+           const finalProduct = { 
+              id: newProduct.id, 
+              title: aiMeta.title, 
+              image: finalImageUrl, 
+              thumbnail: finalThumbnailUrl,
+              basePrice: selectedSize.price, 
+              category: selectedStyle,
+              description: aiMeta.description,
+              isGenerated: true,
+              slug: slug
+           };
+           
+           setRecommendations(prev => prev.map(p => p.id === tempId ? finalProduct : p));
+           setSelectedProduct(current => current?.id === tempId ? finalProduct : current);
+        }
       } else {
         throw new Error("Görsel datası API'den boş döndü.");
       }
@@ -350,9 +344,10 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
       } else {
         alert("Bir hata oluştu. Lütfen tekrar deneyin.");
       }
-      
+    } finally {
+      // TÜM İŞLEMLER (VERİTABANI KAYDI DAHİL) BİTTİĞİNDE BUTON KİLİDİNİ AÇ
       setIsGenerating(false);
-    } 
+    }
   };
 
   const [pw, ph] = selectedSize.value.split('x').map(Number);
