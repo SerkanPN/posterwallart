@@ -33,17 +33,7 @@ const STYLES = [
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
-const base64ToUint8Array = (base64Data: string) => {
-  const parts = base64Data.split(';base64,');
-  const base64String = parts[1];
-  const binaryString = atob(base64String);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-};
-
+// GÖRSELİ TARAYICIDA KÜÇÜLTME FONKSİYONU
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
     const img = new Image();
@@ -218,32 +208,33 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         console.log("5.1. Thumbnail (Küçük resim) tarayıcıda oluşturuluyor...");
         let thumbnailBase64 = await createThumbnail(base64Image);
 
-        console.log("5.5. Görseller Supabase Storage'a Güvenli Yöntemle Yükleniyor...");
+        console.log("5.5. Görseller Kendi Sunucumuza (cPanel) Yükleniyor...");
         
-        const mainBytes = base64ToUint8Array(base64Image);
-        const thumbBytes = base64ToUint8Array(thumbnailBase64);
-        
+        // KENDİ SUNUCUMUZA POST İSTEĞİ (cPanel'deki upload.php dosyasına)
+        const uploadResponse = await fetch('https://posterwallart.shop/upload.php', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            image: base64Image,
+            thumbnail: thumbnailBase64,
+            userId: user.id
+          })
+        });
+
+        const uploadResult = await uploadResponse.json();
+
+        if (!uploadResponse.ok || !uploadResult.success) {
+          throw new Error("cPanel sunucusuna yükleme başarısız oldu.");
+        }
+
+        const finalImageUrl = uploadResult.mainUrl;
+        const finalThumbnailUrl = uploadResult.thumbUrl;
+
+        // Belleği boşalt
         base64Image = "";
         thumbnailBase64 = "";
 
-        const fileBaseName = `${user.id}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
-        const mainFileName = `${fileBaseName}.png`;
-        const thumbFileName = `${fileBaseName}-thumb.jpg`;
-
-        const mainUpload = await supabase.storage.from('artworks').upload(mainFileName, mainBytes, { contentType: 'image/png', upsert: true });
-        if (mainUpload.error) {
-          throw new Error("Supabase Storage ana görsel yüklemesi başarısız oldu.");
-        }
-
-        const thumbUpload = await supabase.storage.from('artworks').upload(thumbFileName, thumbBytes, { contentType: 'image/jpeg', upsert: true });
-        if (thumbUpload.error) {
-          throw new Error("Supabase Storage thumbnail yüklemesi başarısız oldu.");
-        }
-
-        const finalImageUrl = supabase.storage.from('artworks').getPublicUrl(mainFileName).data.publicUrl;
-        const finalThumbnailUrl = supabase.storage.from('artworks').getPublicUrl(thumbFileName).data.publicUrl;
-
-        console.log("5.6. Storage yüklemeleri başarılı!");
+        console.log("5.6. cPanel Yüklemesi başarılı!");
         
         const tempId = `temp-${Date.now()}`;
         const tempProduct = { 
@@ -260,7 +251,6 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
 
         setRecommendations(prev => [tempProduct, ...prev.slice(0, 2)]);
         setSelectedProduct(tempProduct);
-        // DİKKAT: Artık burada setIsGenerating(false) demiyoruz. Sonuna kadar bekliyoruz.
 
         let aiMeta = { 
           title: `${selectedStyle} Masterpiece`, 
@@ -345,7 +335,6 @@ masterpiece, ultra detailed, high contrast, sharp focus, professional lighting, 
         alert("Bir hata oluştu. Lütfen tekrar deneyin.");
       }
     } finally {
-      // TÜM İŞLEMLER (VERİTABANI KAYDI DAHİL) BİTTİĞİNDE BUTON KİLİDİNİ AÇ
       setIsGenerating(false);
     }
   };
