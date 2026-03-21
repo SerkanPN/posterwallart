@@ -6,13 +6,14 @@ import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
 
-type SizeType = '8x10' | '11x14' | '16x20' | '18x24' | '20x30' | '24x36';
-type FrameType = 'unframed' | 'black' | 'oak';
+// Categories matching your DB 'categories' table IDs
+const DB_CATEGORIES = [
+  { id: 1, name: 'Music' }, { id: 2, name: 'Movies' }, { id: 3, name: 'Anime' },
+  { id: 4, name: 'Vintage' }, { id: 5, name: 'Botanical' }, { id: 6, name: 'Abstract' },
+  { id: 7, name: 'Minimalist' }, { id: 17, name: 'Scandinavian' }, { id: 18, name: 'Pop Art' }
+];
 
-interface Product {
-  id: string; title: string; basePrice: number; image: string; category: string; description: string; isGenerated?: boolean; slug?: string; thumbnail?: string;
-}
-
+const STYLES = ['Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Japandi', 'Pop Art', 'Vintage Poster'];
 const SIZES = [
   { label: '8x10"', price: 22, value: '8x10' },
   { label: '11x14"', price: 24, value: '11x14' },
@@ -21,15 +22,6 @@ const SIZES = [
   { label: '20x30"', price: 39, value: '20x30' },
   { label: '24x36"', price: 49, value: '24x36' },
 ];
-
-const STYLES = [
-  'Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Century Modern', 
-  'Japandi', 'Industrial', 'Boho Chic', 'Art Deco', 'Vaporwave', 
-  'Surrealism', 'Pop Art', 'Abstract Expressionism', 'Impressionism', 'Nordic',
-  'Street Art', 'Futurism', 'Vintage Poster', 'Line Art', 'Watercolor'
-];
-
-const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 const base64ToBlob = (base64Data: string) => {
@@ -76,19 +68,19 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
 };
 
 export function Home() {
-  const { user, tokens, addToCart, setAuthModalOpen } = useStore();
+  const { user, tokens, setTokens, setAuthModalOpen } = useStore();
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [recommendations, setRecommendations] = useState<Product[]>([]);
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
   const [selectedSize, setSelectedSize] = useState(SIZES[3]); 
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
-  const [selectedTheme, setSelectedTheme] = useState('Abstract');
+  const [selectedTheme, setSelectedTheme] = useState(DB_CATEGORIES[5]); 
   const [includeText, setIncludeText] = useState(false);
-  const [selectedFrame, setSelectedFrame] = useState<FrameType>('black');
+  const [selectedFrame, setSelectedFrame] = useState<'unframed' | 'black' | 'oak'>('black');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [analysisData, setAnalysisData] = useState<any>(null);
 
@@ -106,18 +98,6 @@ export function Home() {
     }
   }, [user, setAuthModalOpen]);
 
-  const onDropRef = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => setRefImage(e.target?.result as string);
-      reader.readAsDataURL(file);
-    }
-  }, []);
-
-  const roomDrop = useDropzone({ onDrop: onDropRoom, accept: { 'image/*': [] }, maxFiles: 1 });
-  const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
-
   const analyzeRoom = async (base64Image: string) => {
     setIsAnalyzing(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -127,7 +107,7 @@ export function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [
-            { text: "Analyze room for scale. Return PPI (5-10) and perspective. Return ONLY JSON: { \"ppi\": number, \"rotateY\": number, \"skewY\": number, \"detectedStyle\": \"string\" }" },
+            { text: "Analyze room for scale. Return PPI (5-10) and perspective. Return ONLY JSON: { \"ppi\": number, \"rotateY\": number, \"skewY\": number }" },
             { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
           ]}]
         })
@@ -137,21 +117,19 @@ export function Home() {
         const data = JSON.parse(res.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
         setAnalysisData(data);
       }
-    } catch (e) { console.error("Analysis Error:", e); } finally { setIsAnalyzing(false); }
+    } catch (e) { console.error("Room Analysis Error:", e); } finally { setIsAnalyzing(false); }
   };
 
   const handleCreateForMe = async () => {
     if (!user) { setAuthModalOpen(true); return; }
-    if (tokens <= 0) { alert("No tokens remaining. Please top up."); return; }
+    if (tokens <= 0) { alert("Insufficient tokens."); return; }
     if (isGenerating) return; 
 
     setIsGenerating(true);
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      const ar = orientation === 'portrait' ? '9:16 portrait' : '16:9 landscape';
-      const prompt = `You are a world-class artist. Create high-end ${selectedStyle} wall art centered around ${selectedTheme}. Ultra-detailed, 8k, edge-to-edge, no borders. ${includeText ? 'Include elegant text.' : 'No text/signature.'}`;
-
+      const prompt = `Create a high-end ${selectedStyle} poster with ${selectedTheme.name} theme. 8k, edge-to-edge. ${includeText ? 'Add text.' : 'No text.'}`;
       const contents: any = [{ parts: [{ text: prompt }] }];
       if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
@@ -161,7 +139,7 @@ export function Home() {
         body: JSON.stringify({ contents })
       });
 
-      if (!response.ok) throw new Error("AI Service Busy");
+      if (!response.ok) throw new Error("AI Busy.");
       const res = await response.json();
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
@@ -169,27 +147,12 @@ export function Home() {
         let base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
         let thumbnailBase64 = await createThumbnail(base64Image);
 
-        // Metadata generation
-        let aiMeta = { title: `${selectedStyle} Art`, description: "Elite AI decor.", alt_text: "AI wall art", tags: ["art"] };
-        try {
-          const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ contents: [{ parts: [{ text: `Create professional SEO title, description, alt text for ${selectedStyle} poster. Return JSON.` }] }] })
-          });
-          if (seoRes.ok) {
-            const sData = await seoRes.json();
-            aiMeta = JSON.parse(sData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-          }
-        } catch (e) {}
-
-        // CUSTOM BACKEND UPLOAD (Bypasses Supabase Lock & ModSecurity)
         const formData = new FormData();
         formData.append('action', 'generate_and_save');
         formData.append('userId', user.id);
-        formData.append('category', selectedStyle);
+        formData.append('category_id', selectedTheme.id.toString());
         formData.append('price', selectedSize.price.toString());
-        formData.append('metadata', JSON.stringify(aiMeta));
+        formData.append('metadata', JSON.stringify({ title: "AI Artwork", description: "Exclusive AI Wall Art", tags: ["art"] }));
         formData.append('mainImage', base64ToBlob(base64Image), 'art.png');
         formData.append('thumbnail', base64ToBlob(thumbnailBase64), 'thumb.jpg');
 
@@ -199,13 +162,10 @@ export function Home() {
         if (result.success) {
           setRecommendations(prev => [result.product, ...prev.slice(0, 2)]);
           setSelectedProduct(result.product);
-          // Sync tokens locally if needed
+          setTokens(tokens - 1); // Sync tokens locally
         } else { throw new Error(result.error); }
       }
-    } catch (e: any) { 
-        console.error("Critical Error:", e);
-        alert(e.message || "Failed to generate. Token was not deducted."); 
-    } finally { setIsGenerating(false); }
+    } catch (e: any) { alert(e.message); } finally { setIsGenerating(false); }
   };
 
   const [pw, ph] = selectedSize.value.split('x').map(Number);
@@ -217,7 +177,7 @@ export function Home() {
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-20">
               <Loader2 className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-500">Scanning Room...</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-500">Scanning room...</p>
             </div>
           ) : roomImage ? (
             <InteractiveCanvas 
@@ -230,8 +190,8 @@ export function Home() {
               perspective={{ rotateY: analysisData?.rotateY || 0, skewY: analysisData?.skewY || 0 }}
             />
           ) : (
-            <div {...roomDrop.getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer border-2 border-dashed border-zinc-800 m-8 rounded-3xl">
-              <input {...roomDrop.getInputProps()} />
+            <div {...useDropzone({ onDrop: onDropRoom, accept: { 'image/*': [] }, maxFiles: 1 }).getRootProps()} className="absolute inset-0 flex flex-col items-center justify-center cursor-pointer border-2 border-dashed border-zinc-800 m-8 rounded-3xl">
+              <input {...useDropzone({ onDrop: onDropRoom, accept: { 'image/*': [] }, maxFiles: 1 }).getInputProps()} />
               <Upload className="w-12 h-12 opacity-20 mb-4" />
               <p className="font-mono text-xs uppercase opacity-30 tracking-widest">Upload Room Image</p>
             </div>
@@ -244,20 +204,18 @@ export function Home() {
           <button onClick={handleCreateForMe} disabled={isGenerating || !roomImage || (user && tokens <= 0)} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all disabled:opacity-20">
             {isGenerating ? 'Designing...' : 'Make Me Feel Special'}
           </button>
-          
           <div className="space-y-6">
             <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style & Theme</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Theme & Style</label>
                 <div className="grid grid-cols-2 gap-2">
-                    <select value={selectedTheme} onChange={(e)=>setSelectedTheme(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
-                        {THEMES.map(t => <option key={t} value={t}>{t}</option>)}
+                    <select value={selectedTheme.id} onChange={(e)=>setSelectedTheme(DB_CATEGORIES.find(c => c.id === Number(e.target.value)) || DB_CATEGORIES[0])} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
+                        {DB_CATEGORIES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                     </select>
                     <select value={selectedStyle} onChange={(e)=>setSelectedStyle(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
                         {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
                     </select>
                 </div>
             </div>
-
             <div className="space-y-4">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Size</label>
                 <div className="grid grid-cols-3 gap-2">
@@ -268,43 +226,6 @@ export function Home() {
                     ))}
                 </div>
             </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-4">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Orientation</label>
-                    <div className="flex gap-2">
-                        {(['portrait', 'landscape'] as const).map(o => (
-                            <button key={o} onClick={()=>setOrientation(o)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg border capitalize ${orientation === o ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{o}</button>
-                        ))}
-                    </div>
-                </div>
-                <div className="space-y-4">
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Frame</label>
-                    <div className="flex gap-2">
-                        {(['unframed', 'black', 'oak'] as FrameType[]).map(f => (
-                            <button key={f} onClick={()=>setSelectedFrame(f)} className={`flex-1 py-2 rounded-lg border flex items-center justify-center ${selectedFrame === f ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800'}`}>
-                                <div className="w-3 h-3 rounded-full border border-zinc-700" style={{ backgroundColor: FRAME_COLORS[f] || '#fff' }}></div>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-            </div>
-
-            <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
-                <span className="text-xs font-medium">Add Typography?</span>
-                <button onClick={()=>setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
-                    <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-1' : 'left-1'}`} />
-                </button>
-            </div>
-
-            <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference</label>
-                <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer text-center">
-                    <input {...refDrop.getInputProps()} />
-                    {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" /> : <p className="text-[10px] text-zinc-600">Drop image here</p>}
-                </div>
-            </div>
-
             {recommendations.length > 0 && (
               <div className="pt-6 border-t border-zinc-800 space-y-4">
                 <h3 className="text-sm font-bold uppercase italic tracking-tighter">AI Studio Items</h3>
@@ -314,7 +235,7 @@ export function Home() {
                       <img src={p.thumbnail || p.image} className="w-14 h-14 rounded-lg object-cover" />
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold truncate uppercase italic">{p.title}</h4>
-                        <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider italic">Add to Cart • ${p.basePrice}</button>
+                        <button className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider">Add to Cart • ${p.basePrice}</button>
                       </div>
                     </div>
                   </div>
