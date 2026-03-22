@@ -17,28 +17,33 @@ interface User {
 }
 
 interface StoreState {
-  user: User | null; cart: CartItem[]; wishlist: Product[]; isLoading: boolean; isAuthModalOpen: boolean;
+  user: User | null;
+  cart: CartItem[];
+  wishlist: Product[];
+  isLoading: boolean;
+  isAuthModalOpen: boolean;
+  tokens: number;
+  accessToken: string | null; // ← cached, getSession() çağırmayı önler
   setAuthModalOpen: (isOpen: boolean) => void;
   login: (email: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   checkUser: () => Promise<void>;
   addTokens: (amount: number) => void;
-  useToken: () => Promise<boolean>;
+  useToken: () => boolean;
+  setTokens: (tokens: number) => void;
   addToCart: (product: Product) => void;
   removeFromCart: (productId: string) => void;
   updateQuantity: (productId: string, quantity: number) => void;
   toggleWishlist: (product: Product) => void;
   clearCart: () => void;
-  tokens: number;
-  setTokens: (tokens: number) => void;
 }
 
 export const useStore = create<StoreState>()(
   persist(
     (set, get) => ({
       user: null, cart: [], wishlist: [], isLoading: false, isAuthModalOpen: false,
-      tokens: 0,
+      tokens: 0, accessToken: null,
 
       setTokens: (tokens: number) => set((state) => ({
         user: state.user ? { ...state.user, tokens } : null,
@@ -73,7 +78,7 @@ export const useStore = create<StoreState>()(
 
       logout: async () => {
         await supabase.auth.signOut();
-        set({ user: null, tokens: 0 });
+        set({ user: null, tokens: 0, accessToken: null });
       },
 
       checkUser: async () => {
@@ -82,7 +87,6 @@ export const useStore = create<StoreState>()(
         const syncProfile = async (authSession: any) => {
           if (!authSession) return;
 
-          // 1. Supabase profiles tablosunu kontrol et / oluştur
           let { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -100,28 +104,24 @@ export const useStore = create<StoreState>()(
 
           if (!profile) return;
 
-          // 2. MySQL'e senkronize et (fire & forget — hata olursa sessizce geç)
-          try {
-            await fetch(API_URL, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${authSession.access_token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                action: 'sync_user',
-                supabase_id: authSession.user.id,
-                email: authSession.user.email,
-                name: authSession.user.user_metadata?.full_name || authSession.user.user_metadata?.name || authSession.user.email?.split('@')[0] || 'User',
-                avatar: authSession.user.user_metadata?.avatar_url || null,
-                tokens: profile.tokens,
-              }),
-            });
-          } catch (e) {
-            console.warn('[WARN] MySQL sync failed (non-critical):', e);
-          }
+          // MySQL sync (fire & forget)
+          fetch(API_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${authSession.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              action: 'sync_user',
+              supabase_id: authSession.user.id,
+              email: authSession.user.email,
+              name: authSession.user.user_metadata?.full_name || authSession.user.user_metadata?.name || authSession.user.email?.split('@')[0] || 'User',
+              avatar: authSession.user.user_metadata?.avatar_url || null,
+              tokens: profile.tokens,
+            }),
+          }).catch((e) => console.warn('[WARN] MySQL sync failed:', e));
 
-          // 3. Store'u güncelle
+          // Store'u güncelle — accessToken'ı cache'le
           set({
             user: {
               id: authSession.user.id,
@@ -131,12 +131,14 @@ export const useStore = create<StoreState>()(
               isSeller: false,
             },
             tokens: profile.tokens,
+            accessToken: authSession.access_token, // ← burada cache'leniyor
             isAuthModalOpen: false,
           });
         };
 
         if (session) await syncProfile(session);
 
+        // Token refresh olduğunda accessToken'ı güncelle
         supabase.auth.onAuthStateChange(async (_event, session) => {
           if (session) {
             await syncProfile(session);
@@ -144,7 +146,7 @@ export const useStore = create<StoreState>()(
               window.history.replaceState(null, '', window.location.pathname);
             }
           } else {
-            set({ user: null, tokens: 0 });
+            set({ user: null, tokens: 0, accessToken: null });
           }
         });
       },
@@ -154,34 +156,34 @@ export const useStore = create<StoreState>()(
         tokens: state.tokens + amount,
       })),
 
-      useToken: async () => {
-        const { user } = get();
+      // Senkron — await yok, lock yok
+      useToken: () => {
+        const { user, accessToken } = get();
         if (!user || user.tokens <= 0) return false;
 
         const newCount = user.tokens - 1;
 
-        // 1. Store'u HEMEN güncelle — hiçbir şeyi bekleme (lock sorununu önler)
+        // Store'u hemen güncelle
         set({ user: { ...user, tokens: newCount }, tokens: newCount });
 
-        // 2. Supabase'e arka planda yaz
+        // Supabase arka planda
         supabase.from('profiles')
           .update({ tokens: newCount })
           .eq('id', user.id)
           .then(() => {})
-          .catch((e: any) => console.warn('[WARN] Supabase token sync failed:', e));
+          .catch((e: any) => console.warn('[WARN] Supabase token sync:', e));
 
-        // 3. MySQL'e de arka planda yaz
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (!session?.access_token) return;
+        // MySQL arka planda — cache'deki token'ı kullan, getSession() YOK
+        if (accessToken) {
           fetch(API_URL, {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${session.access_token}`,
+              'Authorization': `Bearer ${accessToken}`,
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({ action: 'update_tokens', tokens: newCount }),
-          }).catch((e) => console.warn('[WARN] MySQL token sync failed:', e));
-        });
+          }).catch((e) => console.warn('[WARN] MySQL token sync:', e));
+        }
 
         return true;
       },
@@ -204,6 +206,7 @@ export const useStore = create<StoreState>()(
     {
       name: 'posterwall-storage',
       partialize: (state) => ({ user: state.user, cart: state.cart, wishlist: state.wishlist, tokens: state.tokens })
+      // accessToken persist edilmiyor — güvenlik için
     }
   )
 );
