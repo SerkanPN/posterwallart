@@ -160,36 +160,28 @@ export const useStore = create<StoreState>()(
 
         const newCount = user.tokens - 1;
 
-        // 1. Supabase'den düş (kaynak of truth)
-        const { error } = await supabase
-          .from('profiles')
-          .update({ tokens: newCount })
-          .eq('id', user.id);
-
-        if (error) return false;
-
-        // 2. Store güncelle
+        // 1. Store'u HEMEN güncelle — hiçbir şeyi bekleme (lock sorununu önler)
         set({ user: { ...user, tokens: newCount }, tokens: newCount });
 
-        // 3. MySQL'e de yansıt (fire & forget)
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          if (session?.access_token) {
-            await fetch(API_URL, {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                action: 'update_tokens',
-                tokens: newCount,
-              }),
-            });
-          }
-        } catch (e) {
-          console.warn('[WARN] MySQL token sync failed (non-critical):', e);
-        }
+        // 2. Supabase'e arka planda yaz
+        supabase.from('profiles')
+          .update({ tokens: newCount })
+          .eq('id', user.id)
+          .then(() => {})
+          .catch((e: any) => console.warn('[WARN] Supabase token sync failed:', e));
+
+        // 3. MySQL'e de arka planda yaz
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (!session?.access_token) return;
+          fetch(API_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ action: 'update_tokens', tokens: newCount }),
+          }).catch((e) => console.warn('[WARN] MySQL token sync failed:', e));
+        });
 
         return true;
       },
