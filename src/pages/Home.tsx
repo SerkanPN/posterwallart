@@ -1,13 +1,10 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { motion, AnimatePresence } from 'motion/react';
-import { Upload, Wand2, Image as ImageIcon, Sparkles, ShoppingBag, Maximize2, Palette, Type, Layout, Lock, Loader2 } from 'lucide-react';
+import { Upload, Lock, Loader2 } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { supabase } from '../lib/supabase';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
 
-type SizeType = '8x10' | '11x14' | '16x20' | '18x24' | '20x30' | '24x36';
 type FrameType = 'unframed' | 'black' | 'oak';
 
 interface Product {
@@ -15,7 +12,7 @@ interface Product {
 }
 
 const SIZES = [
-  { label: '8x10"', price: 22, value: '8x10' },
+  { label: '8x10"',  price: 22, value: '8x10'  },
   { label: '11x14"', price: 24, value: '11x14' },
   { label: '16x20"', price: 26, value: '16x20' },
   { label: '18x24"', price: 26, value: '18x24' },
@@ -24,8 +21,8 @@ const SIZES = [
 ];
 
 const STYLES = [
-  'Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Century Modern', 
-  'Japandi', 'Industrial', 'Boho Chic', 'Art Deco', 'Vaporwave', 
+  'Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Century Modern',
+  'Japandi', 'Industrial', 'Boho Chic', 'Art Deco', 'Vaporwave',
   'Surrealism', 'Pop Art', 'Abstract Expressionism', 'Impressionism', 'Nordic',
   'Street Art', 'Futurism', 'Vintage Poster', 'Line Art', 'Watercolor'
 ];
@@ -42,12 +39,9 @@ const calculateAspectRatio = (sizeValue: string, orientation: 'portrait' | 'land
 
 const base64ToUint8Array = (base64Data: string) => {
   const parts = base64Data.split(';base64,');
-  const base64String = parts[1];
-  const binaryString = atob(base64String);
+  const binaryString = atob(parts[1]);
   const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
+  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
   return bytes;
 };
 
@@ -59,19 +53,12 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
       const canvas = document.createElement('canvas');
       let width = img.width;
       let height = img.height;
-      if (width > maxWidth) {
-        height = Math.round((height * maxWidth) / width);
-        width = maxWidth;
-      }
+      if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
       canvas.width = width;
       canvas.height = height;
       const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
-      } else {
-        resolve(base64);
-      }
+      if (ctx) { ctx.drawImage(img, 0, 0, width, height); resolve(canvas.toDataURL('image/jpeg', 0.8)); }
+      else resolve(base64);
       img.src = '';
     };
     img.src = base64;
@@ -79,59 +66,50 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
 };
 
 export function Home() {
-  const { user, tokens, setTokens, addToCart, setAuthModalOpen, useToken } = useStore();
-  
-  const [roomImage, setRoomImage] = useState<string | null>(null);
-  const [refImage, setRefImage] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // accessToken store'dan geliyor — getSession() çağrısı YOK
+  const { user, tokens, addToCart, setAuthModalOpen, useToken, accessToken } = useStore();
+
+  const [roomImage, setRoomImage]       = useState<string | null>(null);
+  const [refImage, setRefImage]         = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing]   = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-
-  const [selectedSize, setSelectedSize] = useState(SIZES[3]);
+  const [selectedSize, setSelectedSize]   = useState(SIZES[3]);
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [selectedTheme, setSelectedTheme] = useState('Abstract');
-  const [includeText, setIncludeText] = useState(false);
+  const [includeText, setIncludeText]     = useState(false);
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('black');
-  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
-  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [orientation, setOrientation]     = useState<'portrait' | 'landscape'>('portrait');
+  const [analysisData, setAnalysisData]   = useState<any>(null);
 
   const isInterfaceLocked = !analysisData || isAnalyzing;
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
     console.log("[LOG] Room image drop detected.");
-    if (!user) {
-      console.warn("[LOG] User not logged in, opening AuthModal.");
-      setAuthModalOpen(true);
-      return;
-    }
+    if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
-    if (file) {
-      console.log("[LOG] File received:", file.name);
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const base64 = e.target?.result as string;
-        setRoomImage(base64);
-        console.log("[LOG] Room image base64 generated, starting analysis...");
-        analyzeRoom(base64);
-      };
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    console.log("[LOG] File received:", file.name);
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const base64 = e.target?.result as string;
+      setRoomImage(base64);
+      analyzeRoom(base64);
+    };
+    reader.readAsDataURL(file);
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
-    console.log("[LOG] Reference image drop detected.");
     const file = acceptedFiles[0];
-    if (file) {
-      console.log("[LOG] Reference file received:", file.name);
-      const reader = new FileReader();
-      reader.onload = (e) => setRefImage(e.target?.result as string);
-      reader.readAsDataURL(file);
-    }
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => setRefImage(e.target?.result as string);
+    reader.readAsDataURL(file);
   }, []);
 
   const roomDrop = useDropzone({ onDrop: onDropRoom, accept: { 'image/*': [] }, maxFiles: 1 });
-  const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
+  const refDrop  = useDropzone({ onDrop: onDropRef,  accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
     console.log("[LOG] Initiating Gemini Room Analysis...");
@@ -144,7 +122,7 @@ export function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [
-            { text: "Analyze room for scale. Return PPI (5-10) and perspective. Return ONLY JSON: { \"ppi\": number, \"rotateY\": number, \"skewY\": number, \"detectedStyle\": \"string\" }" },
+            { text: 'Analyze room for scale. Return PPI (5-10) and perspective. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string" }' },
             { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
           ]}]
         })
@@ -158,9 +136,12 @@ export function Home() {
         console.log("[LOG] Analysis data parsed successfully:", data);
       } else {
         console.error("[ERROR] Gemini Analysis API returned status:", response.status);
+        // Analiz başarısız olsa bile arayüzü kilitleme — default değerler kullan
+        setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern' });
       }
     } catch (e) {
       console.error("[ERROR] Room analysis failed:", e);
+      setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern' });
     } finally {
       setIsAnalyzing(false);
     }
@@ -168,21 +149,16 @@ export function Home() {
 
   const handleCreateForMe = async () => {
     console.log("[LOG] 'Make Me Feel Special' triggered.");
-    if (!user) {
-      console.warn("[LOG] No user session found.");
-      setAuthModalOpen(true);
-      return;
-    }
+    if (!user) { setAuthModalOpen(true); return; }
 
     console.log("[LOG] Current tokens in store:", tokens);
-    if (tokens <= 0) {
-      console.warn("[LOG] Insufficient tokens detected in client store.");
-      alert("Insufficient tokens! Please refill your balance.");
-      return;
-    }
+    if (tokens <= 0) { alert("Insufficient tokens! Please refill your balance."); return; }
+    if (isGenerating || isInterfaceLocked) return;
 
-    if (isGenerating || isInterfaceLocked) {
-      console.warn("[LOG] Action blocked: Generating or Interface Locked.");
+    // accessToken store'dan al — getSession() ÇAĞIRILMIYOR
+    if (!accessToken) {
+      alert("Session expired. Please log in again.");
+      setAuthModalOpen(true);
       return;
     }
 
@@ -191,17 +167,6 @@ export function Home() {
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
 
     try {
-      // 1. Get Supabase session token for API authorization
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        alert("Session expired. Please log in again.");
-        setAuthModalOpen(true);
-        return;
-      }
-      const accessToken = session.access_token;
-      console.log("[LOG] Supabase session token retrieved.");
-
-      // 2. Generate image
       const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
       console.log(`[LOG] Selected Size: ${selectedSize.value}, Orientation: ${orientation}, Calculated Aspect Ratio: ${dynamicAR}`);
 
@@ -212,10 +177,7 @@ export function Home() {
       RESOLUTION: 1024px.`;
 
       const contents: any = [{ parts: [{ text: prompt }] }];
-      if (refImage) {
-        console.log("[LOG] Including reference image in prompt.");
-        contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
-      }
+      if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
 
       console.log("[LOG] Requesting Image Generation from Gemini 3.1...");
       const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
@@ -229,78 +191,72 @@ export function Home() {
       const res = await response.json();
       const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
 
-      if (imgPart?.inlineData) {
-        console.log("[LOG] Image data received successfully.");
-        let base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
-        let thumbnailBase64 = await createThumbnail(base64Image);
+      if (!imgPart?.inlineData) throw new Error("Image data returned empty from API.");
 
-        // 3. SEO metadata
-        let aiMeta: any = {
-          seo_title: `${selectedStyle} Masterpiece`,
-          seo_description: "A beautiful AI-generated artwork.",
-          alt_text: "AI poster",
-          tags: ["art", selectedStyle.toLowerCase()]
-        };
+      console.log("[LOG] Image data received successfully.");
+      const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
+      const thumbnailBase64 = await createThumbnail(base64Image);
 
-        console.log("[LOG] Fetching AI SEO Metadata...");
-        try {
-          const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: `Generate SEO title, description, alt text, tags for ${selectedStyle} ${selectedTheme} poster. Return ONLY JSON with keys: seo_title, seo_description, alt_text, tags.` }] }]
-            })
-          });
-          if (seoRes.ok) {
-            const seoData = await seoRes.json();
-            aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-            console.log("[LOG] SEO Meta generated:", aiMeta);
-          }
-        } catch (e) { console.warn("[LOG] SEO Meta generation skipped or failed."); }
+      // SEO metadata
+      let aiMeta: any = {
+        seo_title: `${selectedStyle} Masterpiece`,
+        seo_description: "A beautiful AI-generated artwork.",
+        alt_text: "AI poster",
+        tags: ["art", selectedStyle.toLowerCase()]
+      };
 
-        // 4. Deduct token via Supabase (useStore handles this)
-        const tokenUsed = await useToken();
-        if (!tokenUsed) {
-          throw new Error("Failed to deduct token. Please try again.");
-        }
-        console.log("[LOG] Token deducted via Supabase.");
-
-        // 5. Upload to API with Authorization header
-        console.log("[LOG] Preparing Blobs for upload...");
-        const mainBlob = new Blob([base64ToUint8Array(base64Image)], { type: 'image/png' });
-        const thumbBlob = new Blob([base64ToUint8Array(thumbnailBase64)], { type: 'image/jpeg' });
-
-        const formData = new FormData();
-        formData.append('action', 'generate_and_save');
-        formData.append('category', selectedStyle);
-        formData.append('price', selectedSize.price.toString());
-        formData.append('metadata', JSON.stringify(aiMeta));
-        formData.append('mainImage', mainBlob, 'main.png');
-        formData.append('thumbnail', thumbBlob, 'thumb.jpg');
-
-        console.log("[LOG] Uploading to SECURE API: https://api.posterwallart.shop/api.php");
-        const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-          body: formData,
+      console.log("[LOG] Fetching AI SEO Metadata...");
+      try {
+        const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: `Generate SEO title, description, alt text, tags for ${selectedStyle} ${selectedTheme} poster. Return ONLY JSON with keys: seo_title, seo_description, alt_text, tags.` }] }]
+          })
         });
-
-        const result = await uploadRes.json();
-        console.log("[LOG] Server response received:", result);
-
-        if (result.success) {
-          console.log("[LOG] Product saved successfully. New Product ID:", result.product.id);
-          setRecommendations(prev => [result.product, ...prev.slice(0, 2)]);
-          setSelectedProduct(result.product);
-        } else {
-          console.error("[LOG] Server rejected the request:", result.error);
-          throw new Error(result.error);
+        if (seoRes.ok) {
+          const seoData = await seoRes.json();
+          aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+          console.log("[LOG] SEO Meta generated:", aiMeta);
         }
+      } catch (e) { console.warn("[LOG] SEO Meta generation skipped."); }
+
+      // Token düş — senkron, lock yok
+      const tokenUsed = useToken();
+      if (!tokenUsed) throw new Error("Failed to deduct token. Please try again.");
+      console.log("[LOG] Token deducted.");
+
+      // Upload
+      console.log("[LOG] Preparing Blobs for upload...");
+      const mainBlob  = new Blob([base64ToUint8Array(base64Image)],    { type: 'image/png'  });
+      const thumbBlob = new Blob([base64ToUint8Array(thumbnailBase64)], { type: 'image/jpeg' });
+
+      const formData = new FormData();
+      formData.append('action',    'generate_and_save');
+      formData.append('category',  selectedStyle);
+      formData.append('price',     selectedSize.price.toString());
+      formData.append('metadata',  JSON.stringify(aiMeta));
+      formData.append('mainImage', mainBlob,  'main.png');
+      formData.append('thumbnail', thumbBlob, 'thumb.jpg');
+
+      console.log("[LOG] Uploading to SECURE API: https://api.posterwallart.shop/api.php");
+      const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+        body: formData,
+      });
+
+      const result = await uploadRes.json();
+      console.log("[LOG] Server response received:", result);
+
+      if (result.success) {
+        console.log("[LOG] Product saved successfully. New Product ID:", result.product.id);
+        setRecommendations(prev => [result.product, ...prev.slice(0, 2)]);
+        setSelectedProduct(result.product);
       } else {
-        throw new Error("Image data returned empty from API.");
+        throw new Error(result.error);
       }
+
     } catch (e: any) {
       console.error("[ERROR] Generation flow caught an error:", e);
       alert(e.message || "An error occurred.");
@@ -310,13 +266,13 @@ export function Home() {
   };
 
   const [pw, ph] = selectedSize.value.split('x').map(Number);
-  const physicalWidth = orientation === 'portrait' ? pw : ph;
+  const physicalWidth  = orientation === 'portrait' ? pw : ph;
   const physicalHeight = orientation === 'portrait' ? ph : pw;
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
       <AuthModal />
-      
+
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
           {isAnalyzing ? (
@@ -420,7 +376,7 @@ export function Home() {
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference (Optional)</label>
               <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer text-center">
                 <input {...refDrop.getInputProps()} />
-                {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" /> : <p className="text-[10px] text-zinc-600">Drop style reference here</p>}
+                {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" alt="ref" /> : <p className="text-[10px] text-zinc-600">Drop style reference here</p>}
               </div>
             </div>
 
@@ -430,7 +386,7 @@ export function Home() {
                 {recommendations.map((p) => (
                   <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.slug === p.slug ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={() => setSelectedProduct(p)}>
                     <div className="flex gap-4 items-center">
-                      <img src={p.thumbnail || p.image} className="w-14 h-14 rounded-lg object-cover" />
+                      <img src={p.thumbnail || p.image} className="w-14 h-14 rounded-lg object-cover" alt={p.title} />
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold truncate uppercase italic">{p.title}</h4>
                         <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider">Add to cart • ${p.basePrice}</button>
