@@ -50,6 +50,7 @@ export function SpecialForRoom() {
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [includeText, setIncludeText] = useState(false);
   const [analysisData, setAnalysisData] = useState<any>(null);
+  const [isInterfaceLocked, setIsInterfaceLocked] = useState(false);
 
   useEffect(() => {
     if (!roomImage) {
