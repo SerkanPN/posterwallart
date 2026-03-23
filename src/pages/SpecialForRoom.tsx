@@ -33,6 +33,35 @@ const STYLES = ['Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Centur
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
+const b64toBlob = (b64Data: string, contentType: string) => {
+  const byteCharacters = atob(b64Data.split(',')[1]);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  const byteArray = new Uint8Array(byteNumbers);
+  return new Blob([byteArray], { type: contentType });
+};
+
+const createThumbnail = async (base64Url: string): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return resolve(base64Url);
+      const MAX_WIDTH = 400;
+      const scale = MAX_WIDTH / img.width;
+      canvas.width = MAX_WIDTH;
+      canvas.height = img.height * scale;
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.8));
+    };
+    img.onerror = reject;
+    img.src = base64Url;
+  });
+};
+
 export function SpecialForRoom() {
   const { user, tokens, addToCart, setAuthModalOpen, useToken, accessToken } = useStore();
   
@@ -204,8 +233,8 @@ export function SpecialForRoom() {
       formData.append('category', style);
       formData.append('price', selectedSize.price.toString());
       formData.append('metadata', JSON.stringify(aiMeta));
-      formData.append('mainImage', new Blob([atob(finalBase64.split(',')[1]).split('').map(c => c.charCodeAt(0))], { type: 'image/png' }), 'm.png');
-      formData.append('thumbnail', new Blob([atob(thumbBase64.split(',')[1]).split('').map(c => c.charCodeAt(0))], { type: 'image/jpeg' }), 't.jpg');
+      formData.append('mainImage', b64toBlob(finalBase64, 'image/png'), 'm.png');
+      formData.append('thumbnail', b64toBlob(thumbBase64, 'image/jpeg'), 't.jpg');
 
       const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
         method: 'POST',
