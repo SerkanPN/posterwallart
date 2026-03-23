@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Lock, Loader2 } from 'lucide-react';
+import { Upload, Lock, Loader2, Download } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
@@ -37,6 +37,15 @@ const calculateAspectRatio = (sizeValue: string, orientation: 'portrait' | 'land
   return orientation === 'portrait' ? `${w / common}:${h / common}` : `${h / common}:${w / common}`;
 };
 
+const getRunwareDims = (sizeStr: string, orientation: 'portrait' | 'landscape') => {
+  const [w, h] = sizeStr.split('x').map(Number);
+  const rw = orientation === 'portrait' ? w : h;
+  const rh = orientation === 'portrait' ? h : w;
+  const snap = (v: number) => Math.floor(v / 64) * 64;
+  if (rw >= rh) return { w: 1024, h: snap((rh / rw) * 1024) };
+  return { w: snap((rw / rh) * 1024), h: 1024 };
+};
+
 const base64ToUint8Array = (base64Data: string) => {
   const parts = base64Data.split(';base64,');
   const binaryString = atob(parts[1]);
@@ -47,7 +56,7 @@ const base64ToUint8Array = (base64Data: string) => {
 
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
-    console.log("[LOG] Creating thumbnail...");
+    console.log("[DEBUG] Thumbnail creation started");
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -66,13 +75,12 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
 };
 
 export function Home() {
-  // accessToken store'dan geliyor — getSession() çağrısı YOK
   const { user, tokens, addToCart, setAuthModalOpen, useToken, accessToken } = useStore();
-
   const [roomImage, setRoomImage]       = useState<string | null>(null);
   const [refImage, setRefImage]         = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing]   = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isUpscalingId, setIsUpscalingId] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedSize, setSelectedSize]   = useState(SIZES[3]);
@@ -86,11 +94,10 @@ export function Home() {
   const isInterfaceLocked = !analysisData || isAnalyzing;
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    console.log("[LOG] Room image drop detected.");
+    console.log("[DEBUG] Room drop detected");
     if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
     if (!file) return;
-    console.log("[LOG] File received:", file.name);
     const reader = new FileReader();
     reader.onload = (e) => {
       const base64 = e.target?.result as string;
@@ -101,6 +108,7 @@ export function Home() {
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
+    console.log("[DEBUG] Reference drop detected");
     const file = acceptedFiles[0];
     if (!file) return;
     const reader = new FileReader();
@@ -112,35 +120,34 @@ export function Home() {
   const refDrop  = useDropzone({ onDrop: onDropRef,  accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
-    console.log("[LOG] Initiating Gemini Room Analysis...");
+    console.log("[DEBUG] Starting room analysis");
     setIsAnalyzing(true);
     setAnalysisData(null);
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
     try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+      const response = await fetch(`/api/gemini`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [
-            { text: 'Analyze room for scale. Return PPI (5-10) and perspective. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string" }' },
-            { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
-          ]}]
+          endpoint: 'gemini-flash-latest:generateContent',
+          payload: {
+            contents: [{ parts: [
+              { text: 'Analyze room for scale. Return PPI (5-10) and perspective. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string" }' },
+              { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
+            ]}]
+          }
         })
       });
       if (response.ok) {
         const res = await response.json();
         const rawText = res.candidates[0].content.parts[0].text;
-        console.log("[LOG] Gemini Raw Response:", rawText);
         const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
         setAnalysisData(data);
-        console.log("[LOG] Analysis data parsed successfully:", data);
+        console.log("[DEBUG] Analysis success", data);
       } else {
-        console.error("[ERROR] Gemini Analysis API returned status:", response.status);
-        // Analiz başarısız olsa bile arayüzü kilitleme — default değerler kullan
-        setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern' });
+        throw new Error("Analysis failed");
       }
     } catch (e) {
-      console.error("[ERROR] Room analysis failed:", e);
+      console.error("[DEBUG] Analysis error", e);
       setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern' });
     } finally {
       setIsAnalyzing(false);
@@ -148,120 +155,143 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    console.log("[LOG] 'Make Me Feel Special' triggered.");
+    console.log("[DEBUG] Production started");
     if (!user) { setAuthModalOpen(true); return; }
-
-    console.log("[LOG] Current tokens in store:", tokens);
-    if (tokens <= 0) { alert("Insufficient tokens! Please refill your balance."); return; }
+    if (tokens <= 0) { alert("Insufficient tokens!"); return; }
     if (isGenerating || isInterfaceLocked) return;
+    if (!accessToken) { setAuthModalOpen(true); return; }
 
-    // accessToken store'dan al — getSession() ÇAĞIRILMIYOR
-    if (!accessToken) {
-      alert("Session expired. Please log in again.");
-      setAuthModalOpen(true);
-      return;
-    }
-
-    console.log("[LOG] Starting generation process...");
     setIsGenerating(true);
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-
     try {
       const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
-      console.log(`[LOG] Selected Size: ${selectedSize.value}, Orientation: ${orientation}, Calculated Aspect Ratio: ${dynamicAR}`);
+      const prompt = `Style: ${selectedStyle}, Theme: ${selectedTheme}, Orientation: ${orientation}, Aspect Ratio: ${dynamicAR}, Text: ${includeText ? 'Minimalist typography' : 'No text'}. High-end wall art, zero borders.`;
+      
+      let finalBase64 = "";
+      let usedFallback = false;
 
-      const prompt = `You are a world-class master artist and elite visual designer specializing in premium wall art.
-      CORE OBJECTIVE: Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders.
-      STYLE: ${selectedStyle}, THEME: ${selectedTheme}, ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}.
-      TEXT: ${includeText ? 'Include minimal typography.' : 'NO text.'}
-      RESOLUTION: 1024px.`;
-
-      const contents: any = [{ parts: [{ text: prompt }] }];
-      if (refImage) contents[0].parts.push({ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } });
-
-      console.log("[LOG] Requesting Image Generation from Gemini 3.1...");
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent?key=${apiKey}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contents })
-      });
-
-      if (!response.ok) throw new Error("Image generation API failed: " + response.status);
-
-      const res = await response.json();
-      const imgPart = res.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData);
-
-      if (!imgPart?.inlineData) throw new Error("Image data returned empty from API.");
-
-      console.log("[LOG] Image data received successfully.");
-      const base64Image = `data:image/png;base64,${imgPart.inlineData.data}`;
-      const thumbnailBase64 = await createThumbnail(base64Image);
-
-      // SEO metadata
-      let aiMeta: any = {
-        seo_title: `${selectedStyle} Masterpiece`,
-        seo_description: "A beautiful AI-generated artwork.",
-        alt_text: "AI poster",
-        tags: ["art", selectedStyle.toLowerCase()]
-      };
-
-      console.log("[LOG] Fetching AI SEO Metadata...");
+      console.log("[DEBUG] Trying Gemini Generation");
       try {
-        const seoRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+        const geminiRes = await fetch(`/api/gemini`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: `Generate SEO title, description, alt text, tags for ${selectedStyle} ${selectedTheme} poster. Return ONLY JSON with keys: seo_title, seo_description, alt_text, tags.` }] }]
+            endpoint: 'gemini-3.1-flash-image-preview:generateContent',
+            payload: { contents: [{ parts: [{ text: prompt }] }] }
           })
         });
-        if (seoRes.ok) {
-          const seoData = await seoRes.json();
-          aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-          console.log("[LOG] SEO Meta generated:", aiMeta);
-        }
-      } catch (e) { console.warn("[LOG] SEO Meta generation skipped."); }
+        const geminiData = await geminiRes.json();
+        const imgData = geminiData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
+        if (!imgData) throw new Error("Gemini empty response");
+        finalBase64 = `data:image/png;base64,${imgData}`;
+        console.log("[DEBUG] Gemini success");
+      } catch (e) {
+        console.warn("[DEBUG] Gemini failed, switching to Runware Flux");
+        usedFallback = true;
+        const dims = getRunwareDims(selectedSize.value, orientation);
+        const runwareRes = await fetch(`/api/runware`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify([{
+            taskType: "imageInference",
+            taskUUID: crypto.randomUUID(),
+            model: "runware:101@1",
+            positivePrompt: prompt,
+            width: dims.w,
+            height: dims.h,
+            numberResults: 1,
+            outputType: "dataURI",
+            outputFormat: "PNG"
+          }])
+        });
+        const runwareData = await runwareRes.json();
+        finalBase64 = runwareData.data?.[0]?.imageURL;
+        if (!finalBase64) throw new Error("Runware failed too");
+        console.log("[DEBUG] Runware fallback success");
+      }
 
-      // Token düş — senkron, lock yok
+      const thumbBase64 = await createThumbnail(finalBase64);
+      
+      console.log("[DEBUG] Fetching AI SEO Meta");
+      let aiMeta = { seo_title: "AI Art", seo_description: "Art", alt_text: "Art", tags: [] };
+      try {
+        const seoRes = await fetch(`/api/gemini`, {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            endpoint: 'gemini-flash-latest:generateContent',
+            payload: { contents: [{ parts: [{ text: `Generate JSON SEO for ${selectedStyle} ${selectedTheme}` }] }] }
+          })
+        });
+        const seoData = await seoRes.json();
+        aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
+      } catch (e) { console.error("[DEBUG] SEO generation failed"); }
+
       const tokenUsed = useToken();
-      if (!tokenUsed) throw new Error("Failed to deduct token. Please try again.");
-      console.log("[LOG] Token deducted.");
+      if (!tokenUsed) throw new Error("Token deduction failed");
 
-      // Upload
-      console.log("[LOG] Preparing Blobs for upload...");
-      const mainBlob  = new Blob([base64ToUint8Array(base64Image)],    { type: 'image/png'  });
-      const thumbBlob = new Blob([base64ToUint8Array(thumbnailBase64)], { type: 'image/jpeg' });
-
+      console.log("[DEBUG] Uploading to PHP Server");
       const formData = new FormData();
-      formData.append('action',    'generate_and_save');
-      formData.append('category',  selectedStyle);
-      formData.append('price',     selectedSize.price.toString());
-      formData.append('metadata',  JSON.stringify(aiMeta));
-      formData.append('mainImage', mainBlob,  'main.png');
-      formData.append('thumbnail', thumbBlob, 'thumb.jpg');
+      formData.append('action', 'generate_and_save');
+      formData.append('category', selectedStyle);
+      formData.append('price', selectedSize.price.toString());
+      formData.append('metadata', JSON.stringify(aiMeta));
+      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'm.png');
+      formData.append('thumbnail', new Blob([base64ToUint8Array(thumbBase64)], { type: 'image/jpeg' }), 't.jpg');
 
-      console.log("[LOG] Uploading to SECURE API: https://api.posterwallart.shop/api.php");
       const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${accessToken}` },
         body: formData,
       });
-
       const result = await uploadRes.json();
-      console.log("[LOG] Server response received:", result);
-
       if (result.success) {
-        console.log("[LOG] Product saved successfully. New Product ID:", result.product.id);
-        setRecommendations(prev => [result.product, ...prev.slice(0, 2)]);
+        setRecommendations(p => [result.product, ...p.slice(0, 2)]);
         setSelectedProduct(result.product);
+        console.log("[DEBUG] Production flow complete");
       } else {
         throw new Error(result.error);
       }
-
-    } catch (e: any) {
-      console.error("[ERROR] Generation flow caught an error:", e);
-      alert(e.message || "An error occurred.");
+    } catch (e) {
+      console.error("[DEBUG] Full production error", e);
+      alert("Error in generation");
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleUpscaleAndDownload = async (product: Product) => {
+    console.log("[DEBUG] Upscale and download started", product.id);
+    setIsUpscalingId(product.id);
+    try {
+      const response = await fetch('/api/runware', {
+        method: 'POST',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify([{
+          taskType: 'upscale',
+          taskUUID: crypto.randomUUID(),
+          inputImage: product.image,
+          model: 'runware:501@1',
+          upscaleFactor: 2,
+          outputType: 'URL',
+          outputFormat: 'PNG'
+        }])
+      });
+      const data = await response.json();
+      const upscaledUrl = data.data?.[0]?.imageURL;
+      if (!upscaledUrl) throw new Error("Upscale failed");
+      
+      console.log("[DEBUG] Download triggering", upscaledUrl);
+      const link = document.createElement('a');
+      link.href = upscaledUrl;
+      link.download = `${product.id}_HighRes.png`;
+      link.target = '_blank';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.error("[DEBUG] Upscale error", e);
+      alert("Upscale failed");
+    } finally {
+      setIsUpscalingId(null);
     }
   };
 
@@ -272,7 +302,6 @@ export function Home() {
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
       <AuthModal />
-
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
           {isAnalyzing ? (
@@ -302,7 +331,6 @@ export function Home() {
           )}
         </div>
       </div>
-
       <div className={`w-[480px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto transition-opacity duration-300 ${isInterfaceLocked ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="p-6 space-y-8 pb-24">
           <div className="space-y-2">
@@ -319,7 +347,6 @@ export function Home() {
               </p>
             )}
           </div>
-
           <div className="space-y-6">
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Category & Theme</label>
@@ -332,7 +359,6 @@ export function Home() {
                 </select>
               </div>
             </div>
-
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Dimensions</label>
               <div className="grid grid-cols-3 gap-2">
@@ -343,7 +369,6 @@ export function Home() {
                 ))}
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-4">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Orientation</label>
@@ -364,22 +389,19 @@ export function Home() {
                 </div>
               </div>
             </div>
-
             <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
               <span className="text-xs font-medium">Include Poster Text?</span>
               <button onClick={() => setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-1' : 'left-1'}`} />
               </button>
             </div>
-
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference (Optional)</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference</label>
               <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer text-center">
                 <input {...refDrop.getInputProps()} />
                 {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" alt="ref" /> : <p className="text-[10px] text-zinc-600">Drop style reference here</p>}
               </div>
             </div>
-
             {recommendations.length > 0 && (
               <div className="pt-6 border-t border-zinc-800 space-y-4">
                 <h3 className="text-sm font-bold uppercase italic tracking-tighter">AI Artist Selection</h3>
@@ -389,7 +411,13 @@ export function Home() {
                       <img src={p.thumbnail || p.image} className="w-14 h-14 rounded-lg object-cover" alt={p.title} />
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold truncate uppercase italic">{p.title}</h4>
-                        <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-[10px] text-emerald-500 font-bold mt-1 uppercase tracking-wider">Add to cart • ${p.basePrice}</button>
+                        <div className="flex gap-2 mt-2">
+                          <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">🛒 Add to cart • ${p.basePrice}</button>
+                          <button onClick={(e) => { e.stopPropagation(); handleUpscaleAndDownload(p); }} disabled={isUpscalingId === p.id} className="text-[10px] text-zinc-400 hover:text-white font-bold uppercase tracking-wider flex items-center gap-1">
+                            {isUpscalingId === p.id ? <Loader2 className="w-2 h-2 animate-spin" /> : <Download className="w-2 h-2" />}
+                            {isUpscalingId === p.id ? 'Processing...' : 'High-Res Download'}
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
