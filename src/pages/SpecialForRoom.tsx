@@ -60,7 +60,7 @@ const base64ToUint8Array = (base64Data: string) => {
 
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
-    console.log("[DEBUG] Thumbnail generator active");
+    console.log("[LOG] Creating internal thumbnail preview...");
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -96,9 +96,11 @@ export function SpecialForRoom() {
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [analysisData, setAnalysisData] = useState<any>(null);
 
-  // Critical Initializer - Prevents White Screen
+  // FIX: isInterfaceLocked was undefined, now declared
+  const isInterfaceLocked = !analysisData || isAnalyzing;
+
   useEffect(() => {
-    console.log("[LOG] SpecialForRoom: Initializing Component...");
+    console.log("[LOG] SpecialForRoom: Booting Architectural Studio...");
     const randomRoom = PRESET_ROOMS[Math.floor(Math.random() * PRESET_ROOMS.length)];
     setRoomImage(randomRoom.url);
     setAnalysisData({
@@ -111,6 +113,7 @@ export function SpecialForRoom() {
   }, []);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
+    console.log("[LOG] Room update detected");
     if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
     if (!file) return;
@@ -124,6 +127,7 @@ export function SpecialForRoom() {
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
+    console.log("[LOG] Reference anchor provided");
     const file = acceptedFiles[0];
     if (!file) return;
     const reader = new FileReader();
@@ -135,7 +139,7 @@ export function SpecialForRoom() {
   const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
-    console.log("[LOG] Backend analysis triggered");
+    console.log("[LOG] Initiating Architectural Deep Scan...");
     setIsAnalyzing(true);
     try {
       const response = await fetch(`/api/gemini`, {
@@ -145,7 +149,7 @@ export function SpecialForRoom() {
           endpoint: 'gemini-flash-latest:generateContent',
           payload: {
             contents: [{ parts: [
-              { text: 'Analyze room. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string", "suggestedStyle": "string", "suggestedTheme": "string" }' },
+              { text: 'Analyze room scale and 3D perspective. Suggest matching style and theme. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string", "suggestedStyle": "string", "suggestedTheme": "string" }' },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]}]
           }
@@ -155,8 +159,9 @@ export function SpecialForRoom() {
       const rawText = res.candidates[0].content.parts[0].text;
       const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
       setAnalysisData(data);
+      console.log("[LOG] Scan complete. Spatial meta verified:", data);
     } catch (e) {
-      console.error("[ERROR] Analysis failed:", e);
+      console.error("[ERROR] Scan failed, falling back to Modern defaults:", e);
       setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, suggestedStyle: 'Modern', suggestedTheme: 'Abstract' });
     } finally {
       setIsAnalyzing(false);
@@ -164,59 +169,85 @@ export function SpecialForRoom() {
   };
 
   const handleCreateForMe = async () => {
+    console.log("[LOG] Studio Genesis cycle started");
     if (!user || tokens <= 0 || isGenerating || !analysisData || !accessToken) {
       if (!user) setAuthModalOpen(true);
       return;
     }
     setIsGenerating(true);
-    console.log("[LOG] Production process started");
     try {
       const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
       let finalStyle = selectedStyle === 'Default' ? (analysisData?.suggestedStyle || 'Modern') : selectedStyle;
       let finalTheme = selectedTheme === 'Default' ? (analysisData?.suggestedTheme || 'Abstract') : selectedTheme;
 
       if (refImage) {
-        finalStyle = "matching the stylistic essence of reference";
-        finalTheme = "coherent with the reference palette";
+        finalStyle = "synchronized with visual style reference";
+        finalTheme = "visually coherent with the provided palette";
       }
 
-      const promptStr = `You are a world-class master artist. Create a high-end wall art. STYLE: ${finalStyle}, THEME: ${finalTheme}, ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}. TEXT: ${includeText ? 'Minimal typography.' : 'NO text.'} RESOLUTION: 1024px.`;
+      const coreInstruction = `You are a world-class master artist and elite visual designer. CORE OBJECTIVE: Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders. STYLE: ${finalStyle}, THEME: ${finalTheme}, ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}. TEXT: ${includeText ? 'Include minimal typography.' : 'NO text.'} RESOLUTION: 1024px.`;
       
       let finalBase64 = "";
       let taskCost = 0;
 
       try {
-        const geminiRes = await fetch(`/api/runware`, { // Using backend-guarded runware endpoint
+        console.log("[LOG] Tier 1: Gemini Processing...");
+        const geminiRes = await fetch(`/api/gemini`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify([{
-            taskType: "imageInference",
-            taskUUID: crypto.randomUUID(),
-            model: FIXED_MODEL.id,
-            positivePrompt: promptStr,
-            width: getRunwareDims(selectedSize.value, orientation).w,
-            height: getRunwareDims(selectedSize.value, orientation).h,
-            numberResults: 1, outputType: "dataURI", outputFormat: "PNG",
-            ...FIXED_MODEL.params,
-            lora: [FIXED_LORA]
-          }])
+          body: JSON.stringify({
+            endpoint: 'gemini-3.1-flash-image-preview:generateContent',
+            payload: { 
+              contents: [{ 
+                parts: [
+                  { text: refImage ? `${coreInstruction} Replicate the aesthetic essence of the reference without exact copying.` : coreInstruction },
+                  ...(refImage ? [{ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } }] : [])
+                ] 
+              }] 
+            }
+          })
         });
-        const rwData = await geminiRes.json();
+        const gData = await geminiRes.json();
+        const b64 = gData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
+        if (!b64) throw new Error("Null stream");
+        finalBase64 = `data:image/png;base64,${b64}`;
+        console.log("[LOG] Gemini production successful");
+      } catch (geminiErr) {
+        console.warn("[LOG] Gemini fail. Triggering Fallback: Runware FLUX...");
+        const dims = getRunwareDims(selectedSize.value, orientation);
+        const task: any = {
+          taskType: "imageInference",
+          taskUUID: crypto.randomUUID(),
+          model: FIXED_MODEL.id,
+          positivePrompt: coreInstruction,
+          width: dims.w, height: dims.h,
+          numberResults: 1, outputType: "dataURI", outputFormat: "PNG",
+          ...FIXED_MODEL.params,
+          lora: [FIXED_LORA]
+        };
+        const rwRes = await fetch(`/api/runware`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify([task])
+        });
+        const rwData = await rwRes.json();
         finalBase64 = rwData.data?.[0]?.imageURL;
         taskCost = rwData.data?.[0]?.cost || 0;
-      } catch (e) { console.error("[ERROR] Production failed:", e); }
+        console.log("[LOG] Runware fallback ready. Tracking cost:", taskCost);
+      }
 
       if (!finalBase64) throw new Error("Cluster failure");
 
       const thumbBase64 = await createThumbnail(finalBase64);
       const tokenUsed = useToken();
-      if (!tokenUsed) throw new Error("Transaction error");
+      if (!tokenUsed) throw new Error("Balance failure");
 
+      console.log("[LOG] Committing to marketplace database...");
       const formData = new FormData();
       formData.append('action', 'generate_and_save');
       formData.append('category', finalStyle);
       formData.append('price', selectedSize.price.toString());
-      formData.append('metadata', JSON.stringify({ seo_title: "AI Art", seo_description: "Unique piece", alt_text: "Art", tags: [] }));
+      formData.append('metadata', JSON.stringify({ seo_title: "AI Wall Art", seo_description: "Unique Studio Creation", alt_text: "Art", tags: [] }));
       formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'm.png');
       formData.append('thumbnail', new Blob([base64ToUint8Array(thumbBase64)], { type: 'image/jpeg' }), 't.jpg');
 
@@ -230,14 +261,16 @@ export function SpecialForRoom() {
         const finalP = { ...result.product, cost: taskCost };
         setRecommendations(p => [finalP, ...p.slice(0, 3)]);
         setSelectedProduct(finalP);
+        console.log("[LOG] Creation cycle finished. Asset ID:", finalP.id);
       }
     } catch (e: any) {
-      console.error("[ERROR] Process error:", e);
-      alert("Error in Genesis sequence");
+      console.error("[ERROR] Genesis failed:", e);
+      alert("Genesis sequence error");
     } finally { setIsGenerating(false); }
   };
 
   const handleUpscaleAndDownload = async (product: Product) => {
+    console.log("[LOG] On-demand HD Upscale initiated");
     setIsUpscalingId(product.id);
     try {
       const response = await fetch('/api/upscale', {
@@ -253,8 +286,16 @@ export function SpecialForRoom() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (e) { console.error("[ERROR] Upscale failed"); }
+      console.log("[LOG] High-Res transfer starting");
+    } catch (e) { console.error("[ERROR] Upscale workflow rejected"); }
     finally { setIsUpscalingId(null); }
+  };
+
+  const resetRoom = () => {
+    const randomRoom = PRESET_ROOMS[Math.floor(Math.random() * PRESET_ROOMS.length)];
+    setRoomImage(randomRoom.url);
+    setAnalysisData({ ppi:randomRoom.ppi, rotateY:randomRoom.rotateY, skewY:randomRoom.skewY, suggestedStyle:randomRoom.style, suggestedTheme:randomRoom.theme });
+    console.log("[LOG] Studio environment reset to preset");
   };
 
   const [pw, ph] = selectedSize.value.split('x').map(Number);
@@ -271,7 +312,8 @@ export function SpecialForRoom() {
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
       <AuthModal />
 
-      <div className="w-[360px] border-r border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
+      {/* LEFT PANEL */}
+      <div className={`w-[360px] border-r border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto transition-all ${isInterfaceLocked ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
         <div className="p-8 space-y-8 pb-24">
           <div>
             <h1 className="text-xl font-black italic tracking-tighter text-emerald-500 uppercase">Special For Room</h1>
@@ -282,21 +324,21 @@ export function SpecialForRoom() {
             <button
               onClick={handleCreateForMe}
               disabled={isGenerating || isAnalyzing}
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase rounded-xl transition-all disabled:opacity-20"
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.15)] disabled:opacity-20"
             >
               {isGenerating ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'MAKE ME FEEL SPECIAL'}
             </button>
-            <p className="text-center text-[10px] text-zinc-600 font-mono uppercase">Credits: {tokens}</p>
+            <p className="text-center text-[10px] text-zinc-600 font-mono uppercase tracking-widest">Available Credits: {tokens}</p>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Style & Tone</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Tone & Aesthetic</label>
               <select disabled={!!refImage} value={selectedTheme} onChange={(e) => setSelectedTheme(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl text-xs outline-none focus:border-emerald-500 disabled:opacity-20">
-                {THEMES.map(t => <option key={t} value={t}>{t === 'Default' ? `Studio Suggestion (${analysisData?.suggestedTheme || '...'})` : t}</option>)}
+                {THEMES.map(t => <option key={t} value={t}>{t === 'Default' ? `Studio Sync (${analysisData?.suggestedTheme || '...'})` : t}</option>)}
               </select>
               <select disabled={!!refImage} value={selectedStyle} onChange={(e) => setSelectedStyle(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl text-xs outline-none focus:border-emerald-500 disabled:opacity-20">
-                {STYLES.map(s => <option key={s} value={s}>{s === 'Default' ? `Studio Suggestion (${analysisData?.suggestedStyle || '...'})` : s}</option>)}
+                {STYLES.map(s => <option key={s} value={s}>{s === 'Default' ? `Studio Sync (${analysisData?.suggestedStyle || '...'})` : s}</option>)}
               </select>
             </div>
 
@@ -313,7 +355,7 @@ export function SpecialForRoom() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Direction</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Layout</label>
                 <div className="flex gap-2">
                   {(['portrait', 'landscape'] as const).map(o => (
                     <button key={o} onClick={() => setOrientation(o)} className={`flex-1 py-3 text-[10px] font-bold rounded-xl border capitalize ${orientation === o ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{o}</button>
@@ -335,16 +377,17 @@ export function SpecialForRoom() {
         </div>
       </div>
 
-      <div className="flex-1 p-8 flex flex-col gap-8 relative">
+      {/* VIEWPORT */}
+      <div className="flex-1 p-8 flex flex-col gap-8 relative overflow-hidden">
         <div className="flex gap-6 h-40">
           <div {...roomDrop.getRootProps()} className="flex-1 border-2 border-dashed border-zinc-800 rounded-[32px] flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/50 transition-all relative overflow-hidden group">
             <input {...roomDrop.getInputProps()} />
             {roomImage && <img src={roomImage} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="Room" />}
             <div className="relative z-10 flex flex-col items-center">
               <Upload className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-emerald-500 transition-colors" />
-              <p className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">1. Update Room</p>
+              <p className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">1. Update Environment</p>
             </div>
-            <button onClick={(e) => { e.stopPropagation(); const r = PRESET_ROOMS[Math.floor(Math.random() * PRESET_ROOMS.length)]; setRoomImage(r.url); setAnalysisData({ppi:r.ppi,rotateY:r.rotateY,skewY:r.skewY,suggestedStyle:r.style,suggestedTheme:r.theme}); }} className="absolute bottom-4 right-4 z-20 p-2 bg-zinc-950/50 rounded-lg hover:bg-zinc-900">
+            <button onClick={(e) => { e.stopPropagation(); resetRoom(); }} className="absolute bottom-4 right-4 z-20 p-2 bg-zinc-950/50 rounded-lg hover:bg-zinc-900 shadow-xl">
               <RotateCcw className="w-3 h-3 text-zinc-400" />
             </button>
           </div>
@@ -356,13 +399,14 @@ export function SpecialForRoom() {
               <ImageIcon className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-emerald-500 transition-colors" />
               <p className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">2. Reference Anchor</p>
             </div>
+            {refImage && <button onClick={(e) => { e.stopPropagation(); setRefImage(null); }} className="absolute bottom-4 right-4 z-20 px-3 py-1 bg-zinc-900/80 rounded-lg text-[8px] font-black uppercase text-zinc-400">Clear</button>}
           </div>
         </div>
 
         <div className="flex-1 relative rounded-[48px] overflow-hidden bg-zinc-900 border border-zinc-800 shadow-[0_0_120px_rgba(0,0,0,0.6)]">
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/95 z-30 backdrop-blur-xl">
-              <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
+              <Loader2 className="w-12 h-12 text-emerald-500 animate-spin shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
               <p className="font-black text-[9px] uppercase tracking-[0.4em] text-emerald-500 animate-pulse">Syncing Space...</p>
             </div>
           ) : (
@@ -379,21 +423,22 @@ export function SpecialForRoom() {
         </div>
       </div>
 
+      {/* SESSION LOGS (RIGHT) */}
       <div className="w-[300px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
         <div className="p-6 space-y-6">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-            <History className="w-3 h-3 text-emerald-500" /> Session History
+            <History className="w-3 h-3 text-emerald-500" /> Genesis Log
           </h3>
           <div className="space-y-4">
             {recommendations.map((p) => (
-              <div key={p.id} className={`p-4 border rounded-3xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800 hover:bg-zinc-900/50'}`} onClick={() => setSelectedProduct(p)}>
+              <div key={p.id} className={`p-4 border rounded-3xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900 shadow-2xl' : 'border-zinc-800 hover:bg-zinc-900/50'}`} onClick={() => setSelectedProduct(p)}>
                 <img src={p.thumbnail || p.image} className="aspect-square w-full rounded-2xl object-cover mb-4 border border-zinc-800" alt={p.title} />
                 <h4 className="text-[10px] font-black truncate uppercase italic text-zinc-300 mb-4">{p.title}</h4>
                 <div className="flex flex-col gap-2">
                   <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-left text-[9px] text-emerald-500 font-black uppercase tracking-widest hover:text-emerald-400">🛒 Add to bag</button>
-                  <button onClick={(e) => { e.stopPropagation(); handleUpscaleAndDownload(p); }} disabled={isUpscalingId === p.id} className="text-left text-[9px] text-zinc-400 hover:text-white font-black uppercase tracking-widest flex items-center gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); handleUpscaleAndDownload(p); }} disabled={isUpscalingId === p.id} className="text-left text-[9px] text-zinc-400 hover:text-white font-black uppercase tracking-widest flex items-center gap-2 transition-colors">
                     {isUpscalingId === p.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Download className="w-2.5 h-2.5" />}
-                    {isUpscalingId === p.id ? 'Processing...' : 'HD Export'}
+                    {isUpscalingId === p.id ? 'Refining...' : 'HD Export'}
                   </button>
                 </div>
               </div>
