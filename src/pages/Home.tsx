@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Lock, Loader2, Download } from 'lucide-react';
+import { Upload, Lock, Loader2, Download, Sparkles } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
@@ -8,8 +8,16 @@ import { AuthModal } from '../components/AuthModal';
 type FrameType = 'unframed' | 'black' | 'oak';
 
 interface Product {
-  id: string; title: string; basePrice: number; image: string; category: string; description: string; isGenerated?: boolean; slug?: string; thumbnail?: string;
+  id: string; title: string; basePrice: number; image: string; category: string; description: string; isGenerated?: boolean; slug?: string; thumbnail?: string; cost?: number;
 }
+
+const MODELS = [
+  { id: 'runware:101@1', name: 'FLUX.1 Dev', group: 'FLUX', supportsLora: true, params: { steps: 28, CFGScale: 1 } },
+  { id: 'runware:100@1', name: 'FLUX.1 Schnell', group: 'FLUX', supportsLora: true, params: { steps: 4, CFGScale: 1 } },
+  { id: 'ideogram:V_3@1', name: 'Ideogram 3.0', group: 'Ideogram', supportsLora: false, params: {} },
+  { id: 'recraft:v4@0', name: 'Recraft V4', group: 'Recraft', supportsLora: false, params: {} },
+  { id: 'civitai:618692@699279', name: 'Juggernaut XL', group: 'SD', supportsLora: true, params: { steps: 30, CFGScale: 7 } },
+];
 
 const SIZES = [
   { label: '8x10"',  price: 22, value: '8x10'  },
@@ -20,13 +28,7 @@ const SIZES = [
   { label: '24x36"', price: 49, value: '24x36' },
 ];
 
-const STYLES = [
-  'Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Century Modern',
-  'Japandi', 'Industrial', 'Boho Chic', 'Art Deco', 'Vaporwave',
-  'Surrealism', 'Pop Art', 'Abstract Expressionism', 'Impressionism', 'Nordic',
-  'Street Art', 'Futurism', 'Vintage Poster', 'Line Art', 'Watercolor'
-];
-
+const STYLES = ['Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Century Modern', 'Japandi', 'Industrial', 'Boho Chic', 'Art Deco', 'Vaporwave', 'Nordic', 'Vintage Poster', 'Line Art', 'Watercolor'];
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
@@ -56,7 +58,7 @@ const base64ToUint8Array = (base64Data: string) => {
 
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
-    console.log("[DEBUG] Thumbnail creation started");
+    console.log("[DEBUG] Starting thumbnail creation");
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -76,22 +78,43 @@ const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
 
 export function Home() {
   const { user, tokens, addToCart, setAuthModalOpen, useToken, accessToken } = useStore();
-  const [roomImage, setRoomImage]       = useState<string | null>(null);
-  const [refImage, setRefImage]         = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing]   = useState(false);
+  const [roomImage, setRoomImage] = useState<string | null>(null);
+  const [refImage, setRefImage] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUpscalingId, setIsUpscalingId] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedSize, setSelectedSize]   = useState(SIZES[3]);
+  const [selectedSize, setSelectedSize] = useState(SIZES[3]);
   const [selectedStyle, setSelectedStyle] = useState('Minimalist');
   const [selectedTheme, setSelectedTheme] = useState('Abstract');
-  const [includeText, setIncludeText]     = useState(false);
+  const [includeText, setIncludeText] = useState(false);
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('black');
-  const [orientation, setOrientation]     = useState<'portrait' | 'landscape'>('portrait');
-  const [analysisData, setAnalysisData]   = useState<any>(null);
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [selectedModel, setSelectedModel] = useState(MODELS[0]);
+  const [loras, setLoras] = useState<any[]>([]);
+  const [selectedLora, setSelectedLora] = useState("");
+  const [loraWeight, setLoraWeight] = useState(0.8);
 
   const isInterfaceLocked = !analysisData || isAnalyzing;
+
+  useEffect(() => {
+    const fetchLoras = async () => {
+      try {
+        console.log("[DEBUG] Fetching TangBohu Loras from Civitai");
+        const res = await fetch('https://civitai.com/api/v1/models?username=TangBohu&types=LORA&limit=100');
+        const data = await res.json();
+        const filtered = data.items.filter((m: any) => 
+          m.name.toLowerCase().includes('style of') && 
+          m.modelVersions?.[0]?.baseModel?.toLowerCase().includes('flux')
+        );
+        setLoras(filtered);
+        console.log(`[DEBUG] Found ${filtered.length} matching Loras`);
+      } catch (e) { console.error("[DEBUG] Lora fetch failed", e); }
+    };
+    fetchLoras();
+  }, []);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
     console.log("[DEBUG] Room drop detected");
@@ -108,7 +131,6 @@ export function Home() {
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
-    console.log("[DEBUG] Reference drop detected");
     const file = acceptedFiles[0];
     if (!file) return;
     const reader = new FileReader();
@@ -117,10 +139,10 @@ export function Home() {
   }, []);
 
   const roomDrop = useDropzone({ onDrop: onDropRoom, accept: { 'image/*': [] }, maxFiles: 1 });
-  const refDrop  = useDropzone({ onDrop: onDropRef,  accept: { 'image/*': [] }, maxFiles: 1 });
+  const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
-    console.log("[DEBUG] Starting room analysis");
+    console.log("[DEBUG] Starting secure room analysis");
     setIsAnalyzing(true);
     setAnalysisData(null);
     try {
@@ -131,23 +153,19 @@ export function Home() {
           endpoint: 'gemini-flash-latest:generateContent',
           payload: {
             contents: [{ parts: [
-              { text: 'Analyze room for scale. Return PPI (5-10) and perspective. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string" }' },
+              { text: 'Analyze room scale and perspective. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string" }' },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]}]
           }
         })
       });
-      if (response.ok) {
-        const res = await response.json();
-        const rawText = res.candidates[0].content.parts[0].text;
-        const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
-        setAnalysisData(data);
-        console.log("[DEBUG] Analysis success", data);
-      } else {
-        throw new Error("Analysis failed");
-      }
+      const res = await response.json();
+      const rawText = res.candidates[0].content.parts[0].text;
+      const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
+      setAnalysisData(data);
+      console.log("[DEBUG] Analysis successful", data);
     } catch (e) {
-      console.error("[DEBUG] Analysis error", e);
+      console.error("[DEBUG] Analysis failed, using defaults", e);
       setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern' });
     } finally {
       setIsAnalyzing(false);
@@ -155,21 +173,21 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    console.log("[DEBUG] Production started");
-    if (!user) { setAuthModalOpen(true); return; }
-    if (tokens <= 0) { alert("Insufficient tokens!"); return; }
-    if (isGenerating || isInterfaceLocked) return;
-    if (!accessToken) { setAuthModalOpen(true); return; }
+    console.log("[DEBUG] Generation process started");
+    if (!user || tokens <= 0 || isGenerating || isInterfaceLocked || !accessToken) {
+      if (!user) setAuthModalOpen(true);
+      return;
+    }
 
     setIsGenerating(true);
     try {
       const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
-      const prompt = `Style: ${selectedStyle}, Theme: ${selectedTheme}, Orientation: ${orientation}, Aspect Ratio: ${dynamicAR}, Text: ${includeText ? 'Minimalist typography' : 'No text'}. High-end wall art, zero borders.`;
+      const prompt = `Premium wall art, style: ${selectedStyle}, theme: ${selectedTheme}, orientation: ${orientation}, aspect ratio: ${dynamicAR}. ${includeText ? 'Elegant minimalist typography.' : 'No text.'} High-end visual.`;
       
       let finalBase64 = "";
-      let usedFallback = false;
+      let taskCost = 0;
 
-      console.log("[DEBUG] Trying Gemini Generation");
+      console.log("[DEBUG] Primary Gen: Gemini");
       try {
         const geminiRes = await fetch(`/api/gemini`, {
           method: "POST",
@@ -179,56 +197,64 @@ export function Home() {
             payload: { contents: [{ parts: [{ text: prompt }] }] }
           })
         });
-        const geminiData = await geminiRes.json();
-        const imgData = geminiData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
-        if (!imgData) throw new Error("Gemini empty response");
-        finalBase64 = `data:image/png;base64,${imgData}`;
-        console.log("[DEBUG] Gemini success");
+        const gData = await geminiRes.json();
+        const b64 = gData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
+        if (!b64) throw new Error("Gemini empty");
+        finalBase64 = `data:image/png;base64,${b64}`;
+        console.log("[DEBUG] Gemini generation success");
       } catch (e) {
-        console.warn("[DEBUG] Gemini failed, switching to Runware Flux");
-        usedFallback = true;
+        console.warn("[DEBUG] Gemini failed, switching to Runware Flux fallback");
         const dims = getRunwareDims(selectedSize.value, orientation);
-        const runwareRes = await fetch(`/api/runware`, {
+        const task: any = {
+          taskType: "imageInference",
+          taskUUID: crypto.randomUUID(),
+          model: selectedModel.id,
+          positivePrompt: prompt,
+          width: dims.w, height: dims.h,
+          numberResults: 1, outputType: "dataURI", outputFormat: "PNG",
+          ...selectedModel.params
+        };
+
+        if (selectedLora && selectedModel.supportsLora) {
+          task.lora = [{ model: selectedLora, weight: loraWeight }];
+          console.log("[DEBUG] Lora applied to fallback task");
+        }
+
+        const rwRes = await fetch(`/api/runware`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify([{
-            taskType: "imageInference",
-            taskUUID: crypto.randomUUID(),
-            model: "runware:101@1",
-            positivePrompt: prompt,
-            width: dims.w,
-            height: dims.h,
-            numberResults: 1,
-            outputType: "dataURI",
-            outputFormat: "PNG"
-          }])
+          body: JSON.stringify([task])
         });
-        const runwareData = await runwareRes.json();
-        finalBase64 = runwareData.data?.[0]?.imageURL;
-        if (!finalBase64) throw new Error("Runware failed too");
-        console.log("[DEBUG] Runware fallback success");
+        const rwData = await rwRes.json();
+        finalBase64 = rwData.data?.[0]?.imageURL;
+        taskCost = rwData.data?.[0]?.cost || 0;
+        if (!finalBase64) throw new Error("Both engines failed");
+        console.log("[DEBUG] Runware fallback success. Cost:", taskCost);
       }
 
       const thumbBase64 = await createThumbnail(finalBase64);
       
-      console.log("[DEBUG] Fetching AI SEO Meta");
-      let aiMeta = { seo_title: "AI Art", seo_description: "Art", alt_text: "Art", tags: [] };
+      console.log("[DEBUG] Generating Metadata");
+      let aiMeta = { seo_title: "AI Masterpiece", seo_description: "Unique Art", alt_text: "AI Art", tags: [] };
       try {
         const seoRes = await fetch(`/api/gemini`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             endpoint: 'gemini-flash-latest:generateContent',
-            payload: { contents: [{ parts: [{ text: `Generate JSON SEO for ${selectedStyle} ${selectedTheme}` }] }] }
+            payload: { contents: [{ parts: [{ text: `Generate JSON SEO for ${selectedStyle} ${selectedTheme} poster. Use keys: seo_title, seo_description, alt_text, tags. Return ONLY JSON.` }] }] }
           })
         });
         const seoData = await seoRes.json();
-        aiMeta = JSON.parse(seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
-      } catch (e) { console.error("[DEBUG] SEO generation failed"); }
+        const cleanJson = seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+        aiMeta = JSON.parse(cleanJson);
+        console.log("[DEBUG] SEO generation success");
+      } catch (e) { console.error("[DEBUG] Metadata failed, using defaults", e); }
 
       const tokenUsed = useToken();
-      if (!tokenUsed) throw new Error("Token deduction failed");
+      if (!tokenUsed) throw new Error("Token error");
 
-      console.log("[DEBUG] Uploading to PHP Server");
+      console.log("[DEBUG] Saving to database");
       const formData = new FormData();
       formData.append('action', 'generate_and_save');
       formData.append('category', selectedStyle);
@@ -244,22 +270,21 @@ export function Home() {
       });
       const result = await uploadRes.json();
       if (result.success) {
-        setRecommendations(p => [result.product, ...p.slice(0, 2)]);
-        setSelectedProduct(result.product);
-        console.log("[DEBUG] Production flow complete");
-      } else {
-        throw new Error(result.error);
+        const newProduct = { ...result.product, cost: taskCost };
+        setRecommendations(p => [newProduct, ...p.slice(0, 2)]);
+        setSelectedProduct(newProduct);
+        console.log("[DEBUG] Product created and displayed");
       }
     } catch (e) {
-      console.error("[DEBUG] Full production error", e);
-      alert("Error in generation");
+      console.error("[DEBUG] Production error", e);
+      alert("Something went wrong");
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleUpscaleAndDownload = async (product: Product) => {
-    console.log("[DEBUG] Upscale and download started", product.id);
+    console.log("[DEBUG] Starting on-demand upscale");
     setIsUpscalingId(product.id);
     try {
       const response = await fetch('/api/runware', {
@@ -277,18 +302,19 @@ export function Home() {
       });
       const data = await response.json();
       const upscaledUrl = data.data?.[0]?.imageURL;
-      if (!upscaledUrl) throw new Error("Upscale failed");
+      const upscaleCost = data.data?.[0]?.cost || 0;
+      if (!upscaledUrl) throw new Error("Upscale API empty");
       
-      console.log("[DEBUG] Download triggering", upscaledUrl);
+      console.log(`[DEBUG] Upscale success. Cost: ${upscaleCost}. Downloading...`);
       const link = document.createElement('a');
       link.href = upscaledUrl;
-      link.download = `${product.id}_HighRes.png`;
+      link.download = `${product.title}_HD.png`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (e) {
-      console.error("[DEBUG] Upscale error", e);
+      console.error("[DEBUG] Upscale failed", e);
       alert("Upscale failed");
     } finally {
       setIsUpscalingId(null);
@@ -296,7 +322,7 @@ export function Home() {
   };
 
   const [pw, ph] = selectedSize.value.split('x').map(Number);
-  const physicalWidth  = orientation === 'portrait' ? pw : ph;
+  const physicalWidth = orientation === 'portrait' ? pw : ph;
   const physicalHeight = orientation === 'portrait' ? ph : pw;
 
   return (
@@ -348,6 +374,23 @@ export function Home() {
             )}
           </div>
           <div className="space-y-6">
+            <div className="space-y-4">
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Model & Lora</label>
+              <div className="grid grid-cols-1 gap-2">
+                <select value={selectedModel.id} onChange={(e) => setSelectedModel(MODELS.find(m => m.id === e.target.value) || MODELS[0])} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
+                  {MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                </select>
+                {selectedModel.supportsLora && (
+                  <div className="flex gap-2">
+                    <select value={selectedLora} onChange={(e) => setSelectedLora(e.target.value)} className="flex-1 bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
+                      <option value="">Select LoRA Style</option>
+                      {loras.map(l => <option key={l.id} value={`civitai:${l.id}@${l.modelVersions[0].id}`}>{l.name}</option>)}
+                    </select>
+                    <input type="number" value={loraWeight} onChange={(e) => setLoraWeight(parseFloat(e.target.value))} step="0.1" className="w-20 bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none" />
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Category & Theme</label>
               <div className="grid grid-cols-2 gap-2">
@@ -415,7 +458,7 @@ export function Home() {
                           <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">🛒 Add to cart • ${p.basePrice}</button>
                           <button onClick={(e) => { e.stopPropagation(); handleUpscaleAndDownload(p); }} disabled={isUpscalingId === p.id} className="text-[10px] text-zinc-400 hover:text-white font-bold uppercase tracking-wider flex items-center gap-1">
                             {isUpscalingId === p.id ? <Loader2 className="w-2 h-2 animate-spin" /> : <Download className="w-2 h-2" />}
-                            {isUpscalingId === p.id ? 'Processing...' : 'High-Res Download'}
+                            {isUpscalingId === p.id ? 'Processing...' : `HD Download ${p.cost ? `(Cost: $${p.cost.toFixed(4)})` : ''}`}
                           </button>
                         </div>
                       </div>
