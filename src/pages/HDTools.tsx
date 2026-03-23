@@ -46,6 +46,7 @@ export function HDTools() {
   const [selectedModel, setSelectedModel] = useState(CUSTOM_MODELS[0]);
   const [selectedLora, setSelectedLora] = useState("");
   const [loraWeight, setLoraWeight] = useState(0.8);
+  const [isInterfaceLocked, setIsInterfaceLocked] = useState(false);
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
     console.log("[LOG] File dropped for processing");
