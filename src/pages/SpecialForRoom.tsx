@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Lock, Loader2, Download, Sparkles, Image as ImageIcon, Info, History, RotateCcw } from 'lucide-react';
+import { Upload, Lock, Loader2, Download, Sparkles, Image as ImageIcon, History, RotateCcw } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
@@ -11,7 +11,6 @@ interface Product {
   id: string; title: string; basePrice: number; image: string; category: string; description: string; isGenerated?: boolean; slug?: string; thumbnail?: string; cost?: number;
 }
 
-// Pre-defined high-quality rooms with calibrated perspective data
 const PRESET_ROOMS = [
   { url: 'https://images.unsplash.com/photo-1616489953149-755e156cc09a?q=80&w=2070', ppi: 8, rotateY: 0, skewY: 0, style: 'Modern', theme: 'Minimalist' },
   { url: 'https://images.unsplash.com/photo-1615876234886-fd9a39faa97f?q=80&w=1932', ppi: 7, rotateY: 2, skewY: 0, style: 'Scandinavian', theme: 'Nature' },
@@ -20,14 +19,8 @@ const PRESET_ROOMS = [
   { url: 'https://images.unsplash.com/photo-1617103996702-96ff29b1c467?q=80&w=2032', ppi: 6, rotateY: 3, skewY: 0, style: 'Art Deco', theme: 'Abstract' }
 ];
 
-const FIXED_MODEL = { 
-  id: 'runware:101@1', 
-  params: { steps: 28, CFGScale: 1, scheduler: "FlowMatchEuler" }, 
-  supportsLora: true 
-};
-
+const FIXED_MODEL = { id: 'runware:101@1', params: { steps: 28, CFGScale: 1, scheduler: "FlowMatchEuler" }, supportsLora: true };
 const FIXED_LORA = { model: "civitai:126208@137927", weight: 0.8 };
-
 const SIZES = [
   { label: '8x10"',  price: 22, value: '8x10'  },
   { label: '11x14"', price: 24, value: '11x14' },
@@ -36,7 +29,6 @@ const SIZES = [
   { label: '20x30"', price: 39, value: '20x30' },
   { label: '24x36"', price: 49, value: '24x36' },
 ];
-
 const STYLES = ['Default', 'Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Century Modern', 'Japandi', 'Industrial', 'Boho Chic', 'Art Deco', 'Nordic', 'Line Art', 'Watercolor'];
 const THEMES = ['Default', 'Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
@@ -68,7 +60,7 @@ const base64ToUint8Array = (base64Data: string) => {
 
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
-    console.log("[LOG] Commencing internal thumbnail generation...");
+    console.log("[DEBUG] Thumbnail generator active");
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -104,24 +96,21 @@ export function SpecialForRoom() {
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [analysisData, setAnalysisData] = useState<any>(null);
 
-  // Initialize with a random room if none exists
+  // Critical Initializer - Prevents White Screen
   useEffect(() => {
-    if (!roomImage) {
-      console.log("[LOG] Initializing session with random studio preset...");
-      const randomRoom = PRESET_ROOMS[Math.floor(Math.random() * PRESET_ROOMS.length)];
-      setRoomImage(randomRoom.url);
-      setAnalysisData({
-        ppi: randomRoom.ppi,
-        rotateY: randomRoom.rotateY,
-        skewY: randomRoom.skewY,
-        suggestedStyle: randomRoom.style,
-        suggestedTheme: randomRoom.theme
-      });
-    }
+    console.log("[LOG] SpecialForRoom: Initializing Component...");
+    const randomRoom = PRESET_ROOMS[Math.floor(Math.random() * PRESET_ROOMS.length)];
+    setRoomImage(randomRoom.url);
+    setAnalysisData({
+      ppi: randomRoom.ppi,
+      rotateY: randomRoom.rotateY,
+      skewY: randomRoom.skewY,
+      suggestedStyle: randomRoom.style,
+      suggestedTheme: randomRoom.theme
+    });
   }, []);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    console.log("[LOG] Room upload detected");
     if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
     if (!file) return;
@@ -135,7 +124,6 @@ export function SpecialForRoom() {
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
-    console.log("[LOG] Style reference drop detected");
     const file = acceptedFiles[0];
     if (!file) return;
     const reader = new FileReader();
@@ -147,9 +135,8 @@ export function SpecialForRoom() {
   const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
-    console.log("[LOG] Starting deep environmental analysis...");
+    console.log("[LOG] Backend analysis triggered");
     setIsAnalyzing(true);
-    setAnalysisData(null);
     try {
       const response = await fetch(`/api/gemini`, {
         method: "POST",
@@ -158,7 +145,7 @@ export function SpecialForRoom() {
           endpoint: 'gemini-flash-latest:generateContent',
           payload: {
             contents: [{ parts: [
-              { text: 'Analyze this room. Map 3D scale and perspective. Suggest a matching style and theme for wall art based on decor. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string", "suggestedStyle": "string", "suggestedTheme": "string" }' },
+              { text: 'Analyze room. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string", "suggestedStyle": "string", "suggestedTheme": "string" }' },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]}]
           }
@@ -168,9 +155,8 @@ export function SpecialForRoom() {
       const rawText = res.candidates[0].content.parts[0].text;
       const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
       setAnalysisData(data);
-      console.log("[LOG] Environmental metadata locked:", data);
     } catch (e) {
-      console.error("[ERROR] Analysis crash, using default mapping:", e);
+      console.error("[ERROR] Analysis failed:", e);
       setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, suggestedStyle: 'Modern', suggestedTheme: 'Abstract' });
     } finally {
       setIsAnalyzing(false);
@@ -178,107 +164,59 @@ export function SpecialForRoom() {
   };
 
   const handleCreateForMe = async () => {
-    console.log("[LOG] Studio generation sequence started");
-    if (!user || tokens <= 0 || isGenerating || !accessToken || !analysisData) {
+    if (!user || tokens <= 0 || isGenerating || !analysisData || !accessToken) {
       if (!user) setAuthModalOpen(true);
       return;
     }
-
     setIsGenerating(true);
+    console.log("[LOG] Production process started");
     try {
       const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
-      
-      // Dynamic style/theme logic
-      let finalStyle = selectedStyle === 'Default' ? analysisData.suggestedStyle : selectedStyle;
-      let finalTheme = selectedTheme === 'Default' ? analysisData.suggestedTheme : selectedTheme;
+      let finalStyle = selectedStyle === 'Default' ? (analysisData?.suggestedStyle || 'Modern') : selectedStyle;
+      let finalTheme = selectedTheme === 'Default' ? (analysisData?.suggestedTheme || 'Abstract') : selectedTheme;
 
-      // Overwrite if reference exists
       if (refImage) {
-        finalStyle = "influenced by provided visual anchor";
-        finalTheme = "visually coherent with reference palette";
+        finalStyle = "matching the stylistic essence of reference";
+        finalTheme = "coherent with the reference palette";
       }
 
-      const coreInstruction = `You are a world-class master artist and elite visual designer specializing in premium wall art. CORE OBJECTIVE: Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders. STYLE: ${finalStyle}, THEME: ${finalTheme}, ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}. TEXT: ${includeText ? 'Include minimal typography.' : 'NO text.'} RESOLUTION: 1024px.`;
+      const promptStr = `You are a world-class master artist. Create a high-end wall art. STYLE: ${finalStyle}, THEME: ${finalTheme}, ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}. TEXT: ${includeText ? 'Minimal typography.' : 'NO text.'} RESOLUTION: 1024px.`;
       
       let finalBase64 = "";
       let taskCost = 0;
 
-      console.log("[LOG] Phase 1: Gemini Processing");
       try {
-        const geminiRes = await fetch(`/api/gemini`, {
+        const geminiRes = await fetch(`/api/runware`, { // Using backend-guarded runware endpoint
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            endpoint: 'gemini-3.1-flash-image-preview:generateContent',
-            payload: { 
-              contents: [{ 
-                parts: [
-                  { text: refImage ? `${coreInstruction} Capture stylistic essence and color harmony of the reference without direct copying.` : coreInstruction },
-                  ...(refImage ? [{ inlineData: { mimeType: "image/jpeg", data: refImage.split(',')[1] } }] : [])
-                ] 
-              }] 
-            }
-          })
+          body: JSON.stringify([{
+            taskType: "imageInference",
+            taskUUID: crypto.randomUUID(),
+            model: FIXED_MODEL.id,
+            positivePrompt: promptStr,
+            width: getRunwareDims(selectedSize.value, orientation).w,
+            height: getRunwareDims(selectedSize.value, orientation).h,
+            numberResults: 1, outputType: "dataURI", outputFormat: "PNG",
+            ...FIXED_MODEL.params,
+            lora: [FIXED_LORA]
+          }])
         });
-        const gData = await geminiRes.json();
-        const b64 = gData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
-        if (!b64) throw new Error("Empty engine response");
-        finalBase64 = `data:image/png;base64,${b64}`;
-        console.log("[LOG] Gemini production successful");
-      } catch (geminiErr) {
-        console.warn("[LOG] Gemini fail, activating Fallback Engine (Runware FLUX)");
-        const dims = getRunwareDims(selectedSize.value, orientation);
-        const task: any = {
-          taskType: "imageInference",
-          taskUUID: crypto.randomUUID(),
-          model: FIXED_MODEL.id,
-          positivePrompt: coreInstruction,
-          width: dims.w, height: dims.h,
-          numberResults: 1, outputType: "dataURI", outputFormat: "PNG",
-          ...FIXED_MODEL.params,
-          lora: [FIXED_LORA]
-        };
-
-        const rwRes = await fetch(`/api/runware`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify([task])
-        });
-        const rwData = await rwRes.json();
+        const rwData = await geminiRes.json();
         finalBase64 = rwData.data?.[0]?.imageURL;
         taskCost = rwData.data?.[0]?.cost || 0;
-        console.log("[LOG] Fallback production successful. Cost:", taskCost);
-      }
+      } catch (e) { console.error("[ERROR] Production failed:", e); }
 
-      if (!finalBase64) throw new Error("Total generation blackout");
+      if (!finalBase64) throw new Error("Cluster failure");
 
       const thumbBase64 = await createThumbnail(finalBase64);
-      
-      console.log("[LOG] Auto-generating SEO meta-packet...");
-      let aiMeta = { seo_title: `${finalStyle} Masterpiece`, seo_description: "Unique piece.", alt_text: "AI Art", tags: [] };
-      try {
-        const seoRes = await fetch(`/api/gemini`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            endpoint: 'gemini-flash-latest:generateContent',
-            payload: { contents: [{ parts: [{ text: `Generate JSON SEO for ${finalStyle} art. Keys: seo_title, seo_description, alt_text, tags. ONLY JSON.` }] }] }
-          })
-        });
-        const seoData = await seoRes.json();
-        const cleanJson = seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
-        aiMeta = JSON.parse(cleanJson);
-      } catch (e) { console.error("[LOG] SEO skipped"); }
-
       const tokenUsed = useToken();
-      if (!tokenUsed) throw new Error("Internal transaction failure");
+      if (!tokenUsed) throw new Error("Transaction error");
 
-      console.log("[LOG] Exporting to marketplace database...");
       const formData = new FormData();
       formData.append('action', 'generate_and_save');
       formData.append('category', finalStyle);
       formData.append('price', selectedSize.price.toString());
-      formData.append('metadata', JSON.stringify(aiMeta));
+      formData.append('metadata', JSON.stringify({ seo_title: "AI Art", seo_description: "Unique piece", alt_text: "Art", tags: [] }));
       formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'm.png');
       formData.append('thumbnail', new Blob([base64ToUint8Array(thumbBase64)], { type: 'image/jpeg' }), 't.jpg');
 
@@ -287,24 +225,19 @@ export function SpecialForRoom() {
         headers: { 'Authorization': `Bearer ${accessToken}` },
         body: formData,
       });
-
       const result = await uploadRes.json();
       if (result.success) {
-        const finalProduct = { ...result.product, cost: taskCost };
-        setRecommendations(p => [finalProduct, ...p.slice(0, 3)]);
-        setSelectedProduct(finalProduct);
-        console.log("[LOG] Product deployment ready");
+        const finalP = { ...result.product, cost: taskCost };
+        setRecommendations(p => [finalP, ...p.slice(0, 3)]);
+        setSelectedProduct(finalP);
       }
-    } catch (error: any) {
-      console.error("[ERROR] Execution error:", error);
-      alert("Genesis sequence failed.");
-    } finally {
-      setIsGenerating(false);
-    }
+    } catch (e: any) {
+      console.error("[ERROR] Process error:", e);
+      alert("Error in Genesis sequence");
+    } finally { setIsGenerating(false); }
   };
 
   const handleUpscaleAndDownload = async (product: Product) => {
-    console.log("[LOG] HD Lab: Requesting 2x Upscale");
     setIsUpscalingId(product.id);
     try {
       const response = await fetch('/api/upscale', {
@@ -320,36 +253,25 @@ export function SpecialForRoom() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (e) {
-      console.error("[ERROR] HD Upscale rejected");
-    } finally {
-      setIsUpscalingId(null);
-    }
-  };
-
-  const resetRoom = () => {
-    const randomRoom = PRESET_ROOMS[Math.floor(Math.random() * PRESET_ROOMS.length)];
-    setRoomImage(randomRoom.url);
-    setAnalysisData({ 
-      ppi: randomRoom.ppi, 
-      rotateY: randomRoom.rotateY, 
-      skewY: randomRoom.skewY, 
-      suggestedStyle: randomRoom.style, 
-      suggestedTheme: randomRoom.theme 
-    });
-    console.log("[LOG] Room reset to studio preset");
+    } catch (e) { console.error("[ERROR] Upscale failed"); }
+    finally { setIsUpscalingId(null); }
   };
 
   const [pw, ph] = selectedSize.value.split('x').map(Number);
   const physicalWidth = orientation === 'portrait' ? pw : ph;
   const physicalHeight = orientation === 'portrait' ? ph : pw;
 
+  if (!analysisData) return (
+    <div className="h-screen bg-zinc-950 flex items-center justify-center">
+      <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
+    </div>
+  );
+
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
       <AuthModal />
 
-      {/* LEFT: CONTROLS */}
-      <div className={`w-[360px] border-r border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto transition-all ${isInterfaceLocked ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+      <div className="w-[360px] border-r border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
         <div className="p-8 space-y-8 pb-24">
           <div>
             <h1 className="text-xl font-black italic tracking-tighter text-emerald-500 uppercase">Special For Room</h1>
@@ -359,39 +281,23 @@ export function SpecialForRoom() {
           <div className="space-y-2">
             <button
               onClick={handleCreateForMe}
-              disabled={isGenerating || !analysisData}
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.15)] disabled:opacity-20"
+              disabled={isGenerating || isAnalyzing}
+              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase rounded-xl transition-all disabled:opacity-20"
             >
               {isGenerating ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'MAKE ME FEEL SPECIAL'}
             </button>
-            {user && (
-              <p className="text-center text-[10px] text-zinc-600 font-mono uppercase tracking-tighter">
-                Credits: <span className={tokens > 0 ? "text-emerald-500" : "text-red-500"}>{tokens}</span>
-              </p>
-            )}
+            <p className="text-center text-[10px] text-zinc-600 font-mono uppercase">Credits: {tokens}</p>
           </div>
 
           <div className="space-y-6">
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Visual Tone</label>
-              <div className="grid grid-cols-1 gap-2">
-                <select 
-                  value={selectedTheme} 
-                  disabled={!!refImage}
-                  onChange={(e) => setSelectedTheme(e.target.value)} 
-                  className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl text-xs outline-none focus:border-emerald-500 disabled:opacity-20 transition-all"
-                >
-                  {THEMES.map(t => <option key={t} value={t}>{t === 'Default' && analysisData ? `Default (${analysisData.suggestedTheme})` : t}</option>)}
-                </select>
-                <select 
-                  value={selectedStyle} 
-                  disabled={!!refImage}
-                  onChange={(e) => setSelectedStyle(e.target.value)} 
-                  className="bg-zinc-900 border border-zinc-800 p-4 rounded-2xl text-xs outline-none focus:border-emerald-500 disabled:opacity-20 transition-all"
-                >
-                  {STYLES.map(s => <option key={s} value={s}>{s === 'Default' && analysisData ? `Default (${analysisData.suggestedStyle})` : s}</option>)}
-                </select>
-              </div>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Style & Tone</label>
+              <select disabled={!!refImage} value={selectedTheme} onChange={(e) => setSelectedTheme(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl text-xs outline-none focus:border-emerald-500 disabled:opacity-20">
+                {THEMES.map(t => <option key={t} value={t}>{t === 'Default' ? `Studio Suggestion (${analysisData?.suggestedTheme || '...'})` : t}</option>)}
+              </select>
+              <select disabled={!!refImage} value={selectedStyle} onChange={(e) => setSelectedStyle(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-4 rounded-2xl text-xs outline-none focus:border-emerald-500 disabled:opacity-20">
+                {STYLES.map(s => <option key={s} value={s}>{s === 'Default' ? `Studio Suggestion (${analysisData?.suggestedStyle || '...'})` : s}</option>)}
+              </select>
             </div>
 
             <div className="space-y-4">
@@ -425,58 +331,43 @@ export function SpecialForRoom() {
                 </div>
               </div>
             </div>
-
-            <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Typography?</span>
-              <button onClick={() => setIncludeText(!includeText)} className={`w-8 h-4 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
-                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-0.5' : 'left-0.5'}`} />
-              </button>
-            </div>
           </div>
         </div>
       </div>
 
-      {/* CENTER: VIEWPORT */}
-      <div className="flex-1 p-8 flex flex-col gap-8 relative overflow-hidden">
+      <div className="flex-1 p-8 flex flex-col gap-8 relative">
         <div className="flex gap-6 h-40">
-          {/* ROOM DROPZONE */}
-          <div {...roomDrop.getRootProps()} className="flex-1 border-2 border-dashed border-zinc-800 rounded-[32px] flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/50 transition-all group relative overflow-hidden">
+          <div {...roomDrop.getRootProps()} className="flex-1 border-2 border-dashed border-zinc-800 rounded-[32px] flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/50 transition-all relative overflow-hidden group">
             <input {...roomDrop.getInputProps()} />
-            {roomImage ? <img src={roomImage} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="Room" /> : null}
+            {roomImage && <img src={roomImage} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="Room" />}
             <div className="relative z-10 flex flex-col items-center">
               <Upload className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-emerald-500 transition-colors" />
-              <p className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">1. Link Room</p>
+              <p className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">1. Update Room</p>
             </div>
-            <button onClick={(e) => { e.stopPropagation(); resetRoom(); }} className="absolute bottom-4 right-4 z-20 p-2 bg-zinc-950/50 rounded-lg hover:bg-zinc-900" title="Random Room">
+            <button onClick={(e) => { e.stopPropagation(); const r = PRESET_ROOMS[Math.floor(Math.random() * PRESET_ROOMS.length)]; setRoomImage(r.url); setAnalysisData({ppi:r.ppi,rotateY:r.rotateY,skewY:r.skewY,suggestedStyle:r.style,suggestedTheme:r.theme}); }} className="absolute bottom-4 right-4 z-20 p-2 bg-zinc-950/50 rounded-lg hover:bg-zinc-900">
               <RotateCcw className="w-3 h-3 text-zinc-400" />
             </button>
           </div>
 
-          {/* REFERENCE DROPZONE */}
-          <div {...refDrop.getRootProps()} className="flex-1 border-2 border-dashed border-zinc-800 rounded-[32px] flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/50 transition-all group relative overflow-hidden">
+          <div {...refDrop.getRootProps()} className="flex-1 border-2 border-dashed border-zinc-800 rounded-[32px] flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/50 transition-all relative overflow-hidden group">
             <input {...refDrop.getInputProps()} />
-            {refImage ? <img src={refImage} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="Ref" /> : null}
+            {refImage && <img src={refImage} className="absolute inset-0 w-full h-full object-cover opacity-25" alt="Ref" />}
             <div className="relative z-10 flex flex-col items-center">
               <ImageIcon className="w-6 h-6 text-zinc-600 mb-2 group-hover:text-emerald-500 transition-colors" />
-              <p className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">2. Ref. Anchor</p>
+              <p className="text-[8px] font-black uppercase tracking-[0.2em] text-zinc-500">2. Reference Anchor</p>
             </div>
-            {refImage && (
-               <button onClick={(e) => { e.stopPropagation(); setRefImage(null); }} className="absolute bottom-4 right-4 z-20 p-2 bg-zinc-950/50 rounded-lg hover:bg-zinc-900" title="Clear Ref">
-                 <span className="text-[8px] font-black text-zinc-400 uppercase">Clear</span>
-               </button>
-            )}
           </div>
         </div>
 
         <div className="flex-1 relative rounded-[48px] overflow-hidden bg-zinc-900 border border-zinc-800 shadow-[0_0_120px_rgba(0,0,0,0.6)]">
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/95 z-30 backdrop-blur-xl">
-              <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin shadow-[0_0_30px_rgba(16,185,129,0.3)]" />
+              <Loader2 className="w-12 h-12 text-emerald-500 animate-spin" />
               <p className="font-black text-[9px] uppercase tracking-[0.4em] text-emerald-500 animate-pulse">Syncing Space...</p>
             </div>
-          ) : roomImage ? (
+          ) : (
             <InteractiveCanvas
-              backgroundImage={roomImage}
+              backgroundImage={roomImage || ""}
               mountedArt={selectedProduct?.thumbnail || selectedProduct?.image || null}
               physicalWidth={physicalWidth}
               physicalHeight={physicalHeight}
@@ -484,28 +375,22 @@ export function SpecialForRoom() {
               frameColor={(FRAME_COLORS as any)[selectedFrame]}
               perspective={{ rotateY: analysisData?.rotateY || 0, skewY: analysisData?.skewY || 0 }}
             />
-          ) : null}
+          )}
         </div>
       </div>
 
-      {/* RIGHT: HISTORY */}
       <div className="w-[300px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto">
         <div className="p-6 space-y-6">
           <h3 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
-            <History className="w-3 h-3 text-emerald-500" /> Recent Creations
+            <History className="w-3 h-3 text-emerald-500" /> Session History
           </h3>
           <div className="space-y-4">
-            {recommendations.length === 0 && (
-              <div className="p-8 border border-zinc-900 rounded-3xl text-center">
-                <p className="text-[9px] text-zinc-700 font-bold uppercase tracking-widest leading-loose">No creations yet</p>
-              </div>
-            )}
             {recommendations.map((p) => (
               <div key={p.id} className={`p-4 border rounded-3xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800 hover:bg-zinc-900/50'}`} onClick={() => setSelectedProduct(p)}>
                 <img src={p.thumbnail || p.image} className="aspect-square w-full rounded-2xl object-cover mb-4 border border-zinc-800" alt={p.title} />
                 <h4 className="text-[10px] font-black truncate uppercase italic text-zinc-300 mb-4">{p.title}</h4>
                 <div className="flex flex-col gap-2">
-                  <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-left text-[9px] text-emerald-500 font-black uppercase tracking-widest hover:text-emerald-400 transition-colors">🛒 Add to bag</button>
+                  <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-left text-[9px] text-emerald-500 font-black uppercase tracking-widest hover:text-emerald-400">🛒 Add to bag</button>
                   <button onClick={(e) => { e.stopPropagation(); handleUpscaleAndDownload(p); }} disabled={isUpscalingId === p.id} className="text-left text-[9px] text-zinc-400 hover:text-white font-black uppercase tracking-widest flex items-center gap-2">
                     {isUpscalingId === p.id ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Download className="w-2.5 h-2.5" />}
                     {isUpscalingId === p.id ? 'Processing...' : 'HD Export'}
