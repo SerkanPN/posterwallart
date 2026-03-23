@@ -66,7 +66,7 @@ const base64ToUint8Array = (base64Data: string) => {
 
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
-    console.log("[LOG] Thumbnail creation started");
+    console.log("[LOG] Thumbnail creation sequence started");
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -110,7 +110,7 @@ export function Home() {
   useEffect(() => {
     const fetchLoras = async () => {
       try {
-        console.log("[LOG] Fetching style loras...");
+        console.log("[LOG] Requesting TangBohu Lora list from Civitai...");
         const res = await fetch('https://civitai.com/api/v1/models?username=TangBohu&types=LORA&limit=100');
         const data = await res.json();
         const filtered = data.items.filter((m: any) => 
@@ -118,16 +118,16 @@ export function Home() {
           m.modelVersions?.[0]?.baseModel?.toLowerCase().includes('flux')
         );
         setLoras(filtered);
-        console.log("[LOG] Loras loaded:", filtered.length);
+        console.log("[LOG] Civitai Loras ready:", filtered.length);
       } catch (e) {
-        console.error("[ERROR] Lora fetch failed:", e);
+        console.error("[ERROR] Failed to fetch Loras:", e);
       }
     };
     fetchLoras();
   }, []);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    console.log("[LOG] Room file dropped");
+    console.log("[LOG] Room image drop detected");
     if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
     if (!file) return;
@@ -141,7 +141,7 @@ export function Home() {
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
-    console.log("[LOG] Reference file dropped");
+    console.log("[LOG] Reference style image drop detected");
     const file = acceptedFiles[0];
     if (!file) return;
     const reader = new FileReader();
@@ -153,7 +153,7 @@ export function Home() {
   const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
-    console.log("[LOG] Analyzing room...");
+    console.log("[LOG] Initiating Architectural Analysis...");
     setIsAnalyzing(true);
     setAnalysisData(null);
     try {
@@ -170,14 +170,14 @@ export function Home() {
           }
         })
       });
-      if (!response.ok) throw new Error("Analysis API failed");
+      if (!response.ok) throw new Error("Analysis failed");
       const res = await response.json();
       const rawText = res.candidates[0].content.parts[0].text;
       const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
       setAnalysisData(data);
-      console.log("[LOG] Analysis successful:", data);
+      console.log("[LOG] Room analyzed successfully:", data);
     } catch (e) {
-      console.error("[ERROR] Analysis failed, using defaults:", e);
+      console.error("[ERROR] Analysis flow broken, using safe defaults:", e);
       setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern' });
     } finally {
       setIsAnalyzing(false);
@@ -185,20 +185,20 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    console.log("[LOG] Generation triggered");
+    console.log("[LOG] Generation flow started");
     if (!user) { setAuthModalOpen(true); return; }
-    if (tokens <= 0) { alert("Insufficient tokens!"); return; }
+    if (tokens <= 0) { alert("You need more tokens!"); return; }
     if (isGenerating || isInterfaceLocked || !accessToken) return;
 
     setIsGenerating(true);
     try {
       const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
-      const prompt = `Style: ${selectedStyle}, Theme: ${selectedTheme}, Orientation: ${orientation}, Aspect Ratio: ${dynamicAR}. ${includeText ? 'Include typography.' : 'No text.'} Premium wall art.`;
+      const prompt = `Premium wall art, style: ${selectedStyle}, theme: ${selectedTheme}, orientation: ${orientation}, aspect ratio: ${dynamicAR}. ${includeText ? 'Minimalist text included.' : 'No text.'} Ultra detailed.`;
       
       let finalBase64 = "";
       let taskCost = 0;
 
-      console.log("[LOG] Attempting primary engine: Gemini");
+      console.log("[LOG] Step 1: Requesting Gemini Engine...");
       try {
         const geminiRes = await fetch(`/api/gemini`, {
           method: "POST",
@@ -208,14 +208,14 @@ export function Home() {
             payload: { contents: [{ parts: [{ text: prompt }] }] }
           })
         });
-        if (!geminiRes.ok) throw new Error("Gemini failed");
+        if (!geminiRes.ok) throw new Error("Gemini API Offline");
         const gData = await geminiRes.json();
         const b64 = gData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
-        if (!b64) throw new Error("Gemini empty data");
+        if (!b64) throw new Error("Gemini returned empty parts");
         finalBase64 = `data:image/png;base64,${b64}`;
-        console.log("[LOG] Gemini success");
+        console.log("[LOG] Gemini engine success");
       } catch (geminiErr) {
-        console.warn("[LOG] Gemini failed, falling back to Runware Flux...");
+        console.warn("[LOG] Gemini failed. Activating Fallback: Runware Flux...");
         const dims = getRunwareDims(selectedSize.value, orientation);
         const task: any = {
           taskType: "imageInference",
@@ -229,7 +229,7 @@ export function Home() {
 
         if (selectedLora && selectedModel.supportsLora) {
           task.lora = [{ model: selectedLora, weight: loraWeight }];
-          console.log("[LOG] Applying LoRA:", selectedLora);
+          console.log("[LOG] Fallback using LoRA:", selectedLora);
         }
 
         const rwRes = await fetch(`/api/runware`, {
@@ -241,42 +241,42 @@ export function Home() {
         if (rwData?.errors) throw new Error(rwData.errors[0].message);
         finalBase64 = rwData.data?.[0]?.imageURL;
         taskCost = rwData.data?.[0]?.cost || 0;
-        console.log("[LOG] Runware fallback success. Cost:", taskCost);
+        console.log("[LOG] Runware engine success. Cost tracked:", taskCost);
       }
 
-      if (!finalBase64) throw new Error("All engines failed");
+      if (!finalBase64) throw new Error("All image engines are down");
 
       const thumbBase64 = await createThumbnail(finalBase64);
       
-      console.log("[LOG] Generating SEO data...");
-      let aiMeta = { seo_title: `${selectedStyle} Masterpiece`, seo_description: "Unique wall art.", alt_text: "AI Art", tags: [] };
+      console.log("[LOG] Extracting SEO Metadata...");
+      let aiMeta = { seo_title: `${selectedStyle} Masterpiece`, seo_description: "Unique AI Art", alt_text: "AI Art", tags: [] };
       try {
         const seoRes = await fetch(`/api/gemini`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             endpoint: 'gemini-flash-latest:generateContent',
-            payload: { contents: [{ parts: [{ text: `Generate JSON SEO metadata for ${selectedStyle} ${selectedTheme} poster. Use keys: seo_title, seo_description, alt_text, tags. Return ONLY JSON.` }] }] }
+            payload: { contents: [{ parts: [{ text: `Generate SEO Metadata JSON for ${selectedStyle} ${selectedTheme} poster. Use keys: seo_title, seo_description, alt_text, tags. Return ONLY JSON.` }] }] }
           })
         });
         const seoData = await seoRes.json();
         const rawJson = seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
         aiMeta = JSON.parse(rawJson);
-        console.log("[LOG] SEO generated successfully");
+        console.log("[LOG] Metadata generated successfully");
       } catch (e) {
-        console.error("[ERROR] SEO generation failed:", e);
+        console.error("[ERROR] Metadata generation failed, using defaults");
       }
 
       const tokenUsed = useToken();
-      if (!tokenUsed) throw new Error("Token consumption failed");
+      if (!tokenUsed) throw new Error("Token logic failed");
 
-      console.log("[LOG] Saving product to server...");
+      console.log("[LOG] Syncing with PHP Database...");
       const formData = new FormData();
       formData.append('action', 'generate_and_save');
       formData.append('category', selectedStyle);
       formData.append('price', selectedSize.price.toString());
       formData.append('metadata', JSON.stringify(aiMeta));
-      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'image.png');
+      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'main.png');
       formData.append('thumbnail', new Blob([base64ToUint8Array(thumbBase64)], { type: 'image/jpeg' }), 'thumb.jpg');
 
       const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
@@ -287,55 +287,47 @@ export function Home() {
 
       const result = await uploadRes.json();
       if (result.success) {
-        const productWithCost = { ...result.product, cost: taskCost };
-        setRecommendations(p => [productWithCost, ...p.slice(0, 2)]);
-        setSelectedProduct(productWithCost);
-        console.log("[LOG] Product saved and displayed");
+        const productWithMeta = { ...result.product, cost: taskCost };
+        setRecommendations(p => [productWithMeta, ...p.slice(0, 2)]);
+        setSelectedProduct(productWithMeta);
+        console.log("[LOG] Production cycle complete.");
       } else {
         throw new Error(result.error);
       }
     } catch (e: any) {
-      console.error("[ERROR] Production flow failed:", e);
-      alert(e.message || "An error occurred");
+      console.error("[ERROR] Complete production flow failure:", e);
+      alert(e.message || "An unexpected error occurred");
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleUpscaleAndDownload = async (product: Product) => {
-    console.log("[LOG] On-demand upscale starting for:", product.id);
+    console.log("[LOG] On-demand upscale triggered for product:", product.id);
     setIsUpscalingId(product.id);
     try {
-      const response = await fetch('/api/runware', {
+      const response = await fetch('/api/upscale', {
         method: 'POST',
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify([{
-          taskType: 'upscale',
-          taskUUID: crypto.randomUUID(),
-          inputImage: product.image,
-          model: 'runware:501@1',
-          upscaleFactor: 2,
-          outputType: 'URL',
-          outputFormat: 'PNG'
-        }])
+        body: JSON.stringify({ imageUrl: product.image })
       });
-      if (!response.ok) throw new Error("Upscale API failed");
+      if (!response.ok) throw new Error("Upscale server rejected request");
       const data = await response.json();
-      const upscaledUrl = data.data?.[0]?.imageURL;
-      const upscaleCost = data.data?.[0]?.cost || 0;
-      if (!upscaledUrl) throw new Error("No URL returned from upscale");
+      const upscaledUrl = data.upscaledUrl;
+      const upscaleCost = data.cost || 0;
+      if (!upscaledUrl) throw new Error("API failed to return upscaled URL");
       
-      console.log(`[LOG] Upscale success. Cost: $${upscaleCost}. Downloading...`);
+      console.log(`[LOG] High-Res success. Cost: $${upscaleCost}. Starting download.`);
       const link = document.createElement('a');
       link.href = upscaledUrl;
-      link.download = `${product.title}_HighRes.png`;
+      link.download = `${product.title}_HighResolution.png`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (e: any) {
-      console.error("[ERROR] Upscale failed:", e);
-      alert("Upscale failed: " + e.message);
+      console.error("[ERROR] Upscale and Download failed:", e);
+      alert("Download failed: " + e.message);
     } finally {
       setIsUpscalingId(null);
     }
@@ -398,7 +390,7 @@ export function Home() {
 
           <div className="space-y-6">
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Model & Advanced Settings</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Model & Advanced Selection</label>
               <div className="space-y-3">
                 <select value={selectedModel.id} onChange={(e) => setSelectedModel(MODELS.find(m => m.id === e.target.value) || MODELS[0])} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
                   {MODELS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.group})</option>)}
@@ -407,12 +399,12 @@ export function Home() {
                 {selectedModel.supportsLora && (
                   <div className="flex gap-2">
                     <select value={selectedLora} onChange={(e) => setSelectedLora(e.target.value)} className="flex-1 bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
-                      <option value="">Select LoRA Style (Optional)</option>
+                      <option value="">Select LoRA Style (TangBohu)</option>
                       {loras.map(l => <option key={l.id} value={`civitai:${l.id}@${l.modelVersions[0].id}`}>{l.name}</option>)}
                     </select>
                     <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 rounded-xl">
                       <Layers className="w-3 h-3 text-zinc-500" />
-                      <input type="number" value={loraWeight} onChange={(e) => setLoraWeight(parseFloat(e.target.value))} step="0.1" className="w-12 bg-transparent text-xs outline-none" title="Lora Weight" />
+                      <input type="number" value={loraWeight} onChange={(e) => setLoraWeight(parseFloat(e.target.value))} step="0.1" className="w-12 bg-transparent text-xs outline-none" title="Lora Strength" />
                     </div>
                   </div>
                 )}
@@ -487,7 +479,7 @@ export function Home() {
                   </h3>
                   <div className="flex items-center gap-1 px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md">
                     <Info className="w-3 h-3 text-zinc-500" />
-                    <span className="text-[8px] text-zinc-500 uppercase tracking-tighter">HD Upscale costs approx. $0.005</span>
+                    <span className="text-[8px] text-zinc-500 uppercase tracking-tighter">HD Upscale available</span>
                   </div>
                 </div>
                 {recommendations.map((p) => (
@@ -506,7 +498,7 @@ export function Home() {
                             className="text-left text-[10px] text-zinc-400 hover:text-white font-bold uppercase tracking-wider flex items-center gap-1 transition-colors disabled:opacity-50"
                           >
                             {isUpscalingId === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                            {isUpscalingId === p.id ? 'Processing...' : `High-Res Download ${p.cost ? `(Est: $${p.cost.toFixed(4)})` : ''}`}
+                            {isUpscalingId === p.id ? 'Processing...' : `Download HD ${p.cost ? `(Est: $${p.cost.toFixed(4)})` : ''}`}
                           </button>
                         </div>
                       </div>
