@@ -66,7 +66,7 @@ const base64ToUint8Array = (base64Data: string) => {
 
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
-    console.log("[LOG] Thumbnail creation sequence started");
+    console.log("[LOG] Generating system thumbnail...");
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -110,7 +110,7 @@ export function Home() {
   useEffect(() => {
     const fetchLoras = async () => {
       try {
-        console.log("[LOG] Requesting TangBohu Lora list from Civitai...");
+        console.log("[LOG] Fetching filtered TangBohu Loras...");
         const res = await fetch('https://civitai.com/api/v1/models?username=TangBohu&types=LORA&limit=100');
         const data = await res.json();
         const filtered = data.items.filter((m: any) => 
@@ -118,16 +118,16 @@ export function Home() {
           m.modelVersions?.[0]?.baseModel?.toLowerCase().includes('flux')
         );
         setLoras(filtered);
-        console.log("[LOG] Civitai Loras ready:", filtered.length);
+        console.log("[LOG] LoRA Styles count:", filtered.length);
       } catch (e) {
-        console.error("[ERROR] Failed to fetch Loras:", e);
+        console.error("[ERROR] Failed to fetch Civitai library:", e);
       }
     };
     fetchLoras();
   }, []);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    console.log("[LOG] Room image drop detected");
+    console.log("[LOG] New room upload detected");
     if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
     if (!file) return;
@@ -141,7 +141,7 @@ export function Home() {
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
-    console.log("[LOG] Reference style image drop detected");
+    console.log("[LOG] New style reference uploaded");
     const file = acceptedFiles[0];
     if (!file) return;
     const reader = new FileReader();
@@ -153,7 +153,7 @@ export function Home() {
   const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
-    console.log("[LOG] Initiating Architectural Analysis...");
+    console.log("[LOG] Running Gemini Vision Analysis...");
     setIsAnalyzing(true);
     setAnalysisData(null);
     try {
@@ -164,20 +164,20 @@ export function Home() {
           endpoint: 'gemini-flash-latest:generateContent',
           payload: {
             contents: [{ parts: [
-              { text: 'Analyze room scale and perspective. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string" }' },
+              { text: 'Analyze this room for wall scale and perspective. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string" }' },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]}]
           }
         })
       });
-      if (!response.ok) throw new Error("Analysis failed");
+      if (!response.ok) throw new Error("API Connection Error");
       const res = await response.json();
       const rawText = res.candidates[0].content.parts[0].text;
       const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
       setAnalysisData(data);
-      console.log("[LOG] Room analyzed successfully:", data);
+      console.log("[LOG] Architectural metadata received:", data);
     } catch (e) {
-      console.error("[ERROR] Analysis flow broken, using safe defaults:", e);
+      console.error("[ERROR] Analysis crash, using fallback ppi:", e);
       setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern' });
     } finally {
       setIsAnalyzing(false);
@@ -185,20 +185,20 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    console.log("[LOG] Generation flow started");
+    console.log("[LOG] Full production cycle initiated");
     if (!user) { setAuthModalOpen(true); return; }
-    if (tokens <= 0) { alert("You need more tokens!"); return; }
+    if (tokens <= 0) { alert("Insufficient tokens!"); return; }
     if (isGenerating || isInterfaceLocked || !accessToken) return;
 
     setIsGenerating(true);
     try {
       const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
-      const prompt = `Premium wall art, style: ${selectedStyle}, theme: ${selectedTheme}, orientation: ${orientation}, aspect ratio: ${dynamicAR}. ${includeText ? 'Minimalist text included.' : 'No text.'} Ultra detailed.`;
+      const prompt = `Elite botanical wall art masterpiece. Style: ${selectedStyle}, Theme: ${selectedTheme}, Orientation: ${orientation}, Aspect Ratio: ${dynamicAR}. ${includeText ? 'Subtle refined typography.' : 'No text.'} Scandinavian high-end aesthetic.`;
       
       let finalBase64 = "";
       let taskCost = 0;
 
-      console.log("[LOG] Step 1: Requesting Gemini Engine...");
+      console.log("[LOG] Phase 1: Gemini Image Generation...");
       try {
         const geminiRes = await fetch(`/api/gemini`, {
           method: "POST",
@@ -208,14 +208,14 @@ export function Home() {
             payload: { contents: [{ parts: [{ text: prompt }] }] }
           })
         });
-        if (!geminiRes.ok) throw new Error("Gemini API Offline");
+        if (!geminiRes.ok) throw new Error("Primary engine offline");
         const gData = await geminiRes.json();
         const b64 = gData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
-        if (!b64) throw new Error("Gemini returned empty parts");
+        if (!b64) throw new Error("Null data from engine");
         finalBase64 = `data:image/png;base64,${b64}`;
         console.log("[LOG] Gemini engine success");
       } catch (geminiErr) {
-        console.warn("[LOG] Gemini failed. Activating Fallback: Runware Flux...");
+        console.warn("[LOG] Gemini failed. Phase 2: Runware Fallback...");
         const dims = getRunwareDims(selectedSize.value, orientation);
         const task: any = {
           taskType: "imageInference",
@@ -229,7 +229,7 @@ export function Home() {
 
         if (selectedLora && selectedModel.supportsLora) {
           task.lora = [{ model: selectedLora, weight: loraWeight }];
-          console.log("[LOG] Fallback using LoRA:", selectedLora);
+          console.log("[LOG] Lora styling injected:", selectedLora);
         }
 
         const rwRes = await fetch(`/api/runware`, {
@@ -241,42 +241,42 @@ export function Home() {
         if (rwData?.errors) throw new Error(rwData.errors[0].message);
         finalBase64 = rwData.data?.[0]?.imageURL;
         taskCost = rwData.data?.[0]?.cost || 0;
-        console.log("[LOG] Runware engine success. Cost tracked:", taskCost);
+        console.log("[LOG] Runware engine success. Cost:", taskCost);
       }
 
-      if (!finalBase64) throw new Error("All image engines are down");
+      if (!finalBase64) throw new Error("Critical: Generation failure on all clusters");
 
       const thumbBase64 = await createThumbnail(finalBase64);
       
-      console.log("[LOG] Extracting SEO Metadata...");
-      let aiMeta = { seo_title: `${selectedStyle} Masterpiece`, seo_description: "Unique AI Art", alt_text: "AI Art", tags: [] };
+      console.log("[LOG] Generating SEO metadata...");
+      let aiMeta = { seo_title: `${selectedStyle} Masterpiece`, seo_description: "Unique high-end art.", alt_text: "AI Art", tags: [] };
       try {
         const seoRes = await fetch(`/api/gemini`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             endpoint: 'gemini-flash-latest:generateContent',
-            payload: { contents: [{ parts: [{ text: `Generate SEO Metadata JSON for ${selectedStyle} ${selectedTheme} poster. Use keys: seo_title, seo_description, alt_text, tags. Return ONLY JSON.` }] }] }
+            payload: { contents: [{ parts: [{ text: `Return ONLY JSON for ${selectedStyle} ${selectedTheme} poster. Keys: seo_title, seo_description, alt_text, tags.` }] }] }
           })
         });
         const seoData = await seoRes.json();
         const rawJson = seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
         aiMeta = JSON.parse(rawJson);
-        console.log("[LOG] Metadata generated successfully");
+        console.log("[LOG] SEO packet generated");
       } catch (e) {
-        console.error("[ERROR] Metadata generation failed, using defaults");
+        console.error("[ERROR] Metadata generation failed:", e);
       }
 
       const tokenUsed = useToken();
-      if (!tokenUsed) throw new Error("Token logic failed");
+      if (!tokenUsed) throw new Error("Balance logic error");
 
-      console.log("[LOG] Syncing with PHP Database...");
+      console.log("[LOG] Uploading to cloud storage...");
       const formData = new FormData();
       formData.append('action', 'generate_and_save');
       formData.append('category', selectedStyle);
       formData.append('price', selectedSize.price.toString());
       formData.append('metadata', JSON.stringify(aiMeta));
-      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'main.png');
+      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'poster.png');
       formData.append('thumbnail', new Blob([base64ToUint8Array(thumbBase64)], { type: 'image/jpeg' }), 'thumb.jpg');
 
       const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
@@ -290,20 +290,20 @@ export function Home() {
         const productWithMeta = { ...result.product, cost: taskCost };
         setRecommendations(p => [productWithMeta, ...p.slice(0, 2)]);
         setSelectedProduct(productWithMeta);
-        console.log("[LOG] Production cycle complete.");
+        console.log("[LOG] Cycle complete. Product live.");
       } else {
         throw new Error(result.error);
       }
     } catch (e: any) {
-      console.error("[ERROR] Complete production flow failure:", e);
-      alert(e.message || "An unexpected error occurred");
+      console.error("[ERROR] Critical workflow failure:", e);
+      alert(e.message || "Operation failed");
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleUpscaleAndDownload = async (product: Product) => {
-    console.log("[LOG] On-demand upscale triggered for product:", product.id);
+    console.log("[LOG] Requesting Runware Upscale (2x) for product:", product.id);
     setIsUpscalingId(product.id);
     try {
       const response = await fetch('/api/upscale', {
@@ -311,23 +311,23 @@ export function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ imageUrl: product.image })
       });
-      if (!response.ok) throw new Error("Upscale server rejected request");
+      if (!response.ok) throw new Error("Upscale API Rejected");
       const data = await response.json();
       const upscaledUrl = data.upscaledUrl;
       const upscaleCost = data.cost || 0;
-      if (!upscaledUrl) throw new Error("API failed to return upscaled URL");
+      if (!upscaledUrl) throw new Error("Engine returned empty URL");
       
-      console.log(`[LOG] High-Res success. Cost: $${upscaleCost}. Starting download.`);
+      console.log(`[LOG] Upscale Successful. Transaction Cost: $${upscaleCost}. Triggering transfer.`);
       const link = document.createElement('a');
       link.href = upscaledUrl;
-      link.download = `${product.title}_HighResolution.png`;
+      link.download = `${product.title}_UltraHD.png`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
     } catch (e: any) {
-      console.error("[ERROR] Upscale and Download failed:", e);
-      alert("Download failed: " + e.message);
+      console.error("[ERROR] Upscale workflow failed:", e);
+      alert("Download error: " + e.message);
     } finally {
       setIsUpscalingId(null);
     }
@@ -346,7 +346,7 @@ export function Home() {
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-20 backdrop-blur-md">
               <Loader2 className="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-500">Architectural Analysis...</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-emerald-500">Mapping architecture...</p>
             </div>
           ) : roomImage ? (
             <InteractiveCanvas
@@ -364,7 +364,7 @@ export function Home() {
               {!user && <Lock className="w-8 h-8 text-zinc-600 mb-2 group-hover:text-white" />}
               <Upload className="w-12 h-12 opacity-20 mb-4 group-hover:opacity-40" />
               <p className="font-mono text-xs uppercase opacity-30 tracking-widest px-12 text-center group-hover:opacity-60">
-                {user ? "Step 1: Upload Room Image" : "Please login to proceed"}
+                {user ? "Step 1: Link your environment" : "Authorization required"}
               </p>
             </div>
           )}
@@ -379,32 +379,32 @@ export function Home() {
               disabled={isGenerating || !roomImage || (user && tokens <= 0) || isInterfaceLocked}
               className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-bold uppercase rounded-xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.3)] disabled:opacity-20"
             >
-              {isGenerating ? 'DESIGNING...' : 'MAKE ME FEEL SPECIAL'}
+              {isGenerating ? 'GENESIS PROCESS...' : 'MAKE ME FEEL SPECIAL'}
             </button>
             {user && (
               <p className="text-center text-[10px] text-zinc-500 font-mono uppercase tracking-tighter">
-                Available Tokens: <span className={tokens > 0 ? "text-emerald-500" : "text-red-500"}>{tokens}</span>
+                Session Credits: <span className={tokens > 0 ? "text-emerald-500" : "text-red-500"}>{tokens}</span>
               </p>
             )}
           </div>
 
           <div className="space-y-6">
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Model & Advanced Selection</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">AI Logic & Styles</label>
               <div className="space-y-3">
                 <select value={selectedModel.id} onChange={(e) => setSelectedModel(MODELS.find(m => m.id === e.target.value) || MODELS[0])} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
-                  {MODELS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.group})</option>)}
+                  {MODELS.map(m => <option key={m.id} value={m.id}>{m.name} Engine</option>)}
                 </select>
                 
                 {selectedModel.supportsLora && (
                   <div className="flex gap-2">
                     <select value={selectedLora} onChange={(e) => setSelectedLora(e.target.value)} className="flex-1 bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
-                      <option value="">Select LoRA Style (TangBohu)</option>
+                      <option value="">Subject Adapter (Optional)</option>
                       {loras.map(l => <option key={l.id} value={`civitai:${l.id}@${l.modelVersions[0].id}`}>{l.name}</option>)}
                     </select>
                     <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 rounded-xl">
                       <Layers className="w-3 h-3 text-zinc-500" />
-                      <input type="number" value={loraWeight} onChange={(e) => setLoraWeight(parseFloat(e.target.value))} step="0.1" className="w-12 bg-transparent text-xs outline-none" title="Lora Strength" />
+                      <input type="number" value={loraWeight} onChange={(e) => setLoraWeight(parseFloat(e.target.value))} step="0.1" className="w-12 bg-transparent text-xs outline-none" title="Adapter Weight" />
                     </div>
                   </div>
                 )}
@@ -412,7 +412,7 @@ export function Home() {
             </div>
 
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Category & Theme</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Artistic Intent</label>
               <div className="grid grid-cols-2 gap-2">
                 <select value={selectedTheme} onChange={(e) => setSelectedTheme(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
                   {THEMES.map(t => <option key={t} value={t}>{t}</option>)}
@@ -424,7 +424,7 @@ export function Home() {
             </div>
 
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Dimensions</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Print Format</label>
               <div className="grid grid-cols-3 gap-2">
                 {SIZES.map(s => (
                   <button key={s.value} onClick={() => setSelectedSize(s)} className={`p-3 rounded-xl border text-[10px] font-bold transition-all ${selectedSize.value === s.value ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-900 text-zinc-400 border-zinc-800'}`}>
@@ -436,7 +436,7 @@ export function Home() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Orientation</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Canvas Direction</label>
                 <div className="flex gap-2">
                   {(['portrait', 'landscape'] as const).map(o => (
                     <button key={o} onClick={() => setOrientation(o)} className={`flex-1 py-2 text-[10px] font-bold rounded-lg border capitalize ${orientation === o ? 'bg-zinc-800 text-white border-zinc-700' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>{o}</button>
@@ -444,7 +444,7 @@ export function Home() {
                 </div>
               </div>
               <div className="space-y-4">
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Frame</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Frame Color</label>
                 <div className="flex gap-2">
                   {(['unframed', 'black', 'oak'] as FrameType[]).map(f => (
                     <button key={f} onClick={() => setSelectedFrame(f)} className={`flex-1 py-2 rounded-lg border flex items-center justify-center ${selectedFrame === f ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800'}`}>
@@ -456,17 +456,17 @@ export function Home() {
             </div>
 
             <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
-              <span className="text-xs font-medium">Include Poster Text?</span>
+              <span className="text-xs font-medium">Inject Minimal Typography?</span>
               <button onClick={() => setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-1' : 'left-1'}`} />
               </button>
             </div>
 
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference (Optional)</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Reference Image</label>
               <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer text-center">
                 <input {...refDrop.getInputProps()} />
-                {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" alt="ref" /> : <p className="text-[10px] text-zinc-600">Drop style reference here</p>}
+                {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" alt="ref" /> : <p className="text-[10px] text-zinc-600">Drop style anchor</p>}
               </div>
             </div>
 
@@ -475,11 +475,11 @@ export function Home() {
                 <div className="flex items-center justify-between">
                   <h3 className="text-sm font-bold uppercase italic tracking-tighter flex items-center gap-2">
                     <Sparkles className="w-4 h-4 text-emerald-500" />
-                    AI Artist Selection
+                    Artist Selection
                   </h3>
                   <div className="flex items-center gap-1 px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md">
                     <Info className="w-3 h-3 text-zinc-500" />
-                    <span className="text-[8px] text-zinc-500 uppercase tracking-tighter">HD Upscale available</span>
+                    <span className="text-[8px] text-zinc-500 uppercase tracking-tighter">HD Rendering available</span>
                   </div>
                 </div>
                 {recommendations.map((p) => (
@@ -489,16 +489,16 @@ export function Home() {
                       <div className="flex-1 min-w-0">
                         <h4 className="text-xs font-bold truncate uppercase italic leading-tight mb-1">{p.title}</h4>
                         <div className="flex flex-col gap-2">
-                          <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-left text-[10px] text-emerald-500 font-bold uppercase tracking-wider hover:text-emerald-400 transition-colors">
-                            🛒 Add to cart • ${p.basePrice}
+                          <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-left text-[10px] text-emerald-500 font-bold uppercase tracking-wider hover:text-emerald-400">
+                            🛒 Add to bag • ${p.basePrice}
                           </button>
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleUpscaleAndDownload(p); }}
                             disabled={isUpscalingId === p.id}
-                            className="text-left text-[10px] text-zinc-400 hover:text-white font-bold uppercase tracking-wider flex items-center gap-1 transition-colors disabled:opacity-50"
+                            className="text-left text-[10px] text-zinc-400 hover:text-white font-bold uppercase tracking-wider flex items-center gap-1 disabled:opacity-50"
                           >
                             {isUpscalingId === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
-                            {isUpscalingId === p.id ? 'Processing...' : `Download HD ${p.cost ? `(Est: $${p.cost.toFixed(4)})` : ''}`}
+                            {isUpscalingId === p.id ? 'Refining...' : `HD Export ${p.cost ? `(Est: $${p.cost.toFixed(4)})` : ''}`}
                           </button>
                         </div>
                       </div>
