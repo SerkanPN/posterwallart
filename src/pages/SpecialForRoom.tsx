@@ -1,6 +1,6 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Lock, Loader2, Download, Sparkles, Image as ImageIcon, History } from 'lucide-react';
+import { Upload, Loader2, Download, Sparkles, Image as ImageIcon } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
@@ -34,7 +34,8 @@ const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'B
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 const b64toBlob = (b64Data: string, contentType: string) => {
-  const byteCharacters = atob(b64Data.split(',')[1]);
+  const parts = b64Data.split(',');
+  const byteCharacters = atob(parts.length === 2 ? parts[1] : parts[0]);
   const byteNumbers = new Array(byteCharacters.length);
   for (let i = 0; i < byteCharacters.length; i++) {
     byteNumbers[i] = byteCharacters.charCodeAt(i);
@@ -65,7 +66,7 @@ const createThumbnail = async (base64Url: string): Promise<string> => {
 export function SpecialForRoom() {
   const { user, tokens, addToCart, setAuthModalOpen, useToken, accessToken } = useStore();
   
-  const [roomImage, setRoomImage] = useState<string | null>(null);
+  const [roomImage, setRoomImage] = useState<string | null>(() => DEFAULT_ROOMS[0]);
   const [refImage, setRefImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -78,22 +79,13 @@ export function SpecialForRoom() {
   const [selectedFrame, setSelectedFrame] = useState<FrameType>('black');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [includeText, setIncludeText] = useState(false);
-  const [analysisData, setAnalysisData] = useState<any>(null);
-  const [isInterfaceLocked, setIsInterfaceLocked] = useState(false);
-
-  useEffect(() => {
-    if (!roomImage) {
-      const randomRoom = DEFAULT_ROOMS[Math.floor(Math.random() * DEFAULT_ROOMS.length)];
-      console.log("[LOG] No image provided, using default studio environment");
-      setRoomImage(randomRoom);
-      setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Abstract', suggestedSubject: 'scandinavian art' });
-    }
-  }, [roomImage]);
+  const [analysisData, setAnalysisData] = useState<any>({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Abstract', suggestedSubject: 'scandinavian art' });
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
     console.log("[LOG] New environment upload triggered");
     if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
       const base64 = e.target?.result as string;
@@ -106,6 +98,7 @@ export function SpecialForRoom() {
   const onDropRef = useCallback((acceptedFiles: File[]) => {
     console.log("[LOG] Reference style anchor received");
     const file = acceptedFiles[0];
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => setRefImage(e.target?.result as string);
     reader.readAsDataURL(file);
@@ -401,10 +394,10 @@ export function SpecialForRoom() {
             <InteractiveCanvas
               backgroundImage={roomImage || ""}
               mountedArt={selectedProduct?.thumbnail || selectedProduct?.image || null}
-              physicalWidth={orientation === 'portrait' ? selectedSize.value.split('x').map(Number)[0] : selectedSize.value.split('x').map(Number)[1]}
-              physicalHeight={orientation === 'portrait' ? selectedSize.value.split('x').map(Number)[1] : selectedSize.value.split('x').map(Number)[0]}
+              physicalWidth={orientation === 'portrait' ? Number(selectedSize.value.split('x')[0]) : Number(selectedSize.value.split('x')[1])}
+              physicalHeight={orientation === 'portrait' ? Number(selectedSize.value.split('x')[1]) : Number(selectedSize.value.split('x')[0])}
               naturalPixelsPerInch={analysisData?.ppi || 7}
-              frameColor={(FRAME_COLORS as any)[selectedFrame]}
+              frameColor={(FRAME_COLORS as any)[selectedFrame] || null}
               perspective={{ rotateY: analysisData?.rotateY || 0, skewY: analysisData?.skewY || 0 }}
             />
           )}
