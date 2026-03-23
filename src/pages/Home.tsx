@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Lock, Loader2, Download, Sparkles } from 'lucide-react';
+import { Upload, Lock, Loader2, Download, Sparkles, Layers, Info } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
@@ -15,8 +15,9 @@ const MODELS = [
   { id: 'runware:101@1', name: 'FLUX.1 Dev', group: 'FLUX', supportsLora: true, params: { steps: 28, CFGScale: 1 } },
   { id: 'runware:100@1', name: 'FLUX.1 Schnell', group: 'FLUX', supportsLora: true, params: { steps: 4, CFGScale: 1 } },
   { id: 'ideogram:V_3@1', name: 'Ideogram 3.0', group: 'Ideogram', supportsLora: false, params: {} },
+  { id: 'ideogram:V_2A@1', name: 'Ideogram 2a', group: 'Ideogram', supportsLora: false, params: {} },
   { id: 'recraft:v4@0', name: 'Recraft V4', group: 'Recraft', supportsLora: false, params: {} },
-  { id: 'civitai:618692@699279', name: 'Juggernaut XL', group: 'SD', supportsLora: true, params: { steps: 30, CFGScale: 7 } },
+  { id: 'civitai:618692@699279', name: 'Juggernaut XL', group: 'SDXL', supportsLora: true, params: { steps: 30, CFGScale: 7 } },
 ];
 
 const SIZES = [
@@ -28,7 +29,13 @@ const SIZES = [
   { label: '24x36"', price: 49, value: '24x36' },
 ];
 
-const STYLES = ['Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Century Modern', 'Japandi', 'Industrial', 'Boho Chic', 'Art Deco', 'Vaporwave', 'Nordic', 'Vintage Poster', 'Line Art', 'Watercolor'];
+const STYLES = [
+  'Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Century Modern',
+  'Japandi', 'Industrial', 'Boho Chic', 'Art Deco', 'Vaporwave',
+  'Surrealism', 'Pop Art', 'Abstract Expressionism', 'Impressionism', 'Nordic',
+  'Street Art', 'Futurism', 'Vintage Poster', 'Line Art', 'Watercolor'
+];
+
 const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
 const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
@@ -43,9 +50,10 @@ const getRunwareDims = (sizeStr: string, orientation: 'portrait' | 'landscape') 
   const [w, h] = sizeStr.split('x').map(Number);
   const rw = orientation === 'portrait' ? w : h;
   const rh = orientation === 'portrait' ? h : w;
+  const MAX = 1024;
   const snap = (v: number) => Math.floor(v / 64) * 64;
-  if (rw >= rh) return { w: 1024, h: snap((rh / rw) * 1024) };
-  return { w: snap((rw / rh) * 1024), h: 1024 };
+  if (rw >= rh) return { w: MAX, h: snap((rh / rw) * MAX) };
+  return { w: snap((rw / rh) * MAX), h: MAX };
 };
 
 const base64ToUint8Array = (base64Data: string) => {
@@ -58,7 +66,7 @@ const base64ToUint8Array = (base64Data: string) => {
 
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
-    console.log("[DEBUG] Starting thumbnail creation");
+    console.log("[LOG] Thumbnail creation started");
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -102,7 +110,7 @@ export function Home() {
   useEffect(() => {
     const fetchLoras = async () => {
       try {
-        console.log("[DEBUG] Fetching TangBohu Loras from Civitai");
+        console.log("[LOG] Fetching style loras...");
         const res = await fetch('https://civitai.com/api/v1/models?username=TangBohu&types=LORA&limit=100');
         const data = await res.json();
         const filtered = data.items.filter((m: any) => 
@@ -110,14 +118,16 @@ export function Home() {
           m.modelVersions?.[0]?.baseModel?.toLowerCase().includes('flux')
         );
         setLoras(filtered);
-        console.log(`[DEBUG] Found ${filtered.length} matching Loras`);
-      } catch (e) { console.error("[DEBUG] Lora fetch failed", e); }
+        console.log("[LOG] Loras loaded:", filtered.length);
+      } catch (e) {
+        console.error("[ERROR] Lora fetch failed:", e);
+      }
     };
     fetchLoras();
   }, []);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    console.log("[DEBUG] Room drop detected");
+    console.log("[LOG] Room file dropped");
     if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
     if (!file) return;
@@ -131,6 +141,7 @@ export function Home() {
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
+    console.log("[LOG] Reference file dropped");
     const file = acceptedFiles[0];
     if (!file) return;
     const reader = new FileReader();
@@ -142,7 +153,7 @@ export function Home() {
   const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
-    console.log("[DEBUG] Starting secure room analysis");
+    console.log("[LOG] Analyzing room...");
     setIsAnalyzing(true);
     setAnalysisData(null);
     try {
@@ -159,13 +170,14 @@ export function Home() {
           }
         })
       });
+      if (!response.ok) throw new Error("Analysis API failed");
       const res = await response.json();
       const rawText = res.candidates[0].content.parts[0].text;
       const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
       setAnalysisData(data);
-      console.log("[DEBUG] Analysis successful", data);
+      console.log("[LOG] Analysis successful:", data);
     } catch (e) {
-      console.error("[DEBUG] Analysis failed, using defaults", e);
+      console.error("[ERROR] Analysis failed, using defaults:", e);
       setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern' });
     } finally {
       setIsAnalyzing(false);
@@ -173,21 +185,20 @@ export function Home() {
   };
 
   const handleCreateForMe = async () => {
-    console.log("[DEBUG] Generation process started");
-    if (!user || tokens <= 0 || isGenerating || isInterfaceLocked || !accessToken) {
-      if (!user) setAuthModalOpen(true);
-      return;
-    }
+    console.log("[LOG] Generation triggered");
+    if (!user) { setAuthModalOpen(true); return; }
+    if (tokens <= 0) { alert("Insufficient tokens!"); return; }
+    if (isGenerating || isInterfaceLocked || !accessToken) return;
 
     setIsGenerating(true);
     try {
       const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
-      const prompt = `Premium wall art, style: ${selectedStyle}, theme: ${selectedTheme}, orientation: ${orientation}, aspect ratio: ${dynamicAR}. ${includeText ? 'Elegant minimalist typography.' : 'No text.'} High-end visual.`;
+      const prompt = `Style: ${selectedStyle}, Theme: ${selectedTheme}, Orientation: ${orientation}, Aspect Ratio: ${dynamicAR}. ${includeText ? 'Include typography.' : 'No text.'} Premium wall art.`;
       
       let finalBase64 = "";
       let taskCost = 0;
 
-      console.log("[DEBUG] Primary Gen: Gemini");
+      console.log("[LOG] Attempting primary engine: Gemini");
       try {
         const geminiRes = await fetch(`/api/gemini`, {
           method: "POST",
@@ -197,13 +208,14 @@ export function Home() {
             payload: { contents: [{ parts: [{ text: prompt }] }] }
           })
         });
+        if (!geminiRes.ok) throw new Error("Gemini failed");
         const gData = await geminiRes.json();
         const b64 = gData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
-        if (!b64) throw new Error("Gemini empty");
+        if (!b64) throw new Error("Gemini empty data");
         finalBase64 = `data:image/png;base64,${b64}`;
-        console.log("[DEBUG] Gemini generation success");
-      } catch (e) {
-        console.warn("[DEBUG] Gemini failed, switching to Runware Flux fallback");
+        console.log("[LOG] Gemini success");
+      } catch (geminiErr) {
+        console.warn("[LOG] Gemini failed, falling back to Runware Flux...");
         const dims = getRunwareDims(selectedSize.value, orientation);
         const task: any = {
           taskType: "imageInference",
@@ -217,7 +229,7 @@ export function Home() {
 
         if (selectedLora && selectedModel.supportsLora) {
           task.lora = [{ model: selectedLora, weight: loraWeight }];
-          console.log("[DEBUG] Lora applied to fallback task");
+          console.log("[LOG] Applying LoRA:", selectedLora);
         }
 
         const rwRes = await fetch(`/api/runware`, {
@@ -226,65 +238,72 @@ export function Home() {
           body: JSON.stringify([task])
         });
         const rwData = await rwRes.json();
+        if (rwData?.errors) throw new Error(rwData.errors[0].message);
         finalBase64 = rwData.data?.[0]?.imageURL;
         taskCost = rwData.data?.[0]?.cost || 0;
-        if (!finalBase64) throw new Error("Both engines failed");
-        console.log("[DEBUG] Runware fallback success. Cost:", taskCost);
+        console.log("[LOG] Runware fallback success. Cost:", taskCost);
       }
+
+      if (!finalBase64) throw new Error("All engines failed");
 
       const thumbBase64 = await createThumbnail(finalBase64);
       
-      console.log("[DEBUG] Generating Metadata");
-      let aiMeta = { seo_title: "AI Masterpiece", seo_description: "Unique Art", alt_text: "AI Art", tags: [] };
+      console.log("[LOG] Generating SEO data...");
+      let aiMeta = { seo_title: `${selectedStyle} Masterpiece`, seo_description: "Unique wall art.", alt_text: "AI Art", tags: [] };
       try {
         const seoRes = await fetch(`/api/gemini`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             endpoint: 'gemini-flash-latest:generateContent',
-            payload: { contents: [{ parts: [{ text: `Generate JSON SEO for ${selectedStyle} ${selectedTheme} poster. Use keys: seo_title, seo_description, alt_text, tags. Return ONLY JSON.` }] }] }
+            payload: { contents: [{ parts: [{ text: `Generate JSON SEO metadata for ${selectedStyle} ${selectedTheme} poster. Use keys: seo_title, seo_description, alt_text, tags. Return ONLY JSON.` }] }] }
           })
         });
         const seoData = await seoRes.json();
-        const cleanJson = seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
-        aiMeta = JSON.parse(cleanJson);
-        console.log("[DEBUG] SEO generation success");
-      } catch (e) { console.error("[DEBUG] Metadata failed, using defaults", e); }
+        const rawJson = seoData.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
+        aiMeta = JSON.parse(rawJson);
+        console.log("[LOG] SEO generated successfully");
+      } catch (e) {
+        console.error("[ERROR] SEO generation failed:", e);
+      }
 
       const tokenUsed = useToken();
-      if (!tokenUsed) throw new Error("Token error");
+      if (!tokenUsed) throw new Error("Token consumption failed");
 
-      console.log("[DEBUG] Saving to database");
+      console.log("[LOG] Saving product to server...");
       const formData = new FormData();
       formData.append('action', 'generate_and_save');
       formData.append('category', selectedStyle);
       formData.append('price', selectedSize.price.toString());
       formData.append('metadata', JSON.stringify(aiMeta));
-      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'm.png');
-      formData.append('thumbnail', new Blob([base64ToUint8Array(thumbBase64)], { type: 'image/jpeg' }), 't.jpg');
+      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'image.png');
+      formData.append('thumbnail', new Blob([base64ToUint8Array(thumbBase64)], { type: 'image/jpeg' }), 'thumb.jpg');
 
       const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${accessToken}` },
         body: formData,
       });
+
       const result = await uploadRes.json();
       if (result.success) {
-        const newProduct = { ...result.product, cost: taskCost };
-        setRecommendations(p => [newProduct, ...p.slice(0, 2)]);
-        setSelectedProduct(newProduct);
-        console.log("[DEBUG] Product created and displayed");
+        const productWithCost = { ...result.product, cost: taskCost };
+        setRecommendations(p => [productWithCost, ...p.slice(0, 2)]);
+        setSelectedProduct(productWithCost);
+        console.log("[LOG] Product saved and displayed");
+      } else {
+        throw new Error(result.error);
       }
-    } catch (e) {
-      console.error("[DEBUG] Production error", e);
-      alert("Something went wrong");
+    } catch (e: any) {
+      console.error("[ERROR] Production flow failed:", e);
+      alert(e.message || "An error occurred");
     } finally {
       setIsGenerating(false);
     }
   };
 
   const handleUpscaleAndDownload = async (product: Product) => {
-    console.log("[DEBUG] Starting on-demand upscale");
+    console.log("[LOG] On-demand upscale starting for:", product.id);
     setIsUpscalingId(product.id);
     try {
       const response = await fetch('/api/runware', {
@@ -300,22 +319,23 @@ export function Home() {
           outputFormat: 'PNG'
         }])
       });
+      if (!response.ok) throw new Error("Upscale API failed");
       const data = await response.json();
       const upscaledUrl = data.data?.[0]?.imageURL;
       const upscaleCost = data.data?.[0]?.cost || 0;
-      if (!upscaledUrl) throw new Error("Upscale API empty");
+      if (!upscaledUrl) throw new Error("No URL returned from upscale");
       
-      console.log(`[DEBUG] Upscale success. Cost: ${upscaleCost}. Downloading...`);
+      console.log(`[LOG] Upscale success. Cost: $${upscaleCost}. Downloading...`);
       const link = document.createElement('a');
       link.href = upscaledUrl;
-      link.download = `${product.title}_HD.png`;
+      link.download = `${product.title}_HighRes.png`;
       link.target = '_blank';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-    } catch (e) {
-      console.error("[DEBUG] Upscale failed", e);
-      alert("Upscale failed");
+    } catch (e: any) {
+      console.error("[ERROR] Upscale failed:", e);
+      alert("Upscale failed: " + e.message);
     } finally {
       setIsUpscalingId(null);
     }
@@ -328,6 +348,7 @@ export function Home() {
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
       <AuthModal />
+
       <div className="flex-1 p-6 flex flex-col relative">
         <div className="flex-1 relative rounded-2xl overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
           {isAnalyzing ? (
@@ -357,6 +378,7 @@ export function Home() {
           )}
         </div>
       </div>
+
       <div className={`w-[480px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto transition-opacity duration-300 ${isInterfaceLocked ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="p-6 space-y-8 pb-24">
           <div className="space-y-2">
@@ -373,24 +395,30 @@ export function Home() {
               </p>
             )}
           </div>
+
           <div className="space-y-6">
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Model & Lora</label>
-              <div className="grid grid-cols-1 gap-2">
-                <select value={selectedModel.id} onChange={(e) => setSelectedModel(MODELS.find(m => m.id === e.target.value) || MODELS[0])} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
-                  {MODELS.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Model & Advanced Settings</label>
+              <div className="space-y-3">
+                <select value={selectedModel.id} onChange={(e) => setSelectedModel(MODELS.find(m => m.id === e.target.value) || MODELS[0])} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
+                  {MODELS.map(m => <option key={m.id} value={m.id}>{m.name} ({m.group})</option>)}
                 </select>
+                
                 {selectedModel.supportsLora && (
                   <div className="flex gap-2">
                     <select value={selectedLora} onChange={(e) => setSelectedLora(e.target.value)} className="flex-1 bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none">
-                      <option value="">Select LoRA Style</option>
+                      <option value="">Select LoRA Style (Optional)</option>
                       {loras.map(l => <option key={l.id} value={`civitai:${l.id}@${l.modelVersions[0].id}`}>{l.name}</option>)}
                     </select>
-                    <input type="number" value={loraWeight} onChange={(e) => setLoraWeight(parseFloat(e.target.value))} step="0.1" className="w-20 bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-xs outline-none" />
+                    <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 px-3 rounded-xl">
+                      <Layers className="w-3 h-3 text-zinc-500" />
+                      <input type="number" value={loraWeight} onChange={(e) => setLoraWeight(parseFloat(e.target.value))} step="0.1" className="w-12 bg-transparent text-xs outline-none" title="Lora Weight" />
+                    </div>
                   </div>
                 )}
               </div>
             </div>
+
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Category & Theme</label>
               <div className="grid grid-cols-2 gap-2">
@@ -402,6 +430,7 @@ export function Home() {
                 </select>
               </div>
             </div>
+
             <div className="space-y-4">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Dimensions</label>
               <div className="grid grid-cols-3 gap-2">
@@ -412,6 +441,7 @@ export function Home() {
                 ))}
               </div>
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-4">
                 <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Orientation</label>
@@ -432,33 +462,51 @@ export function Home() {
                 </div>
               </div>
             </div>
+
             <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-2xl border border-zinc-800">
               <span className="text-xs font-medium">Include Poster Text?</span>
               <button onClick={() => setIncludeText(!includeText)} className={`w-10 h-5 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
                 <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-1' : 'left-1'}`} />
               </button>
             </div>
+
             <div className="space-y-4">
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500 block">Style Reference (Optional)</label>
               <div {...refDrop.getRootProps()} className="border-2 border-dashed border-zinc-800 rounded-2xl p-4 hover:bg-zinc-900 cursor-pointer text-center">
                 <input {...refDrop.getInputProps()} />
                 {refImage ? <img src={refImage} className="h-16 mx-auto rounded-lg shadow-xl" alt="ref" /> : <p className="text-[10px] text-zinc-600">Drop style reference here</p>}
               </div>
             </div>
+
             {recommendations.length > 0 && (
               <div className="pt-6 border-t border-zinc-800 space-y-4">
-                <h3 className="text-sm font-bold uppercase italic tracking-tighter">AI Artist Selection</h3>
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase italic tracking-tighter flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-emerald-500" />
+                    AI Artist Selection
+                  </h3>
+                  <div className="flex items-center gap-1 px-2 py-1 bg-zinc-900 border border-zinc-800 rounded-md">
+                    <Info className="w-3 h-3 text-zinc-500" />
+                    <span className="text-[8px] text-zinc-500 uppercase tracking-tighter">HD Upscale costs approx. $0.005</span>
+                  </div>
+                </div>
                 {recommendations.map((p) => (
                   <div key={p.id} className={`p-4 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.slug === p.slug ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-800'}`} onClick={() => setSelectedProduct(p)}>
                     <div className="flex gap-4 items-center">
-                      <img src={p.thumbnail || p.image} className="w-14 h-14 rounded-lg object-cover" alt={p.title} />
+                      <img src={p.thumbnail || p.image} className="w-16 h-16 rounded-lg object-cover" alt={p.title} />
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-xs font-bold truncate uppercase italic">{p.title}</h4>
-                        <div className="flex gap-2 mt-2">
-                          <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-[10px] text-emerald-500 font-bold uppercase tracking-wider">🛒 Add to cart • ${p.basePrice}</button>
-                          <button onClick={(e) => { e.stopPropagation(); handleUpscaleAndDownload(p); }} disabled={isUpscalingId === p.id} className="text-[10px] text-zinc-400 hover:text-white font-bold uppercase tracking-wider flex items-center gap-1">
-                            {isUpscalingId === p.id ? <Loader2 className="w-2 h-2 animate-spin" /> : <Download className="w-2 h-2" />}
-                            {isUpscalingId === p.id ? 'Processing...' : `HD Download ${p.cost ? `(Cost: $${p.cost.toFixed(4)})` : ''}`}
+                        <h4 className="text-xs font-bold truncate uppercase italic leading-tight mb-1">{p.title}</h4>
+                        <div className="flex flex-col gap-2">
+                          <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="text-left text-[10px] text-emerald-500 font-bold uppercase tracking-wider hover:text-emerald-400 transition-colors">
+                            🛒 Add to cart • ${p.basePrice}
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleUpscaleAndDownload(p); }}
+                            disabled={isUpscalingId === p.id}
+                            className="text-left text-[10px] text-zinc-400 hover:text-white font-bold uppercase tracking-wider flex items-center gap-1 transition-colors disabled:opacity-50"
+                          >
+                            {isUpscalingId === p.id ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                            {isUpscalingId === p.id ? 'Processing...' : `High-Res Download ${p.cost ? `(Est: $${p.cost.toFixed(4)})` : ''}`}
                           </button>
                         </div>
                       </div>
