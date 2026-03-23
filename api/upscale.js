@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   const apiKey = process.env.RUNWARE_API_KEY;
 
   if (!apiKey) {
-    console.error("[DEBUG] CRITICAL: RUNWARE_API_KEY is missing in Vercel");
+    console.error("[DEBUG] CRITICAL: RUNWARE_API_KEY is missing in Vercel Environment Variables");
     return res.status(500).json({ error: 'Server configuration error: Missing Runware API Key' });
   }
 
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: "Görsel URL'si gelmedi." });
   }
 
-  console.log("[DEBUG] Starting Runware Upscale Process for:", imageUrl);
+  console.log("[DEBUG] Starting Runware Upscale (2x) for:", imageUrl);
 
   try {
     const response = await fetch('https://api.runware.ai/v1', {
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
           taskUUID: crypto.randomUUID(),
           inputImage: imageUrl,
           model: 'runware:501@1',
-          upscaleFactor: 4,
+          upscaleFactor: 2, // HATA BURADAYDI: 4 yerine 2 destekleniyor
           outputType: 'URL',
           outputFormat: 'PNG'
         }
