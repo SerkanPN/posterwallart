@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Lock, Loader2, Sparkles, Image as ImageIcon, History, ShoppingCart } from 'lucide-react';
+import { Upload, Lock, Loader2, Download, Sparkles, Image as ImageIcon, History, ShoppingCart, Plus, Info } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
@@ -35,9 +35,9 @@ const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
 
 const calculateAspectRatio = (sizeValue: string, orientation: 'portrait' | 'landscape') => {
   const [w, h] = sizeValue.split('x').map(Number);
-  const common = (a: number, b: number): number => (b === 0 ? a : common(b, a % b));
-  const gcd = common(w, h);
-  return orientation === 'portrait' ? `${w / gcd}:${h / gcd}` : `${h / gcd}:${w / gcd}`;
+  const getGCD = (a: number, b: number): number => (b === 0 ? a : getGCD(b, a % b));
+  const common = getGCD(w, h);
+  return orientation === 'portrait' ? `${w / common}:${h / common}` : `${h / common}:${w / common}`;
 };
 
 const getRunwareDims = (sizeStr: string, orientation: 'portrait' | 'landscape') => {
@@ -60,7 +60,7 @@ const base64ToUint8Array = (base64Data: string) => {
 
 const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
   return new Promise((resolve) => {
-    console.log("[LOG] UI: Processing thumbnail creation");
+    console.log("[LOG] Thumbnail generator processing...");
     const img = new Image();
     img.onload = () => {
       const canvas = document.createElement('canvas');
@@ -99,14 +99,14 @@ export function SpecialForRoom() {
   useEffect(() => {
     if (!roomImage) {
       const randomRoom = DEFAULT_ROOMS[Math.floor(Math.random() * DEFAULT_ROOMS.length)];
-      console.log("[LOG] UI: Initializing studio with preset environment");
+      console.log("[LOG] No room provided, selecting preset environment...");
       setRoomImage(randomRoom);
-      setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Abstract', suggestedSubject: 'botanical composition' });
+      setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Abstract', suggestedSubject: 'balanced composition' });
     }
   }, [roomImage]);
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
-    console.log("[LOG] UI: Room file drop detected");
+    console.log("[LOG] Room image dropped");
     if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
     const reader = new FileReader();
@@ -119,7 +119,7 @@ export function SpecialForRoom() {
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
-    console.log("[LOG] UI: Style reference anchor drop detected");
+    console.log("[LOG] Reference image dropped");
     const file = acceptedFiles[0];
     const reader = new FileReader();
     reader.onload = (e) => setRefImage(e.target?.result as string);
@@ -130,7 +130,7 @@ export function SpecialForRoom() {
   const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
-    console.log("[LOG] API: Mapping architectural coordinates...");
+    console.log("[LOG] Initiating AI architectural scan...");
     setIsAnalyzing(true);
     try {
       const response = await fetch(`/api/gemini`, {
@@ -140,7 +140,7 @@ export function SpecialForRoom() {
           endpoint: 'gemini-flash-latest:generateContent',
           payload: {
             contents: [{ parts: [
-              { text: 'Analyze this room for wall scale and 3D perspective. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string", "suggestedTheme": "string", "suggestedSubject": "string" }' },
+              { text: 'Analyze this room. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string", "suggestedTheme": "string", "suggestedSubject": "string" }' },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]}]
           }
@@ -150,17 +150,17 @@ export function SpecialForRoom() {
       const rawText = res.candidates[0].content.parts[0].text;
       const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
       setAnalysisData(data);
-      console.log("[LOG] API: Architecture synced", data);
+      console.log("[LOG] Analysis successful:", data);
     } catch (error) {
-      console.error("[ERROR] API: Mapping failure", error);
-      setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Abstract', suggestedSubject: 'minimalist art' });
+      console.error("[ERROR] Analysis failure:", error);
+      setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Abstract', suggestedSubject: 'artistic piece' });
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const handleCreateForMe = async () => {
-    console.log("[LOG] Process: Master production sequence initiated");
+    console.log("[LOG] Genesis cycle started");
     if (!user || tokens <= 0 || isGenerating || !accessToken) {
       if (!user) setAuthModalOpen(true);
       return;
@@ -171,34 +171,32 @@ export function SpecialForRoom() {
       const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
       const style = selectedStyle === 'Default' ? (analysisData?.detectedStyle || "Modern") : selectedStyle;
       const theme = selectedTheme === 'Default' ? (analysisData?.suggestedTheme || "Abstract") : selectedTheme;
-      const subject = analysisData?.suggestedSubject || "high-end art piece";
+      const subject = analysisData?.suggestedSubject || "high-end art";
 
-      let promptDirectives = `You are a world-class master artist and elite visual designer specializing in premium wall art. CORE OBJECTIVE: Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders. STYLE: ${style}, THEME: ${theme}, SUBJECT: ${subject}, ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}. ${includeText ? 'Include minimal typography.' : 'NO text.'} RESOLUTION: 1024px.`;
+      let prompt = `You are a world-class master artist and elite visual designer specializing in premium wall art. CORE OBJECTIVE: Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders. STYLE: ${style}, THEME: ${theme}, SUBJECT: ${subject}, ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}. ${includeText ? 'Include minimal typography.' : 'NO text.'} RESOLUTION: 1024px.`;
       
       if (refImage) {
-        promptDirectives = `You are a master artist. Using the provided reference image as both your thematic subject and visual style guide, create an ORIGINAL and unique masterpiece. Reimagine the core subject and artistic brushwork of the reference into a fresh composition. Maintain the color palette and atmosphere but do not copy exactly. ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}. High-end elite art. ${includeText ? 'Subtle typography allowed.' : 'NO text.'}`;
+        prompt = `You are a master artist. Using the provided reference image as both your thematic subject and visual style guide, create an ORIGINAL and unique masterpiece. Reimagine the core subject and artistic brushwork of the reference into a fresh composition. Maintain the color palette and atmosphere but do not copy exactly. ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}. High-end elite art. ${includeText ? 'Subtle typography.' : 'NO text.'}`;
       }
 
       let finalBase64 = "";
-      let taskCost = 0;
-
-      console.log("[LOG] API: Cluster Gen - Phase 1");
+      console.log("[LOG] Requesting primary engine...");
       try {
         const geminiRes = await fetch(`/api/gemini`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             endpoint: 'gemini-3.1-flash-image-preview:generateContent',
-            payload: { contents: [{ parts: [{ text: promptDirectives }] }] }
+            payload: { contents: [{ parts: [{ text: prompt }] }] }
           })
         });
         const gData = await geminiRes.json();
         const b64 = gData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
-        if (!b64) throw new Error("Null response");
+        if (!b64) throw new Error("API empty");
         finalBase64 = `data:image/png;base64,${b64}`;
-        console.log("[LOG] API: Primary engine success");
-      } catch (err) {
-        console.warn("[LOG] API: Engine fallback to Runware FLUX");
+        console.log("[LOG] Primary engine success");
+      } catch (geminiErr) {
+        console.warn("[LOG] Primary engine failed. Triggering Runware Fallback...");
         const dims = getRunwareDims(selectedSize.value, orientation);
         const rwRes = await fetch(`/api/runware`, {
           method: "POST",
@@ -207,7 +205,7 @@ export function SpecialForRoom() {
             taskType: "imageInference",
             taskUUID: crypto.randomUUID(),
             model: FIXED_MODEL.id,
-            positivePrompt: promptDirectives,
+            positivePrompt: prompt,
             width: dims.w, height: dims.h,
             numberResults: 1, outputType: "dataURI", outputFormat: "PNG",
             ...FIXED_MODEL.params,
@@ -216,37 +214,35 @@ export function SpecialForRoom() {
         });
         const rwData = await rwRes.json();
         finalBase64 = rwData.data?.[0]?.imageURL;
-        taskCost = rwData.data?.[0]?.cost || 0;
-        console.log("[LOG] API: Fallback success, cost tracked:", taskCost);
       }
 
-      if (!finalBase64) throw new Error("Cluster isolation failure");
+      if (!finalBase64) throw new Error("Critical production failure");
 
       const thumbBase64 = await createThumbnail(finalBase64);
       
-      console.log("[LOG] API: Processing metadata sync");
-      let aiMeta = { seo_title: `Custom ${style} Artwork`, seo_description: "Unique high-end wall art.", alt_text: "AI Art", tags: [] };
+      console.log("[LOG] Generating metadata...");
+      let aiMeta = { seo_title: `${selectedStyle} Art`, seo_description: "Unique piece.", alt_text: "AI Art", tags: [] };
       try {
         const seoRes = await fetch(`/api/gemini`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             endpoint: 'gemini-flash-latest:generateContent',
-            payload: { contents: [{ parts: [{ text: `Generate JSON SEO for ${style} ${theme} art. Keys: seo_title, seo_description, alt_text, tags. Return ONLY JSON.` }] }] }
+            payload: { contents: [{ parts: [{ text: `Generate JSON SEO for ${style} ${theme} art. Use keys: seo_title, seo_description, alt_text, tags. Return ONLY JSON.` }] }] }
           })
         });
         const rawJson = (await seoRes.json()).candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
         aiMeta = JSON.parse(rawJson);
-      } catch (e) { console.error("[LOG] API: Metadata generator skipped"); }
+      } catch (e) { console.error("[LOG] SEO generation failed"); }
 
       useToken();
 
-      console.log("[LOG] API: Deploying to marketplace database");
+      console.log("[LOG] Syncing with database...");
       const formData = new FormData();
       formData.append('action', 'generate_and_save');
       formData.append('category', style);
       formData.append('price', selectedSize.price.toString());
       formData.append('metadata', JSON.stringify(aiMeta));
-      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'main.png');
+      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'm.png');
       formData.append('thumbnail', new Blob([base64ToUint8Array(thumbBase64)], { type: 'image/jpeg' }), 't.jpg');
 
       const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
@@ -259,11 +255,11 @@ export function SpecialForRoom() {
       if (result.success) {
         setRecommendations(p => [result.product, ...p.slice(0, 5)]);
         setSelectedProduct(result.product);
-        console.log("[LOG] System: Production cycle complete");
+        console.log("[LOG] Deployment complete.");
       }
     } catch (error: any) {
-      console.error("[ERROR] Process: Production flow broken", error);
-      alert("System Error: " + error.message);
+      console.error("[ERROR] Workflow broken:", error);
+      alert("Error: " + error.message);
     } finally {
       setIsGenerating(false);
     }
@@ -273,12 +269,12 @@ export function SpecialForRoom() {
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
       <AuthModal />
 
-      {/* LEFT: CONTROLS */}
+      {/* LEFT PANEL: CONTROLS */}
       <div className={`w-[340px] border-r border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto transition-all ${isInterfaceLocked ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
         <div className="p-6 space-y-8 pb-24">
           <div>
             <h1 className="text-xl font-black italic tracking-tighter text-emerald-500 uppercase leading-none">SPECIAL FOR<br/>YOUR ROOM</h1>
-            <p className="text-[9px] text-zinc-500 font-bold tracking-widest mt-2 uppercase opacity-50">AI Design Studio v4.2</p>
+            <p className="text-[9px] text-zinc-500 font-bold tracking-widest mt-2 uppercase opacity-50">AI Design Studio v4.5</p>
           </div>
 
           <div className="space-y-2">
@@ -294,7 +290,9 @@ export function SpecialForRoom() {
 
           <div className="space-y-6">
             <div className="space-y-3">
-              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Visual Tuning</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                <Sparkles className="w-3 h-3" /> Artistic Tuning
+              </label>
               <div className="grid grid-cols-1 gap-2">
                 <select 
                   value={selectedStyle} 
@@ -318,7 +316,9 @@ export function SpecialForRoom() {
             </div>
 
             <div className="space-y-3">
-              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Format</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                <Maximize className="w-3 h-3" /> Dimensions
+              </label>
               <div className="grid grid-cols-2 gap-2">
                 {SIZES.map(s => (
                   <button key={s.value} onClick={() => setSelectedSize(s)} className={`py-2 rounded-xl border text-[9px] font-black transition-all ${selectedSize.value === s.value ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}>{s.label}</button>
@@ -332,7 +332,9 @@ export function SpecialForRoom() {
             </div>
 
             <div className="space-y-3">
-              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Finishing</label>
+              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500 flex items-center gap-2">
+                <Layers className="w-3 h-3" /> Finishing
+              </label>
               <div className="flex gap-2">
                 {(['unframed', 'black', 'oak'] as FrameType[]).map(f => (
                   <button key={f} onClick={() => setSelectedFrame(f)} className={`flex-1 py-2 rounded-xl border flex items-center justify-center ${selectedFrame === f ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800'}`}>
@@ -341,7 +343,7 @@ export function SpecialForRoom() {
                 ))}
               </div>
               <div className="flex items-center justify-between p-3 bg-zinc-900 rounded-xl border border-zinc-800">
-                <span className="text-[10px] font-bold">Typography?</span>
+                <span className="text-[10px] font-bold">Include Typography?</span>
                 <button onClick={() => setIncludeText(!includeText)} className={`w-8 h-4 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
                   <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-0.5' : 'left-0.5'}`} />
                 </button>
@@ -351,7 +353,7 @@ export function SpecialForRoom() {
         </div>
       </div>
 
-      {/* CENTER: UPLOADS & CANVAS */}
+      {/* CENTER AREA: UPLOADS & STUDIO */}
       <div className="flex-1 p-6 flex flex-col gap-6 relative overflow-hidden bg-zinc-950">
         <div className="flex gap-4 h-32">
           <div {...roomDrop.getRootProps()} className="flex-1 border-2 border-dashed border-zinc-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/50 transition-all group relative overflow-hidden bg-zinc-900/20">
@@ -370,7 +372,7 @@ export function SpecialForRoom() {
             {refImage ? (
               <div className="absolute inset-0">
                 <img src={refImage} className="w-full h-full object-cover opacity-40" alt="Ref" />
-                <button onClick={(e) => { e.stopPropagation(); setRefImage(null); }} className="absolute top-1 right-1 bg-red-500/80 p-1 rounded-md text-[7px] font-black">RESET</button>
+                <button onClick={(e) => { e.stopPropagation(); setRefImage(null); }} className="absolute top-1 right-1 bg-red-500/80 p-1 rounded-md text-[7px] font-black uppercase">RESET</button>
               </div>
             ) : null}
             <div className="relative z-10 flex flex-col items-center">
@@ -384,7 +386,7 @@ export function SpecialForRoom() {
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-30 backdrop-blur-xl">
               <div className="w-12 h-12 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-black text-[9px] uppercase tracking-[0.3em] text-emerald-500">Scanning Architectural Space...</p>
+              <p className="font-black text-[9px] uppercase tracking-[0.3em] text-emerald-500 font-mono">Architectural Scanning...</p>
             </div>
           ) : (
             <InteractiveCanvas
@@ -400,7 +402,7 @@ export function SpecialForRoom() {
         </div>
       </div>
 
-      {/* RIGHT: RECENT CREATIONS */}
+      {/* RIGHT PANEL: RECENT CREATIONS */}
       <div className="w-[280px] border-l border-zinc-800 bg-zinc-950 flex flex-col h-full">
         <div className="p-6 space-y-6 overflow-y-auto scrollbar-hide">
           <div className="flex items-center gap-2 border-b border-zinc-900 pb-4">
@@ -409,12 +411,15 @@ export function SpecialForRoom() {
           </div>
           
           <div className="space-y-4">
-            {recommendations.length === 0 && <p className="text-[9px] text-zinc-700 italic text-center py-10 font-bold uppercase">Ready</p>}
+            {recommendations.length === 0 && <p className="text-[9px] text-zinc-700 italic text-center py-10 font-bold uppercase tracking-widest">Ready for magic</p>}
             {recommendations.map((p) => (
-              <div key={p.id} className={`p-2 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-900 hover:bg-zinc-900/40'}`} onClick={() => setSelectedProduct(p)}>
-                <img src={p.thumbnail || p.image} className="w-full aspect-square rounded-xl object-cover mb-2 border border-zinc-800" alt="Creation" />
-                <button onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} className="w-full py-2 bg-emerald-600/10 text-emerald-500 text-[8px] font-black uppercase rounded-lg hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center gap-2">
-                  <ShoppingCart className="w-3 h-3" /> Add to Cart
+              <div key={p.id} className={`p-2 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900 shadow-lg' : 'border-zinc-900 hover:bg-zinc-900/40'}`} onClick={() => setSelectedProduct(p)}>
+                <img src={p.thumbnail || p.image} className="w-full aspect-square rounded-xl object-cover mb-2 border border-zinc-800 shadow-sm" alt="Creation" />
+                <button 
+                  onClick={(e) => { e.stopPropagation(); addToCart({ ...p, price: p.basePrice, type: 'physical' }); }} 
+                  className="w-full py-2 bg-emerald-600 text-white text-[8px] font-black uppercase rounded-lg hover:bg-emerald-500 transition-all flex items-center justify-center gap-2"
+                >
+                  <ShoppingCart className="w-3 h-3" /> ADD TO CART
                 </button>
               </div>
             ))}
