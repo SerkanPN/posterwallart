@@ -1,0 +1,14 @@
+[
+  { "id": "Minimalist", "label": "Minimalist" },
+  { "id": "Bauhaus", "label": "Bauhaus" },
+  { "id": "Cyberpunk", "label": "Cyberpunk" },
+  { "id": "Renaissance", "label": "Renaissance" },
+  { "id": "Mid-Century Modern", "label": "Mid-Century Modern" },
+  { "id": "Japandi", "label": "Japandi" },
+  { "id": "Industrial", "label": "Industrial" },
+  { "id": "Boho Chic", "label": "Boho Chic" },
+  { "id": "Art Deco", "label": "Art Deco" },
+  { "id": "Nordic", "label": "Nordic" },
+  { "id": "Line Art", "label": "Line Art" },
+  { "id": "Watercolor", "label": "Watercolor" }
+]
