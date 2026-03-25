@@ -15,7 +15,16 @@ interface ConfigItem { id: string; label: string; price?: number; width?: number
 const FIXED_DEFAULT_ROOM = "https://images.unsplash.com/photo-1614359833859-457335928af0?q=80&w=1500&auto=format&fit=crop";
 const FIXED_MODEL = { id: 'runware:101@1', params: { steps: 28, CFGScale: 1, scheduler: "FlowMatchEuler" }, supportsLora: true };
 const FIXED_LORA = { model: "civitai:126208@137927", weight: 0.8 };
-
+const loadConfigs = async () => {
+  const version = new Date().getTime(); // Cache'i her seferinde kırmak için
+  try {
+    const [s, t, sz, o, f] = await Promise.all([
+      fetch(`/config/styles.json?v=${version}`).then(r => r.json()),
+      fetch(`/config/themes.json?v=${version}`).then(r => r.json()),
+      fetch(`/config/sizes.json?v=${version}`).then(r => r.json()),
+      fetch(`/config/orientations.json?v=${version}`).then(r => r.json()),
+      fetch(`/config/frames.json?v=${version}`).then(r => r.json())
+    ]);
 export function SpecialForRoom() {
   const { user, tokens, addToCart, setAuthModalOpen, useToken, accessToken, setCartOpen } = useStore();
   
