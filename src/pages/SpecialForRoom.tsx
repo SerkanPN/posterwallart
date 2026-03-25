@@ -1,81 +1,36 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Lock, Loader2, Download, Sparkles, Image as ImageIcon, History, ShoppingCart, X, Check } from 'lucide-react';
+import { Upload, Lock, Loader2, Download, Sparkles, Image as ImageIcon, History, ShoppingCart, X, Check, ChevronDown } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
 
+// --- TYPES ---
 type FrameType = 'unframed' | 'black' | 'oak';
 
 interface Product {
   id: string; title: string; basePrice: number; image: string; category: string; description: string; isGenerated?: boolean; slug?: string; thumbnail?: string; cost?: number;
 }
 
-const FIXED_DEFAULT_ROOM = "https://images.unsplash.com/photo-1583847268964-b28dc8f51f92?q=80&w=1500&auto=format&fit=crop";
+interface ConfigItem { id: string; label: string; price?: number; width?: number; height?: number; color?: string | null; }
 
+// --- CONSTANTS ---
+const FIXED_DEFAULT_ROOM = "https://images.unsplash.com/photo-1629079447841-d83b1999f0c0?q=80&w=1500&auto=format&fit=crop";
 const FIXED_MODEL = { id: 'runware:101@1', params: { steps: 28, CFGScale: 1, scheduler: "FlowMatchEuler" }, supportsLora: true };
 const FIXED_LORA = { model: "civitai:126208@137927", weight: 0.8 };
-
-const SIZES = [
-  { label: '8x10"',  price: 22, value: '8x10'  },
-  { label: '11x14"', price: 24, value: '11x14' },
-  { label: '16x20"', price: 26, value: '16x20' },
-  { label: '18x24"', price: 26, value: '18x24' },
-  { label: '20x30"', price: 39, value: '20x30' },
-  { label: '24x36"', price: 49, value: '24x36' },
-];
-
-const STYLES = ['Minimalist', 'Bauhaus', 'Cyberpunk', 'Renaissance', 'Mid-Century Modern', 'Japandi', 'Industrial', 'Boho Chic', 'Art Deco', 'Nordic', 'Line Art', 'Watercolor'];
-const THEMES = ['Nature', 'Music', 'Movie', 'Abstract', 'Cityscape', 'Space', 'Botanical', 'Architecture'];
-const FRAME_COLORS = { 'unframed': null, 'black': '#18181b', 'oak': '#8b5a2b' };
-
-const calculateAspectRatio = (sizeValue: string, orientation: 'portrait' | 'landscape') => {
-  const [w, h] = sizeValue.split('x').map(Number);
-  const common = (a: number, b: number): number => (b === 0 ? a : common(b, a % b));
-  const gcd = common(w, h);
-  return orientation === 'portrait' ? `${w / gcd}:${h / gcd}` : `${h / gcd}:${w / gcd}`;
-};
-
-const getRunwareDims = (sizeStr: string, orientation: 'portrait' | 'landscape') => {
-  const [w, h] = sizeStr.split('x').map(Number);
-  const rw = orientation === 'portrait' ? w : h;
-  const rh = orientation === 'portrait' ? h : w;
-  const MAX = 1024;
-  const snap = (v: number) => Math.floor(v / 64) * 64;
-  if (rw >= rh) return { w: MAX, h: snap((rh / rw) * MAX) };
-  return { w: snap((rw / rh) * MAX), h: MAX };
-};
-
-const base64ToUint8Array = (base64Data: string) => {
-  const parts = base64Data.split(';base64,');
-  const binaryString = atob(parts[1]);
-  const bytes = new Uint8Array(binaryString.length);
-  for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
-  return bytes;
-};
-
-const createThumbnail = (base64: string, maxWidth = 400): Promise<string> => {
-  return new Promise((resolve) => {
-    console.log("[LOG] System: Processing thumbnail creation...");
-    const img = new Image();
-    img.onload = () => {
-      const canvas = document.createElement('canvas');
-      let width = img.width;
-      let height = img.height;
-      if (width > maxWidth) { height = Math.round((height * maxWidth) / width); width = maxWidth; }
-      canvas.width = width; canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (ctx) { ctx.drawImage(img, 0, 0, width, height); resolve(canvas.toDataURL('image/jpeg', 0.8)); }
-      else resolve(base64);
-      img.src = '';
-    };
-    img.src = base64;
-  });
-};
 
 export function SpecialForRoom() {
   const { user, tokens, addToCart, setAuthModalOpen, useToken, accessToken, setCartOpen } = useStore();
   
+  // --- EXTERNAL JSON CONFIG STATES ---
+  const [configStyles, setConfigStyles] = useState<ConfigItem[]>([]);
+  const [configThemes, setConfigThemes] = useState<ConfigItem[]>([]);
+  const [configSizes, setConfigSizes] = useState<ConfigItem[]>([]);
+  const [configOrientations, setConfigOrientations] = useState<ConfigItem[]>([]);
+  const [configFrames, setConfigFrames] = useState<ConfigItem[]>([]);
+  const [isConfigLoading, setIsConfigLoading] = useState(true);
+
+  // --- UI STATES ---
   const [roomImage, setRoomImage] = useState<string | null>(null);
   const [refImage, setRefImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -83,26 +38,87 @@ export function SpecialForRoom() {
   const [isUpscalingId, setIsUpscalingId] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [selectedSize, setSelectedSize] = useState(SIZES[3]);
-  const [selectedStyle, setSelectedStyle] = useState('Default');
-  const [selectedTheme, setSelectedTheme] = useState('Default');
-  const [selectedFrame, setSelectedFrame] = useState<FrameType>('black');
-  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
-  const [includeText, setIncludeText] = useState(false);
   const [analysisData, setAnalysisData] = useState<any>(null);
 
-  const [modalProduct, setModalProduct] = useState<Product | null>(null);
-  const [modalSize, setModalSize] = useState(SIZES[3]);
+  // --- SELECTION STATES ---
+  const [selectedStyle, setSelectedStyle] = useState('Default');
+  const [selectedTheme, setSelectedTheme] = useState('Default');
+  const [selectedSizeId, setSelectedSizeId] = useState('');
+  const [selectedOrientation, setSelectedOrientation] = useState('');
+  const [selectedFrameId, setSelectedFrameId] = useState('');
+  const [includeText, setIncludeText] = useState(false);
 
-  const isInterfaceLocked = !analysisData || isAnalyzing;
+  // --- MODAL STATES ---
+  const [modalProduct, setModalProduct] = useState<Product | null>(null);
+  const [modalSizeId, setModalSizeId] = useState('');
+
+  const isInterfaceLocked = !analysisData || isAnalyzing || isConfigLoading;
+
+  // --- FETCH CONFIG FROM JSON FILES ---
+  useEffect(() => {
+    const loadConfigs = async () => {
+      console.log("[LOG] System: Fetching external configuration JSONs...");
+      try {
+        const [s, t, sz, o, f] = await Promise.all([
+          fetch('/config/styles.json').then(r => r.json()),
+          fetch('/config/themes.json').then(r => r.json()),
+          fetch('/config/sizes.json').then(r => r.json()),
+          fetch('/config/orientations.json').then(r => r.json()),
+          fetch('/config/frames.json').then(r => r.json())
+        ]);
+        setConfigStyles(s);
+        setConfigThemes(t);
+        setConfigSizes(sz);
+        setConfigOrientations(o);
+        setConfigFrames(f);
+        setSelectedSizeId(sz[3]?.id || '');
+        setSelectedOrientation(o[0]?.id || '');
+        setSelectedFrameId(f[1]?.id || f[0]?.id || '');
+        setModalSizeId(sz[3]?.id || '');
+        console.log("[LOG] System: Configuration loaded successfully");
+      } catch (error) {
+        console.error("[ERROR] System: Failed to fetch JSON configs", error);
+      } finally {
+        setIsConfigLoading(false);
+      }
+    };
+    loadConfigs();
+  }, []);
 
   useEffect(() => {
     if (!roomImage) {
-      console.log("[LOG] UI: Setting fixed studio environment");
+      console.log("[LOG] UI: Setting fixed high-end studio environment");
       setRoomImage(FIXED_DEFAULT_ROOM);
-      setAnalysisData({ ppi: 8.5, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Minimalist', suggestedSubject: 'aesthetic botanical' });
+      setAnalysisData({ ppi: 14.5, rotateY: 0, skewY: 0, detectedStyle: 'Warm Minimalist', suggestedTheme: 'Vintage', suggestedSubject: 'botanical line art' });
     }
   }, [roomImage]);
+
+  // --- HELPERS ---
+  const calculateAspectRatio = (sizeId: string, orientation: string) => {
+    const size = configSizes.find(s => s.id === sizeId);
+    if (!size || !size.width || !size.height) return "3:4";
+    const common = (a: number, b: number): number => (b === 0 ? a : common(b, a % b));
+    const gcd = common(size.width, size.height);
+    return orientation === 'portrait' ? `${size.width / gcd}:${size.height / gcd}` : `${size.height / gcd}:${size.width / gcd}`;
+  };
+
+  const getRunwareDims = (sizeId: string, orientation: string) => {
+    const size = configSizes.find(s => s.id === sizeId) || { width: 18, height: 24 };
+    const rw = orientation === 'portrait' ? size.width! : size.height!;
+    const rh = orientation === 'portrait' ? size.height! : size.width!;
+    const MAX = 1024;
+    const snap = (v: number) => Math.floor(v / 64) * 64;
+    if (rw >= rh) return { w: MAX, h: snap((rh / rw) * MAX) };
+    return { w: snap((rw / rh) * MAX), h: MAX };
+  };
+
+  const base64ToUint8Array = (base64Data: string) => {
+    const parts = base64Data.split(';base64,');
+    const binaryString = atob(parts[1]);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
+    return bytes;
+  };
 
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
     if (!user) { setAuthModalOpen(true); return; }
@@ -114,7 +130,7 @@ export function SpecialForRoom() {
       analyzeRoom(base64);
     };
     reader.readAsDataURL(file);
-    console.log("[LOG] UI: Custom room uploaded");
+    console.log("[LOG] UI: Custom environment uploaded");
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
@@ -122,14 +138,14 @@ export function SpecialForRoom() {
     const reader = new FileReader();
     reader.onload = (e) => setRefImage(e.target?.result as string);
     reader.readAsDataURL(file);
-    console.log("[LOG] UI: Style anchor uploaded");
+    console.log("[LOG] UI: Style anchor linked");
   }, []);
 
   const roomDrop = useDropzone({ onDrop: onDropRoom, accept: { 'image/*': [] }, maxFiles: 1 });
   const refDrop = useDropzone({ onDrop: onDropRef, accept: { 'image/*': [] }, maxFiles: 1 });
 
   const analyzeRoom = async (base64Image: string) => {
-    console.log("[LOG] API: Commencing architectural scan");
+    console.log("[LOG] API: Starting secure architectural scan...");
     setIsAnalyzing(true);
     try {
       const response = await fetch(`/api/gemini`, {
@@ -139,7 +155,7 @@ export function SpecialForRoom() {
           endpoint: 'gemini-flash-latest:generateContent',
           payload: {
             contents: [{ parts: [
-              { text: 'Analyze this room for scale and 3D perspective. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string", "suggestedTheme": "string", "suggestedSubject": "string" }' },
+              { text: 'Analyze this room. Return ONLY JSON: { "ppi": number, "rotateY": number, "skewY": number, "detectedStyle": "string", "suggestedTheme": "string", "suggestedSubject": "string" }' },
               { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
             ]}]
           }
@@ -149,17 +165,17 @@ export function SpecialForRoom() {
       const rawText = res.candidates[0].content.parts[0].text;
       const data = JSON.parse(rawText.replace(/```json/g, '').replace(/```/g, '').trim());
       setAnalysisData(data);
-      console.log("[LOG] API: Mapping complete");
+      console.log("[LOG] API: Mapping complete", data);
     } catch (error) {
       console.error("[ERROR] API: Analysis crash", error);
-      setAnalysisData({ ppi: 7, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Abstract', suggestedSubject: 'artwork' });
+      setAnalysisData({ ppi: 12, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Abstract', suggestedSubject: 'artwork' });
     } finally {
       setIsAnalyzing(false);
     }
   };
 
   const handleCreateForMe = async () => {
-    console.log("[LOG] Process: Production flow activated");
+    console.log("[LOG] Production: Initializing Master Artist flow...");
     if (!user || tokens <= 0 || isGenerating || !accessToken) {
       if (!user) setAuthModalOpen(true);
       return;
@@ -167,19 +183,19 @@ export function SpecialForRoom() {
 
     setIsGenerating(true);
     try {
-      const dynamicAR = calculateAspectRatio(selectedSize.value, orientation);
+      const dynamicAR = calculateAspectRatio(selectedSizeId, selectedOrientation);
       const style = selectedStyle === 'Default' ? (analysisData?.detectedStyle || "Modern") : selectedStyle;
       const theme = selectedTheme === 'Default' ? (analysisData?.suggestedTheme || "Abstract") : selectedTheme;
       const subject = analysisData?.suggestedSubject || "high-end visual";
 
-      let prompt = `You are a world-class master artist and elite visual designer specializing in premium wall art. CORE OBJECTIVE: Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders. STYLE: ${style}, THEME: ${theme}, SUBJECT: ${subject}, ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}. ${includeText ? 'Include minimal typography.' : 'NO text.'} RESOLUTION: 1024px.`;
+      let prompt = `You are a world-class master artist and elite visual designer specializing in premium wall art. CORE OBJECTIVE: Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders. STYLE: ${style}, THEME: ${theme}, SUBJECT: ${subject}, ORIENTATION: ${selectedOrientation}, ASPECT RATIO: ${dynamicAR}. ${includeText ? 'Include minimal typography.' : 'NO text.'} RESOLUTION: 1024px.`;
       
       if (refImage) {
-        prompt = `You are a master artist. Using the provided reference image as both your thematic subject and visual style guide, create an ORIGINAL and unique masterpiece. Reimagine the core subject and artistic brushwork of the reference into a fresh composition. Maintain the color palette and atmosphere but do not copy exactly. ORIENTATION: ${orientation}, ASPECT RATIO: ${dynamicAR}. High-end elite art. ${includeText ? 'Subtle typography.' : 'NO text.'}`;
+        prompt = `You are a master artist. Using the provided reference image as both your thematic subject and visual style guide, create an ORIGINAL masterpiece. Reimagine the core subject and brushwork into a fresh composition. Maintain color palette. ORIENTATION: ${selectedOrientation}, ASPECT RATIO: ${dynamicAR}. High-end elite art. ${includeText ? 'Subtle typography.' : 'NO text.'}`;
       }
 
       let finalBase64 = "";
-      console.log("[LOG] API: Fetching production clusters");
+      console.log("[LOG] API: Fetching production clusters...");
       try {
         const geminiRes = await fetch(`/api/gemini`, {
           method: "POST",
@@ -193,10 +209,10 @@ export function SpecialForRoom() {
         const b64 = gData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
         if (!b64) throw new Error("Empty engine response");
         finalBase64 = `data:image/png;base64,${b64}`;
-        console.log("[LOG] API: Primary cluster success");
+        console.log("[LOG] API: Primary engine success");
       } catch (err) {
-        console.warn("[LOG] API: Fallback mode engaged - Runware");
-        const dims = getRunwareDims(selectedSize.value, orientation);
+        console.warn("[LOG] API: Falling back to FLUX engine cluster");
+        const dims = getRunwareDims(selectedSizeId, selectedOrientation);
         const rwRes = await fetch(`/api/runware`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -215,33 +231,28 @@ export function SpecialForRoom() {
         finalBase64 = rwData.data?.[0]?.imageURL;
       }
 
-      if (!finalBase64) throw new Error("Complete cluster failure");
+      if (!finalBase64) throw new Error("All image clusters failed");
 
-      const thumbBase64 = await createThumbnail(finalBase64);
-      
-      console.log("[LOG] API: Synchronizing SEO metadata");
-      let aiMeta = { seo_title: `Exclusive ${style} Piece`, seo_description: "Art redefined.", alt_text: "AI Art", tags: [] };
-      try {
-        const seoRes = await fetch(`/api/gemini`, {
-          method: "POST", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            endpoint: 'gemini-flash-latest:generateContent',
-            payload: { contents: [{ parts: [{ text: `Generate JSON SEO for ${style} art. Use keys: seo_title, seo_description, alt_text, tags. ONLY JSON.` }] }] }
-          })
-        });
-        const rawJson = (await seoRes.json()).candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim();
-        aiMeta = JSON.parse(rawJson);
-      } catch (e) { console.error("[LOG] SEO packet skipped"); }
+      // Creating temporary thumbnail via canvas
+      const thumbB64 = await new Promise<string>((resolve) => {
+        const img = new Image(); img.src = finalBase64;
+        img.onload = () => {
+          const c = document.createElement('canvas'); c.width = 400; c.height = 400;
+          c.getContext('2d')?.drawImage(img, 0, 0, 400, 400);
+          resolve(c.toDataURL('image/jpeg', 0.8));
+        };
+      });
 
       useToken();
 
+      console.log("[LOG] API: Deployment to database...");
       const formData = new FormData();
       formData.append('action', 'generate_and_save');
       formData.append('category', style);
-      formData.append('price', selectedSize.price.toString());
-      formData.append('metadata', JSON.stringify(aiMeta));
-      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'm.png');
-      formData.append('thumbnail', new Blob([base64ToUint8Array(thumbBase64)], { type: 'image/jpeg' }), 't.jpg');
+      formData.append('price', (configSizes.find(s => s.id === selectedSizeId)?.price || 22).toString());
+      formData.append('metadata', JSON.stringify({ seo_title: `Exclusive ${style} Art` }));
+      formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'main.png');
+      formData.append('thumbnail', new Blob([base64ToUint8Array(thumbB64)], { type: 'image/jpeg' }), 't.jpg');
 
       const uploadRes = await fetch('https://api.posterwallart.shop/api.php', {
         method: 'POST',
@@ -253,11 +264,11 @@ export function SpecialForRoom() {
       if (result.success) {
         setRecommendations(p => [result.product, ...p.slice(0, 5)]);
         setSelectedProduct(result.product);
-        console.log("[LOG] System: Masterpiece deployed");
+        console.log("[LOG] System: Deployment complete");
       }
     } catch (error: any) {
-      console.error("[ERROR] Process: Production flow broken", error);
-      alert("Execution Error: " + error.message);
+      console.error("[ERROR] Process: Production broken", error);
+      alert("Error: " + error.message);
     } finally {
       setIsGenerating(false);
     }
@@ -265,19 +276,16 @@ export function SpecialForRoom() {
 
   const handleFinalAddToCart = () => {
     if (!modalProduct) return;
-    console.log("[LOG] UI: Committing to cart - Size:", modalSize.label);
-    addToCart({ 
-      ...modalProduct, 
-      price: modalSize.price, 
-      type: 'physical',
-      selectedSize: modalSize.value 
-    });
+    const sizeObj = configSizes.find(s => s.id === modalSizeId);
+    if (!sizeObj) return;
+    console.log("[LOG] UI: Committing cart sync...");
+    addToCart({ ...modalProduct, price: sizeObj.price, type: 'physical', selectedSize: sizeObj.label });
     setModalProduct(null);
     setCartOpen(true);
   };
 
   const handleUpscaleAndDownload = async (product: Product) => {
-    console.log("[LOG] API: HD Upscale requested");
+    console.log("[LOG] API: HD Upscale initiated for ID:", product.id);
     setIsUpscalingId(product.id);
     try {
       const response = await fetch('/api/upscale', {
@@ -286,7 +294,7 @@ export function SpecialForRoom() {
         body: JSON.stringify({ imageUrl: product.image })
       });
       const data = await response.json();
-      if (!data.upscaledUrl) throw new Error("API Failure");
+      if (!data.upscaledUrl) throw new Error("Empty engine response");
       const link = document.createElement('a');
       link.href = data.upscaledUrl;
       link.download = `HD_Export_${product.title}.png`;
@@ -294,120 +302,107 @@ export function SpecialForRoom() {
       document.body.appendChild(link); link.click(); document.body.removeChild(link);
       console.log("[LOG] API: HD transfer successful");
     } catch (error) {
-      console.error("[ERROR] API: HD pipeline broken", error);
-      alert("Upscale failed");
+      console.error("[ERROR] API: HD workflow broken", error);
+      alert("Upscale service temporarily down");
     } finally {
       setIsUpscalingId(null);
     }
   };
 
+  const currentSizeObj = configSizes.find(s => s.id === selectedSizeId);
+  const frameColor = configFrames.find(f => f.id === selectedFrameId)?.color || null;
+
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
       <AuthModal />
 
-      {/* DETAIL MODAL */}
+      {/* PRODUCT POPUP MODAL */}
       {modalProduct && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-zinc-950/90 backdrop-blur-xl" onClick={() => setModalProduct(null)} />
-          <div className="relative bg-zinc-900 border border-zinc-800 rounded-[40px] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col md:row shadow-2xl animate-in fade-in zoom-in-95 duration-300 flex-row">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 animate-in fade-in duration-300">
+          <div className="absolute inset-0 bg-zinc-950/95 backdrop-blur-xl" onClick={() => setModalProduct(null)} />
+          <div className="relative bg-zinc-900 border border-zinc-800 rounded-[40px] w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col md:flex-row shadow-2xl zoom-in-95 duration-300">
             <button onClick={() => setModalProduct(null)} className="absolute top-6 right-6 z-10 p-2 bg-zinc-950 rounded-full border border-zinc-800 hover:bg-zinc-800 transition-all">
               <X className="w-5 h-5" />
             </button>
             <div className="flex-1 bg-zinc-950 flex items-center justify-center p-8">
-              <img src={modalProduct.image} className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl" alt="Preview" />
+              <img src={modalProduct.image} className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl border border-zinc-800" alt="Detail" />
             </div>
-            <div className="w-full md:w-[400px] p-10 flex flex-col justify-between border-l border-zinc-800">
+            <div className="w-full md:w-[380px] p-10 flex flex-col justify-between border-l border-zinc-800">
               <div className="space-y-8">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-2">New Creation</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-500 mb-2">Marketplace Item</p>
                   <h2 className="text-3xl font-black italic tracking-tighter uppercase leading-tight">{modalProduct.title}</h2>
                 </div>
                 <div className="space-y-4">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Format Selection</label>
-                  <div className="grid grid-cols-2 gap-2">
-                    {SIZES.map(s => (
-                      <button key={s.value} onClick={() => setModalSize(s)} className={`py-3 rounded-xl border text-[10px] font-black transition-all ${modalSize.value === s.value ? 'bg-zinc-100 text-zinc-900 border-zinc-100' : 'bg-zinc-950 text-zinc-500 border-zinc-800'}`}>
-                        {s.label} • ${s.price}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="p-4 bg-zinc-950/50 rounded-2xl border border-zinc-800 space-y-2">
-                  <div className="flex items-center gap-2 text-zinc-400">
-                    <Check className="w-3 h-3 text-emerald-500" />
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Museum-Grade Printing</span>
-                  </div>
+                  <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Select Format</label>
+                  <select 
+                    value={modalSizeId} 
+                    onChange={(e) => setModalSizeId(e.target.value)} 
+                    className="w-full bg-zinc-950 border border-zinc-800 p-4 rounded-2xl text-xs font-bold outline-none"
+                  >
+                    {configSizes.map(s => <option key={s.id} value={s.id}>{s.label} — ${s.price}</option>)}
+                  </select>
                 </div>
               </div>
               <button onClick={handleFinalAddToCart} className="w-full py-5 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase rounded-2xl transition-all shadow-[0_0_30px_rgba(16,185,129,0.2)] flex items-center justify-center gap-3 mt-8">
-                <ShoppingCart className="w-5 h-5" /> ADD TO CART • ${modalSize.price}
+                <ShoppingCart className="w-5 h-5" /> ADD TO CART
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* LEFT: CONTROLS */}
-      <div className={`w-[340px] border-r border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto transition-all ${isInterfaceLocked ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+      {/* LEFT PANEL: CONTROLS */}
+      <div className={`w-[320px] border-r border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto transition-all ${isInterfaceLocked ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
         <div className="p-6 space-y-8 pb-24">
           <div>
             <h1 className="text-xl font-black italic tracking-tighter text-emerald-500 uppercase leading-none">SPECIAL FOR<br/>YOUR ROOM</h1>
-            <p className="text-[9px] text-zinc-500 font-bold tracking-widest mt-2 uppercase opacity-50">AI Design Hub v5.0</p>
+            <p className="text-[9px] text-zinc-500 font-bold tracking-widest mt-2 uppercase opacity-50 tracking-tighter">AI Studio Hub v6.0</p>
           </div>
 
-          <div className="space-y-2">
-            <button
-              onClick={handleCreateForMe}
-              disabled={isGenerating || (user && tokens <= 0) || isInterfaceLocked}
-              className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase rounded-2xl transition-all shadow-[0_0_40px_rgba(16,185,129,0.15)] disabled:opacity-20"
-            >
-              {isGenerating ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : 'MAKE ME FEEL SPECIAL'}
-            </button>
-            {user && <p className="text-center text-[9px] text-zinc-600 uppercase font-black tracking-widest">Tokens: <span className="text-emerald-500">{tokens}</span></p>}
-          </div>
+          <button
+            onClick={handleCreateForMe}
+            disabled={isGenerating || (user && tokens <= 0) || isInterfaceLocked}
+            className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase rounded-2xl transition-all shadow-[0_0_40px_rgba(16,185,129,0.15)] disabled:opacity-20 flex items-center justify-center gap-2"
+          >
+            {isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Sparkles className="w-4 h-4" /> MAKE ME SPECIAL</>}
+          </button>
 
           <div className="space-y-6">
             <div className="space-y-3">
-              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Aesthetic Tone</label>
-              <div className="grid grid-cols-1 gap-2">
-                <select value={selectedStyle} disabled={!!refImage} onChange={(e) => setSelectedStyle(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none focus:border-emerald-500 disabled:opacity-20">
-                  <option value="Default">Style: Auto (Matched)</option>
-                  {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
+              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Visual Aesthetic</label>
+              <div className="space-y-2">
+                <select value={selectedStyle} disabled={!!refImage} onChange={(e) => setSelectedStyle(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none">
+                  <option value="Default">Style: Auto Detect</option>
+                  {configStyles.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                 </select>
-                <select value={selectedTheme} disabled={!!refImage} onChange={(e) => setSelectedTheme(e.target.value)} className="bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none focus:border-emerald-500 disabled:opacity-20">
-                  <option value="Default">Theme: AI Suggest</option>
-                  {THEMES.map(t => <option key={t} value={t}>{t}</option>)}
+                <select value={selectedTheme} disabled={!!refImage} onChange={(e) => setSelectedTheme(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none">
+                  <option value="Default">Theme: Auto Suggest</option>
+                  {configThemes.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
             </div>
+
             <div className="space-y-3">
-              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Dimensions</label>
-              <div className="grid grid-cols-2 gap-2">
-                {SIZES.map(s => (
-                  <button key={s.value} onClick={() => setSelectedSize(s)} className={`py-2 rounded-xl border text-[9px] font-black transition-all ${selectedSize.value === s.value ? 'bg-zinc-100 text-zinc-900' : 'bg-zinc-900 text-zinc-500 border-zinc-800'}`}>{s.label}</button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                {(['portrait', 'landscape'] as const).map(o => (
-                  <button key={o} onClick={() => setOrientation(o)} className={`flex-1 py-2 text-[9px] font-black rounded-xl border capitalize ${orientation === o ? 'bg-zinc-800 text-white' : 'bg-zinc-950 text-zinc-600 border-zinc-800'}`}>{o}</button>
-                ))}
+              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Physical Settings</label>
+              <div className="space-y-2">
+                <select value={selectedSizeId} onChange={(e) => setSelectedSizeId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none">
+                  {configSizes.map(s => <option key={s.id} value={s.id}>{s.label} • ${s.price}</option>)}
+                </select>
+                <select value={selectedOrientation} onChange={(e) => setSelectedOrientation(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none">
+                  {configOrientations.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+                <select value={selectedFrameId} onChange={(e) => setSelectedFrameId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none">
+                  {configFrames.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                </select>
               </div>
             </div>
-            <div className="space-y-3">
-              <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Finishing</label>
-              <div className="flex gap-2">
-                {(['unframed', 'black', 'oak'] as FrameType[]).map(f => (
-                  <button key={f} onClick={() => setSelectedFrame(f)} className={`flex-1 py-2 rounded-xl border flex items-center justify-center ${selectedFrame === f ? 'bg-zinc-800 border-zinc-600' : 'bg-zinc-950 border-zinc-800'}`}>
-                    <div className="w-2.5 h-2.5 rounded-full border border-zinc-700" style={{ backgroundColor: FRAME_COLORS[f] || '#fff' }}></div>
-                  </button>
-                ))}
-              </div>
-              <div className="flex items-center justify-between p-3 bg-zinc-900 rounded-xl border border-zinc-800">
-                <span className="text-[10px] font-bold">Typography?</span>
-                <button onClick={() => setIncludeText(!includeText)} className={`w-8 h-4 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
-                  <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-0.5' : 'left-0.5'}`} />
-                </button>
-              </div>
+
+            <div className="flex items-center justify-between p-4 bg-zinc-900 rounded-xl border border-zinc-800">
+              <span className="text-[10px] font-bold uppercase text-zinc-400">Typography?</span>
+              <button onClick={() => setIncludeText(!includeText)} className={`w-8 h-4 rounded-full transition-all ${includeText ? 'bg-emerald-600' : 'bg-zinc-700'} relative`}>
+                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${includeText ? 'right-0.5' : 'left-0.5'}`} />
+              </button>
             </div>
           </div>
         </div>
@@ -418,42 +413,39 @@ export function SpecialForRoom() {
         <div className="flex gap-4 h-32">
           <div {...roomDrop.getRootProps()} className="flex-1 border-2 border-dashed border-zinc-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/50 transition-all group relative overflow-hidden bg-zinc-900/20">
             <input {...roomDrop.getInputProps()} />
-            {roomImage && roomImage.startsWith('data') ? (
+            {roomImage && roomImage.startsWith('http') === false ? (
               <img src={roomImage} className="absolute inset-0 w-full h-full object-cover opacity-30" alt="Room" />
             ) : null}
-            <div className="relative z-10 flex flex-col items-center">
-              <Upload className="w-6 h-6 text-zinc-600 mb-1 group-hover:text-emerald-500" />
-              <p className="text-[8px] font-black uppercase tracking-widest text-zinc-500">1. UPLOAD YOUR ROOM</p>
-            </div>
+            <Upload className="w-6 h-6 text-zinc-600 mb-1 group-hover:text-emerald-500 relative z-10" />
+            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-500 relative z-10">1. UPLOAD YOUR ROOM</p>
           </div>
           <div {...refDrop.getRootProps()} className="flex-1 border-2 border-dashed border-zinc-800 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-zinc-900/50 transition-all group relative overflow-hidden bg-zinc-900/20">
             <input {...refDrop.getInputProps()} />
             {refImage ? (
               <div className="absolute inset-0">
                 <img src={refImage} className="w-full h-full object-cover opacity-40" alt="Ref" />
-                <button onClick={(e) => { e.stopPropagation(); setRefImage(null); }} className="absolute top-1 right-1 bg-red-500/80 p-1 rounded-md text-[7px] font-black uppercase">RESET</button>
+                <button onClick={(e) => { e.stopPropagation(); setRefImage(null); }} className="absolute top-1 right-1 bg-red-500/80 p-1 rounded-md text-[7px] font-black">RESET</button>
               </div>
             ) : null}
-            <div className="relative z-10 flex flex-col items-center">
-              <ImageIcon className="w-6 h-6 text-zinc-600 mb-1 group-hover:text-blue-500" />
-              <p className="text-[8px] font-black uppercase tracking-widest text-zinc-500">2. UPLOAD REFERENCE</p>
-            </div>
+            <ImageIcon className="w-6 h-6 text-zinc-600 mb-1 group-hover:text-blue-500 relative z-10" />
+            <p className="text-[8px] font-black uppercase tracking-widest text-zinc-500 relative z-10">2. UPLOAD REFERENCE</p>
           </div>
         </div>
-        <div className="flex-1 relative rounded-[32px] overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl">
+
+        <div className="flex-1 relative rounded-[32px] overflow-hidden bg-zinc-900 border border-zinc-800 shadow-2xl shadow-black/50">
           {isAnalyzing ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-zinc-950/90 z-30 backdrop-blur-xl">
               <div className="w-12 h-12 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-              <p className="font-black text-[9px] uppercase tracking-[0.3em] text-emerald-500">Architectural Scanning...</p>
+              <p className="font-black text-[9px] uppercase tracking-[0.3em] text-emerald-500">Decoding Room Geometry...</p>
             </div>
           ) : (
             <InteractiveCanvas
               backgroundImage={roomImage || ""}
               mountedArt={selectedProduct?.thumbnail || selectedProduct?.image || null}
-              physicalWidth={orientation === 'portrait' ? selectedSize.value.split('x').map(Number)[0] : selectedSize.value.split('x').map(Number)[1]}
-              physicalHeight={orientation === 'portrait' ? selectedSize.value.split('x').map(Number)[1] : selectedSize.value.split('x').map(Number)[0]}
-              naturalPixelsPerInch={analysisData?.ppi || 7}
-              frameColor={(FRAME_COLORS as any)[selectedFrame]}
+              physicalWidth={selectedOrientation === 'portrait' ? (currentSizeObj?.width || 18) : (currentSizeObj?.height || 24)}
+              physicalHeight={selectedOrientation === 'portrait' ? (currentSizeObj?.height || 24) : (currentSizeObj?.width || 18)}
+              naturalPixelsPerInch={analysisData?.ppi || 14.5}
+              frameColor={frameColor}
               perspective={{ rotateY: analysisData?.rotateY || 0, skewY: analysisData?.skewY || 0 }}
             />
           )}
@@ -468,15 +460,15 @@ export function SpecialForRoom() {
             <h2 className="text-[10px] font-black uppercase tracking-[0.2em] text-zinc-500">HISTORY</h2>
           </div>
           <div className="space-y-4">
-            {recommendations.length === 0 && <p className="text-[9px] text-zinc-700 italic text-center py-10 font-bold uppercase tracking-tighter">Ready for magic</p>}
+            {recommendations.length === 0 && <p className="text-[9px] text-zinc-700 italic text-center py-10 font-black uppercase tracking-widest">No Creations</p>}
             {recommendations.map((p) => (
               <div key={p.id} className={`p-2 border rounded-2xl cursor-pointer transition-all ${selectedProduct?.id === p.id ? 'border-emerald-500 bg-zinc-900' : 'border-zinc-900 hover:bg-zinc-900/40'}`} onClick={() => setSelectedProduct(p)}>
-                <img src={p.thumbnail || p.image} className="w-full aspect-square rounded-xl object-cover mb-2 border border-zinc-800 shadow-sm" alt="Creation" />
+                <img src={p.thumbnail || p.image} className="w-full aspect-square rounded-xl object-cover mb-2 border border-zinc-800" alt="Res" />
                 <div className="flex flex-col gap-1.5">
-                  <button onClick={(e) => { e.stopPropagation(); setModalProduct(p); setModalSize(SIZES[3]); }} className="w-full py-2 bg-emerald-600/10 text-emerald-500 text-[8px] font-black uppercase rounded-lg hover:bg-emerald-600 hover:text-white transition-all flex items-center justify-center gap-2">
+                  <button onClick={(e) => { e.stopPropagation(); setModalProduct(p); }} className="w-full py-2 bg-emerald-600/10 text-emerald-500 text-[8px] font-black uppercase rounded-lg flex items-center justify-center gap-2 hover:bg-emerald-600 hover:text-white transition-all">
                     <ShoppingCart className="w-3 h-3" /> ADD TO CART
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); handleUpscaleAndDownload(p); }} disabled={isUpscalingId === p.id} className="w-full py-1.5 text-zinc-500 hover:text-zinc-200 text-[8px] font-black uppercase flex items-center justify-center gap-1">
+                  <button onClick={(e) => { e.stopPropagation(); handleUpscaleAndDownload(p); }} disabled={isUpscalingId === p.id} className="w-full py-1.5 text-zinc-500 text-[8px] font-black uppercase flex items-center justify-center gap-1 hover:text-white transition-colors">
                     {isUpscalingId === p.id ? <Loader2 className="w-2 h-2 animate-spin" /> : <Download className="w-2 h-2" />}
                     {isUpscalingId === p.id ? 'PROCESSING...' : 'HD DOWNLOAD'}
                   </button>
