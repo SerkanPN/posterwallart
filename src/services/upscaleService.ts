@@ -23,7 +23,7 @@ export async function getUpscaledImage(
   }
 
   // 2. Call Vercel upscale endpoint
-  console.log('[Upscale] No cache — calling Replicate...');
+  console.log('[Upscale] No cache — calling API...');
   const upscaleRes = await fetch('/api/upscale', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
