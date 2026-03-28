@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, Loader2, Download, Sparkles, Image as ImageIcon, History, ShoppingCart, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
@@ -261,7 +261,7 @@ export function SpecialForRoom() {
                 <div className="space-y-4">
                   <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Choose Format</label>
                   <select value={modalSizeId} onChange={(e) => setModalSizeId(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 p-4 rounded-2xl text-xs font-bold outline-none">
-                    {SIZES.map(s => <option key={s.id} value={s.id}>{s.label} — ${s.price}</option>)}
+                    {SIZES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                   </select>
                 </div>
               </div>
@@ -295,7 +295,7 @@ export function SpecialForRoom() {
               <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Physical Format</label>
               <div className="space-y-2">
                 <select value={selectedSizeId} onChange={(e) => setSelectedSizeId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none focus:border-emerald-500 transition-colors">
-                  {SIZES.map(s => <option key={s.id} value={s.id}>{s.label} • ${s.price}</option>)}
+                  {SIZES.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
                 </select>
                 <select value={selectedOrientationId} onChange={(e) => setSelectedOrientationId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none focus:border-emerald-500 transition-colors">
                   {ORIENTATIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
