@@ -1,104 +1,77 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
-import { Upload, Lock, Loader2, Download, Sparkles, Image as ImageIcon, History, ShoppingCart, X, Check } from 'lucide-react';
+import { Upload, Loader2, Download, Sparkles, Image as ImageIcon, History, ShoppingCart, X } from 'lucide-react';
 import { useStore } from '../store/useStore';
 import { InteractiveCanvas } from '../components/InteractiveCanvas';
 import { AuthModal } from '../components/AuthModal';
-
 
 // --- TYPES ---
 interface Product {
   id: string; title: string; basePrice: number; image: string; category: string; description: string; isGenerated?: boolean; slug?: string; thumbnail?: string; cost?: number;
 }
-interface ConfigItem { id: string; label: string; price?: number; width?: number; height?: number; color?: string | null; }
 
-// --- CONSTANTS ---
-const FIXED_DEFAULT_ROOM = "https://images.unsplash.com/photo-1614359833859-457335928af0?q=80&w=1500&auto=format&fit=crop";
+// --- STATIC CONFIGURATIONS (Prevents White Screen Crashes) ---
+const SIZES = [
+  { id: "8x10", label: '8x10"', price: 22, width: 8, height: 10 },
+  { id: "11x14", label: '11x14"', price: 24, width: 11, height: 14 },
+  { id: "16x20", label: '16x20"', price: 26, width: 16, height: 20 },
+  { id: "18x24", label: '18x24"', price: 26, width: 18, height: 24 },
+  { id: "20x30", label: '20x30"', price: 39, width: 20, height: 30 },
+  { id: "24x36", label: '24x36"', price: 49, width: 24, height: 36 }
+];
+
+const STYLES = ["Minimalist", "Bauhaus", "Cyberpunk", "Renaissance", "Mid-Century Modern", "Japandi", "Industrial", "Boho Chic", "Art Deco", "Nordic", "Line Art", "Watercolor"];
+const THEMES = ["Nature", "Music", "Movie", "Abstract", "Cityscape", "Space", "Botanical", "Architecture"];
+
+const FRAMES = [
+  { id: "unframed", label: "No Frame", color: null },
+  { id: "black", label: "Black Gallery Frame", color: "#18181b" },
+  { id: "oak", label: "Natural Oak Frame", color: "#8b5a2b" }
+];
+
+const ORIENTATIONS = [
+  { id: "portrait", label: "Portrait" },
+  { id: "landscape", label: "Landscape" }
+];
+
+const DEFAULT_ROOMS = [
+  "https://images.unsplash.com/photo-1616489953149-8356952814b1?q=80&w=1500&auto=format&fit=crop",
+  "https://images.unsplash.com/photo-1586023492125-27b2c045efd7?q=80&w=1500&auto=format&fit=crop"
+];
+
 const FIXED_MODEL = { id: 'runware:101@1', params: { steps: 28, CFGScale: 1, scheduler: "FlowMatchEuler" }, supportsLora: true };
 const FIXED_LORA = { model: "civitai:126208@137927", weight: 0.8 };
 
 export function SpecialForRoom() {
-  const { user, tokens, addToCart, setAuthModalOpen, useToken, accessToken, setCartOpen } = useStore();
+  const { user, tokens, addToCart, setAuthModalOpen, useToken, accessToken } = useStore();
   
-  // --- CONFIG STATES (NO HARDCODED LISTS) ---
-  const [configStyles, setConfigStyles] = useState<ConfigItem[]>([]);
-  const [configThemes, setConfigThemes] = useState<ConfigItem[]>([]);
-  const [configSizes, setConfigSizes] = useState<ConfigItem[]>([]);
-  const [configOrientations, setConfigOrientations] = useState<ConfigItem[]>([]);
-  const [configFrames, setConfigFrames] = useState<ConfigItem[]>([]);
-  const [isConfigLoading, setIsConfigLoading] = useState(true);
-
   // --- UI STATES ---
-  const [roomImage, setRoomImage] = useState<string | null>(null);
+  const [roomImage, setRoomImage] = useState<string>(DEFAULT_ROOMS[0]);
   const [refImage, setRefImage] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUpscalingId, setIsUpscalingId] = useState<string | null>(null);
   const [recommendations, setRecommendations] = useState<Product[]>([]);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [analysisData, setAnalysisData] = useState<any>(null);
+  
+  // Güvenli başlangıç değerleri (Sayfa çökmesini engeller)
+  const [analysisData, setAnalysisData] = useState({ ppi: 15.0, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Abstract', suggestedSubject: 'aesthetic piece' });
 
   // --- SELECTION STATES ---
   const [selectedStyle, setSelectedStyle] = useState('Default');
   const [selectedTheme, setSelectedTheme] = useState('Default');
-  const [selectedSizeId, setSelectedSizeId] = useState('');
-  const [selectedOrientationId, setSelectedOrientationId] = useState('');
-  const [selectedFrameId, setSelectedFrameId] = useState('');
+  const [selectedSizeId, setSelectedSizeId] = useState(SIZES[3].id); // 18x24 varsayılan
+  const [selectedOrientationId, setSelectedOrientationId] = useState(ORIENTATIONS[0].id);
+  const [selectedFrameId, setSelectedFrameId] = useState(FRAMES[1].id); // Siyah çerçeve varsayılan
   const [includeText, setIncludeText] = useState(false);
 
   // --- MODAL STATES ---
   const [modalProduct, setModalProduct] = useState<Product | null>(null);
-  const [modalSizeId, setModalSizeId] = useState('');
-
-  // Critical: Interface stays locked until analysis is done OR configs are missing
-  const isInterfaceLocked = isConfigLoading || isAnalyzing || !analysisData;
-
-  // --- 1. FETCH CONFIG FROM PUBLIC/CONFIG/*.JSON ---
-  useEffect(() => {
-    const loadConfigs = async () => {
-      console.log("[LOG] System: Syncing configuration from JSON storage...");
-      try {
-        const [s, t, sz, o, f] = await Promise.all([
-          fetch('/config/styles.json').then(r => r.json()),
-          fetch('/config/themes.json').then(r => r.json()),
-          fetch('/config/sizes.json').then(r => r.json()),
-          fetch('/config/orientations.json').then(r => r.json()),
-          fetch('/config/frames.json').then(r => r.json())
-        ]);
-        setConfigStyles(s);
-        setConfigThemes(t);
-        setConfigSizes(sz);
-        setConfigOrientations(o);
-        setConfigFrames(f);
-        
-        // Dynamic Default Assignments
-        if (sz.length > 0) { setSelectedSizeId(sz[3]?.id || sz[0].id); setModalSizeId(sz[3]?.id || sz[0].id); }
-        if (o.length > 0) setSelectedOrientationId(o[0].id);
-        if (f.length > 0) setSelectedFrameId(f[1]?.id || f[0].id);
-        
-        console.log("[LOG] System: Configuration sync complete");
-      } catch (error) {
-        console.error("[ERROR] System: Critical JSON fetch failure. Dropdowns will be empty.", error);
-      } finally {
-        setIsConfigLoading(false);
-      }
-    };
-    loadConfigs();
-  }, []);
-
-  // --- 2. INITIALIZE ROOM ---
-  useEffect(() => {
-    if (!roomImage) {
-      console.log("[LOG] UI: Waiting for user input, using default record studio base");
-      setRoomImage(FIXED_DEFAULT_ROOM);
-      setAnalysisData({ ppi: 15.0, rotateY: 0, skewY: 0, detectedStyle: 'Warm Minimalist', suggestedTheme: 'Aesthetic', suggestedSubject: 'vintage vibes' });
-    }
-  }, [roomImage]);
+  const [modalSizeId, setModalSizeId] = useState(SIZES[3].id);
 
   // --- HELPERS ---
   const calculateAspectRatio = (sizeId: string, orientationId: string) => {
-    const size = configSizes.find(s => s.id === sizeId);
-    if (!size || !size.width || !size.height) return "3:4";
+    const size = SIZES.find(s => s.id === sizeId) || SIZES[3];
     const common = (a: number, b: number): number => (b === 0 ? a : common(b, a % b));
     const gcd = common(size.width, size.height);
     return orientationId === 'portrait' ? `${size.width / gcd}:${size.height / gcd}` : `${size.height / gcd}:${size.width / gcd}`;
@@ -106,7 +79,7 @@ export function SpecialForRoom() {
 
   const base64ToUint8Array = (base64Data: string) => {
     const parts = base64Data.split(';base64,');
-    const binaryString = atob(parts[1]);
+    const binaryString = atob(parts[1] || parts[0]);
     const bytes = new Uint8Array(binaryString.length);
     for (let i = 0; i < binaryString.length; i++) bytes[i] = binaryString.charCodeAt(i);
     return bytes;
@@ -116,6 +89,7 @@ export function SpecialForRoom() {
   const onDropRoom = useCallback((acceptedFiles: File[]) => {
     if (!user) { setAuthModalOpen(true); return; }
     const file = acceptedFiles[0];
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => {
       const base64 = e.target?.result as string;
@@ -123,15 +97,14 @@ export function SpecialForRoom() {
       analyzeRoom(base64);
     };
     reader.readAsDataURL(file);
-    console.log("[LOG] UI: New room image processing...");
   }, [user, setAuthModalOpen]);
 
   const onDropRef = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
+    if (!file) return;
     const reader = new FileReader();
     reader.onload = (e) => setRefImage(e.target?.result as string);
     reader.readAsDataURL(file);
-    console.log("[LOG] UI: Style reference anchor set");
   }, []);
 
   const roomDrop = useDropzone({ onDrop: onDropRoom, accept: { 'image/*': [] }, maxFiles: 1 });
@@ -156,9 +129,8 @@ export function SpecialForRoom() {
       const res = await response.json();
       const data = JSON.parse(res.candidates[0].content.parts[0].text.replace(/```json/g, '').replace(/```/g, '').trim());
       setAnalysisData(data);
-      console.log("[LOG] API: Architectural metadata verified");
     } catch (error) {
-      console.error("[ERROR] API: Analysis crash, using default matrix");
+      console.error("[ERROR] Analysis crash, using default matrix", error);
       setAnalysisData({ ppi: 12, rotateY: 0, skewY: 0, detectedStyle: 'Modern', suggestedTheme: 'Abstract', suggestedSubject: 'piece' });
     } finally {
       setIsAnalyzing(false);
@@ -171,14 +143,13 @@ export function SpecialForRoom() {
       return;
     }
     setIsGenerating(true);
-    console.log("[LOG] Process: Production flow started");
 
     try {
-      const sizeObj = configSizes.find(s => s.id === selectedSizeId);
+      const sizeObj = SIZES.find(s => s.id === selectedSizeId) || SIZES[3];
       const dynamicAR = calculateAspectRatio(selectedSizeId, selectedOrientationId);
-      const style = selectedStyle === 'Default' ? (analysisData?.detectedStyle || "Modern") : selectedStyle;
-      const theme = selectedTheme === 'Default' ? (analysisData?.suggestedTheme || "Abstract") : selectedTheme;
-      const subject = analysisData?.suggestedSubject || "artwork";
+      const style = selectedStyle === 'Default' ? analysisData.detectedStyle : selectedStyle;
+      const theme = selectedTheme === 'Default' ? analysisData.suggestedTheme : selectedTheme;
+      const subject = analysisData.suggestedSubject;
 
       let prompt = `You are a world-class master artist and elite visual designer specializing in premium wall art. CORE OBJECTIVE: Create a visually stunning, ultra-detailed, high-end wall art composition that fully utilizes the canvas with ZERO empty borders. STYLE: ${style}, THEME: ${theme}, SUBJECT: ${subject}, ORIENTATION: ${selectedOrientationId}, ASPECT RATIO: ${dynamicAR}. ${includeText ? 'Include minimal typography.' : 'NO text.'} RESOLUTION: 1024px.`;
       
@@ -196,9 +167,7 @@ export function SpecialForRoom() {
         const b64 = gData.candidates?.[0]?.content?.parts?.find((p: any) => p.inlineData)?.inlineData?.data;
         if (!b64) throw new Error("API Null response");
         finalBase64 = `data:image/png;base64,${b64}`;
-        console.log("[LOG] API: Genesis successful");
       } catch (e) {
-        console.warn("[LOG] API: Fallback cluster engaged - Runware");
         const rwRes = await fetch(`/api/runware`, {
           method: "POST", headers: { "Content-Type": "application/json" },
           body: JSON.stringify([{ taskType: "imageInference", taskUUID: crypto.randomUUID(), model: FIXED_MODEL.id, positivePrompt: prompt, width: 1024, height: 1024, numberResults: 1, outputType: "dataURI", outputFormat: "PNG", ...FIXED_MODEL.params, lora: [FIXED_LORA] }])
@@ -209,7 +178,7 @@ export function SpecialForRoom() {
 
       if (!finalBase64) throw new Error("All image clusters failed");
 
-      // Creating temporary thumbnail
+      // Thumbnail
       const thumbB64 = await new Promise<string>((resolve) => {
         const img = new Image(); img.src = finalBase64;
         img.onload = () => {
@@ -224,7 +193,7 @@ export function SpecialForRoom() {
       const formData = new FormData();
       formData.append('action', 'generate_and_save');
       formData.append('category', style);
-      formData.append('price', (sizeObj?.price || 22).toString());
+      formData.append('price', sizeObj.price.toString());
       formData.append('metadata', JSON.stringify({ seo_title: `Custom ${style} Art` }));
       formData.append('mainImage', new Blob([base64ToUint8Array(finalBase64)], { type: 'image/png' }), 'm.png');
       formData.append('thumbnail', new Blob([base64ToUint8Array(thumbB64)], { type: 'image/jpeg' }), 't.jpg');
@@ -239,10 +208,8 @@ export function SpecialForRoom() {
       if (result.success) {
         setRecommendations(p => [result.product, ...p.slice(0, 5)]);
         setSelectedProduct(result.product);
-        console.log("[LOG] System: Masterpiece live");
       }
     } catch (error: any) {
-      console.error("[ERROR] Production failed:", error);
       alert("Execution error: " + error.message);
     } finally {
       setIsGenerating(false);
@@ -251,11 +218,10 @@ export function SpecialForRoom() {
 
   const handleFinalAddToCart = () => {
     if (!modalProduct) return;
-    const sizeObj = configSizes.find(s => s.id === modalSizeId);
+    const sizeObj = SIZES.find(s => s.id === modalSizeId);
     if (!sizeObj) return;
-    addToCart({ ...modalProduct, price: sizeObj.price, type: 'physical', selectedSize: sizeObj.label });
+    addToCart({ ...modalProduct, price: sizeObj.price, type: 'physical' });
     setModalProduct(null);
-    setCartOpen(true);
   };
 
   const handleUpscaleAndDownload = async (product: Product) => {
@@ -275,8 +241,8 @@ export function SpecialForRoom() {
     }
   };
 
-  const currentSizeObj = configSizes.find(s => s.id === selectedSizeId);
-  const frameColor = configFrames.find(f => f.id === selectedFrameId)?.color || null;
+  const currentSizeObj = SIZES.find(s => s.id === selectedSizeId) || SIZES[3];
+  const frameColor = FRAMES.find(f => f.id === selectedFrameId)?.color || null;
 
   return (
     <div className="flex h-[calc(100vh-4rem)] bg-zinc-950 text-zinc-50 overflow-hidden font-sans">
@@ -295,7 +261,7 @@ export function SpecialForRoom() {
                 <div className="space-y-4">
                   <label className="text-[10px] font-black uppercase tracking-widest text-zinc-500">Choose Format</label>
                   <select value={modalSizeId} onChange={(e) => setModalSizeId(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 p-4 rounded-2xl text-xs font-bold outline-none">
-                    {configSizes.map(s => <option key={s.id} value={s.id}>{s.label} — ${s.price}</option>)}
+                    {SIZES.map(s => <option key={s.id} value={s.id}>{s.label} — ${s.price}</option>)}
                   </select>
                 </div>
               </div>
@@ -306,10 +272,10 @@ export function SpecialForRoom() {
       )}
 
       {/* LEFT: CONTROLS */}
-      <div className={`w-[320px] border-r border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto transition-all ${isInterfaceLocked ? 'opacity-40 pointer-events-none' : 'opacity-100'}`}>
+      <div className={`w-[320px] border-r border-zinc-800 bg-zinc-950 flex flex-col h-full overflow-y-auto transition-all`}>
         <div className="p-6 space-y-8 pb-24">
           <div><h1 className="text-xl font-black italic tracking-tighter text-emerald-500 uppercase leading-none">SPECIAL FOR<br/>YOUR ROOM</h1><p className="text-[9px] text-zinc-500 font-bold tracking-widest mt-2 uppercase opacity-50">Studio AI v8.5</p></div>
-          <button onClick={handleCreateForMe} disabled={isGenerating || (user && tokens <= 0) || isInterfaceLocked} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase rounded-2xl transition-all shadow-[0_0_40px_rgba(16,185,129,0.15)] disabled:opacity-20 flex items-center justify-center gap-2">{isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Sparkles className="w-4 h-4" /> MAKE ME SPECIAL</>}</button>
+          <button onClick={handleCreateForMe} disabled={isGenerating || (user && tokens <= 0)} className="w-full py-4 bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase rounded-2xl transition-all shadow-[0_0_40px_rgba(16,185,129,0.15)] disabled:opacity-20 flex items-center justify-center gap-2">{isGenerating ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Sparkles className="w-4 h-4" /> MAKE ME SPECIAL</>}</button>
           
           <div className="space-y-6">
             <div className="space-y-4">
@@ -317,11 +283,11 @@ export function SpecialForRoom() {
               <div className="space-y-2">
                 <select value={selectedStyle} disabled={!!refImage} onChange={(e) => setSelectedStyle(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none focus:border-emerald-500 transition-colors">
                   <option value="Default">Style: Auto Detect</option>
-                  {configStyles.map(s => <option key={s.id} value={s.id}>{s.label}</option>)}
+                  {STYLES.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
                 <select value={selectedTheme} disabled={!!refImage} onChange={(e) => setSelectedTheme(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none focus:border-emerald-500 transition-colors">
                   <option value="Default">Theme: Auto Suggest</option>
-                  {configThemes.map(t => <option key={t} value={t}>{t}</option>)}
+                  {THEMES.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
             </div>
@@ -329,13 +295,13 @@ export function SpecialForRoom() {
               <label className="text-[9px] font-black uppercase tracking-widest text-zinc-500">Physical Format</label>
               <div className="space-y-2">
                 <select value={selectedSizeId} onChange={(e) => setSelectedSizeId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none focus:border-emerald-500 transition-colors">
-                  {configSizes.map(s => <option key={s.id} value={s.id}>{s.label} • ${s.price}</option>)}
+                  {SIZES.map(s => <option key={s.id} value={s.id}>{s.label} • ${s.price}</option>)}
                 </select>
                 <select value={selectedOrientationId} onChange={(e) => setSelectedOrientationId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none focus:border-emerald-500 transition-colors">
-                  {configOrientations.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                  {ORIENTATIONS.map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
                 </select>
                 <select value={selectedFrameId} onChange={(e) => setSelectedFrameId(e.target.value)} className="w-full bg-zinc-900 border border-zinc-800 p-3 rounded-xl text-[11px] font-bold outline-none focus:border-emerald-500 transition-colors">
-                  {configFrames.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+                  {FRAMES.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
                 </select>
               </div>
             </div>
