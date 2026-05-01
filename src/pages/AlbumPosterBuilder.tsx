@@ -101,7 +101,7 @@ export default function AlbumPosterBuilder() {
           .btn-dark { background: #161622; border: 1px solid #2b2b3d; }
           .btn-dark:hover { background: #1e1e2d; }
           .main-view { flex: 1; display: flex; flex-direction: column; position: relative; }
-          #top-bar { display: flex; justify-content: space-between; align-items: center; padding: 25px 40px; flex-shrink: 0; z-index: 50; }
+          #top-bar { display: flex; justify-content: space-between; align-items: center; padding: 25px 40px; flex-shrink: 0; z-index: 50; width: 100%; }
           .glitch-text { margin: 0; font-family: 'Montserrat', sans-serif; font-size: 2.4rem; font-weight: 900; color: #fff; letter-spacing: -0.5px; text-transform: uppercase; text-shadow: 2px 0 0 #ff003c, -2px 0 0 #00eaff; }
           .top-bar-left p { margin: 2px 0 0 0; color: var(--accent); font-style: italic; font-weight: 600; font-size: 0.9rem; }
           .view-toggle { display: flex; background: var(--bg-sidebar); border-radius: 50px; padding: 5px; border: 1px solid var(--border-color); }
@@ -681,7 +681,6 @@ export default function AlbumPosterBuilder() {
                 w.variantStates[key] = w.canvas.toJSON(w.PROPS_TO_SAVE);
                 
                 try {
-                    // YENI GÜNCELLEME: Burada sadece galeri gorselleri uretiliyor (multiplier artirildi)
                     const previewUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 0.8, multiplier: 0.4 });
                     variantsData.push({ layout: l, theme: t_theme, url: previewUrl, key: key });
                 } catch(e) {
@@ -985,13 +984,13 @@ export default function AlbumPosterBuilder() {
                             id: `custom_pro_${w.activeAlbumData.id}_${v.key}_${Date.now()}_${index}`,
                             name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} (${v.layout} - ${v.theme})`,
                             price: 29.99,
-                            image: w.activeAlbumData.cover_xl, // RAW URL
+                            image: w.activeAlbumData.cover_xl, 
                             type: 'custom_pro_album',
                             metadata: {
                                 format: w.currentFormat,
                                 layout: v.layout,
                                 theme: v.theme,
-                                designState: w.variantStates[v.key] // JSON payload
+                                designState: w.variantStates[v.key]
                             }
                         });
                     });
@@ -1001,13 +1000,13 @@ export default function AlbumPosterBuilder() {
                         id: `custom_pro_${w.activeAlbumData.id}_${Date.now()}`,
                         name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} Poster`,
                         price: 29.99,
-                        image: w.activeAlbumData.cover_xl, // RAW URL
+                        image: w.activeAlbumData.cover_xl, 
                         type: 'custom_pro_album',
                         metadata: {
                             format: w.currentFormat,
                             layout: (document.getElementById('layoutSelect') as HTMLSelectElement).value,
                             theme: (document.getElementById('themeSelect') as HTMLSelectElement).value,
-                            designState: w.canvas.toJSON(w.PROPS_TO_SAVE) // JSON payload
+                            designState: w.canvas.toJSON(w.PROPS_TO_SAVE)
                         }
                     });
                     alert("Added to cart successfully!");
@@ -1130,24 +1129,31 @@ export default function AlbumPosterBuilder() {
 
         {/* MAIN VIEW (CANVAS) */}
         <div className="main-view">
-            <div id="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '25px 40px' }}>
-                <div className="top-bar-left">
+            <div id="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '25px 40px', width: '100%' }}>
+                {/* Left Side */}
+                <div className="top-bar-left" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
                     <h2 id="top_title" className="glitch-text">DESIGNER</h2>
                     <p id="top_subtitle" style={{ margin: '2px 0 0 0', color: 'var(--accent)', fontStyle: 'italic', fontWeight: 600, fontSize: '0.9rem' }}>Make your music visual.</p>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <div className="view-toggle">
-                        <button onClick={() => (window as any).showVariantsView()} id="btn-show-gallery" className="toggle-btn active">GALLERY</button>
-                        <button onClick={() => (window as any).showSingleEditor()} id="btn-show-editor" className="toggle-btn">EDITOR</button>
-                    </div>
+                
+                {/* Center Side */}
+                <div style={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
                     <button 
                         className="sidebar-download-btn" 
-                        style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "10px 25px", fontSize: "0.85rem", width: "auto", margin: 0, borderRadius: "50px" }} 
+                        style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "12px 30px", fontSize: "0.9rem", width: "auto", margin: 0, borderRadius: "50px", boxShadow: "0 4px 15px rgba(29, 185, 84, 0.3)" }} 
                         onClick={() => (window as any).handleAddToCart()}
                     >
                         <i className="fas fa-shopping-cart" style={{ marginRight: "8px" }}></i> 
                         ADD TO CART
                     </button>
+                </div>
+
+                {/* Right Side */}
+                <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                    <div className="view-toggle">
+                        <button onClick={() => (window as any).showVariantsView()} id="btn-show-gallery" className="toggle-btn active">GALLERY</button>
+                        <button onClick={() => (window as any).showSingleEditor()} id="btn-show-editor" className="toggle-btn">EDITOR</button>
+                    </div>
                 </div>
             </div>
             
