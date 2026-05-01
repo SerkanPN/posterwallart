@@ -225,12 +225,6 @@ export default function AlbumPosterBuilder() {
         w.toggleGridVisuals(); 
     };
 
-    (document.getElementById('formatSelect') as HTMLSelectElement).value = 'a2';
-    w.rescale((document.getElementById('zoom-slider') as HTMLInputElement).value);
-    (document.getElementById('frameColorPicker') as HTMLInputElement).value = "#f5f5f5";
-    w.updateFrameColor("#f5f5f5"); 
-    w.showVariantsView(); 
-
     w.executeDeezerSearch = function() {
         const q = (document.getElementById('query') as HTMLInputElement).value; 
         if(!q) return;
@@ -312,7 +306,7 @@ export default function AlbumPosterBuilder() {
         else { alert("Please upload an image first."); } 
     };
 
-    document.getElementById('qrFileUpload')!.addEventListener('change', function(e: any) {
+    document.getElementById('qrFileUpload')?.addEventListener('change', function(e: any) {
         const file = e.target.files[0]; if(!file) return;
         const reader = new FileReader();
         reader.onload = function(f: any) {
@@ -423,7 +417,7 @@ export default function AlbumPosterBuilder() {
     
     w.updateBlurSettings = async function() { await w.updateBlurSettingsPromise(); w.saveCurrentStateToMemory(); };
 
-    document.getElementById('customUpload')!.addEventListener('change', function(e: any) {
+    document.getElementById('customUpload')?.addEventListener('change', function(e: any) {
         const file = e.target.files[0]; if(!file) return; const reader = new FileReader();
         reader.onload = function(f: any) {
             w.currentImg = f.target.result; let existingImg = w.canvas.getObjects().find((o: any) => o.id === 'main-cover');
@@ -897,7 +891,6 @@ export default function AlbumPosterBuilder() {
     };
 
     w.isGridEnabled = false; w.GRID_SIZE = 50 * w.BASE_PREVIEW_SCALE; w.gridLines = [];
-    w.toggleGrid = function(force: any = null) { w.isGridEnabled = (force !== null) ? force : (document.getElementById('gridToggle') as HTMLInputElement).checked; w.toggleGridVisuals(); };
     w.toggleGridVisuals = function() {
         const dims = w.getCurrentDimensions();
         w.gridLines.forEach((l: any) => w.canvas.remove(l)); 
@@ -907,6 +900,7 @@ export default function AlbumPosterBuilder() {
             for (let i = 0; i <= (dims.h * w.BASE_PREVIEW_SCALE / w.GRID_SIZE); i++) { let l = new w.fabric.Line([ 0, i * w.GRID_SIZE, dims.w * w.BASE_PREVIEW_SCALE, i * w.GRID_SIZE], { stroke: 'rgba(255,255,255,0.15)', strokeWidth: 1, selectable: false, evented: false, id: 'gridLine' }); w.gridLines.push(l); w.canvas.add(l); l.sendToBack(); }
         } w.canvas.requestRenderAll();
     };
+    w.toggleGrid = function(force: any = null) { w.isGridEnabled = (force !== null) ? force : (document.getElementById('gridToggle') as HTMLInputElement).checked; w.toggleGridVisuals(); };
 
     w.SNAP_DIST = 15 * w.BASE_PREVIEW_SCALE; w.guidelines = [];
     w.canvas.on('object:moving', function (e: any) {
@@ -1051,6 +1045,13 @@ export default function AlbumPosterBuilder() {
             alert("Added to cart successfully!");
         }, 100);
     };
+
+    // TETIKLEYICILER EN SONA TASINDI:
+    (document.getElementById('formatSelect') as HTMLSelectElement).value = 'a2';
+    w.rescale((document.getElementById('zoom-slider') as HTMLInputElement).value);
+    (document.getElementById('frameColorPicker') as HTMLInputElement).value = "#f5f5f5";
+    w.updateFrameColor("#f5f5f5"); 
+    w.showVariantsView(); 
   };
 
   return (
@@ -1078,8 +1079,22 @@ export default function AlbumPosterBuilder() {
             <div className="sidebar-group">
                 <span className="sidebar-title" id="title_search_music"><i className="fas fa-music"></i> Search Music</span>
                 <div style={{ position: "relative" }}>
-                    <input type="text" id="query" className="sidebar-control" placeholder="Artist or Album..." onKeyDown={(e) => { if(e.key === 'Enter') (window as any).executeDeezerSearch(); }} style={{ paddingRight: "40px" }} />
-                    <i className="fas fa-search" style={{ position: "absolute", right: "15px", top: "14px", color: "var(--text-muted)", cursor: "pointer" }} onClick={() => (window as any).executeDeezerSearch()}></i>
+                    <input type="text" id="query" className="sidebar-control" placeholder="Artist or Album..." onKeyDown={(e) => { 
+                        if(e.key === 'Enter') {
+                            if (typeof (window as any).executeDeezerSearch === 'function') {
+                                (window as any).executeDeezerSearch();
+                            } else {
+                                alert("Loading editor engine... Please wait a few seconds.");
+                            }
+                        }
+                    }} style={{ paddingRight: "40px" }} />
+                    <i className="fas fa-search" style={{ position: "absolute", right: "15px", top: "14px", color: "var(--text-muted)", cursor: "pointer" }} onClick={() => {
+                        if (typeof (window as any).executeDeezerSearch === 'function') {
+                            (window as any).executeDeezerSearch();
+                        } else {
+                            alert("Loading editor engine... Please wait a few seconds.");
+                        }
+                    }}></i>
                 </div>
             </div>
 
