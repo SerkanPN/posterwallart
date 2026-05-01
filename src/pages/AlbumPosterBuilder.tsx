@@ -35,6 +35,15 @@ export default function AlbumPosterBuilder() {
     };
 
     const initScripts = async () => {
+      // Load FontAwesome for Icons
+      if (!document.getElementById('font-awesome-cdn')) {
+          const faLink = document.createElement('link');
+          faLink.id = 'font-awesome-cdn';
+          faLink.rel = 'stylesheet';
+          faLink.href = 'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css';
+          document.head.appendChild(faLink);
+      }
+
       // Load Google Fonts dynamically
       const fontUrl = `https://fonts.googleapis.com/css?family=${GOOGLE_FONTS.map(f => f.replace(/ /g, '+')).join('|')}&display=swap`;
       if (!document.getElementById('google-fonts-custom')) {
@@ -65,7 +74,10 @@ export default function AlbumPosterBuilder() {
           .poster-pro-container::-webkit-scrollbar-thumb:hover { background: #505070; }
           .poster-pro-container *, .poster-pro-container *::before, .poster-pro-container *::after { box-sizing: border-box; }
           
-          .sidebar-pro { width: 340px; background: var(--bg-sidebar); padding: 30px 25px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 24px; overflow-y: auto; z-index: 1000; flex-shrink: 0; }
+          .sidebar-pro-left { width: 340px; background: var(--bg-sidebar); padding: 30px 25px; border-right: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 24px; overflow-y: auto; z-index: 1000; flex-shrink: 0; }
+          .sidebar-pro-right-wrapper { width: 340px; background: var(--bg-sidebar); border-left: 1px solid var(--border-color); display: flex; flex-direction: column; z-index: 1000; flex-shrink: 0; height: 100%; }
+          .sidebar-pro-right-scroll { flex: 1; padding: 30px 25px; display: flex; flex-direction: column; gap: 24px; overflow-y: auto; }
+          
           .sidebar-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
           .sidebar-logo .icon { background: #ffd000; color: #000; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; font-family: 'Montserrat', sans-serif;}
           .sidebar-logo .text { font-family: 'Montserrat', sans-serif; font-weight: 900; font-size: 1.4rem; letter-spacing: -0.5px; color: #fff;}
@@ -88,8 +100,6 @@ export default function AlbumPosterBuilder() {
           .btn-danger:hover { background: #e11d48; }
           .btn-dark { background: #161622; border: 1px solid #2b2b3d; }
           .btn-dark:hover { background: #1e1e2d; }
-          .poster-pro-container details summary { font-size: 0.75rem; color: var(--text-muted); cursor: pointer; font-weight: 800; text-transform: uppercase; padding: 10px 0; outline: none; letter-spacing: 0.5px;}
-          .poster-pro-container details summary:hover { color: var(--text-main); }
           .main-view { flex: 1; display: flex; flex-direction: column; position: relative; }
           #top-bar { display: flex; justify-content: space-between; align-items: center; padding: 25px 40px; flex-shrink: 0; z-index: 50; }
           .glitch-text { margin: 0; font-family: 'Montserrat', sans-serif; font-size: 2.4rem; font-weight: 900; color: #fff; letter-spacing: -0.5px; text-transform: uppercase; text-shadow: 2px 0 0 #ff003c, -2px 0 0 #00eaff; }
@@ -376,7 +386,7 @@ export default function AlbumPosterBuilder() {
                         img.set({ originX: 'center', originY: 'center', id: 'branding-qr', selectable: true });
                         w.canvas.add(img);
                     }
-                } catch(e) { console.error("QR Code Error:", e); }
+                } catch(e) {}
                 w.handleBrandingUI();
                 resolve(true);
             }, { crossOrigin: 'anonymous' });
@@ -671,10 +681,6 @@ export default function AlbumPosterBuilder() {
                     variantsData.push({ layout: l, theme: t_theme, url: previewUrl, key: key });
                 } catch(e) {
                     variantsData.push({ layout: l, theme: t_theme, url: '', key: key });
-                    if(!w.warnedCORS) {
-                        alert("Security Alert: Because you are loading an image directly, your browser will not allow you to preview or save the poster.\n\nTO FIX THIS: Use the 'Select your PNG' button inside the Branding menu to properly upload your QR code once.");
-                        w.warnedCORS = true;
-                    }
                 }
             }
         }
@@ -691,7 +697,7 @@ export default function AlbumPosterBuilder() {
                         <div class="variant-theme">${v.theme} THEME</div>
                     </div>
                     <div class="variant-actions">
-                        <button class="sidebar-download-btn btn-accent" style="padding:10px; flex:2;">EDIT THIS POSTER</button>
+                        <button class="sidebar-download-btn btn-accent" style="padding:10px; width:100%;">EDIT THIS POSTER</button>
                     </div>
                 </div>
             `).join('');
@@ -900,7 +906,6 @@ export default function AlbumPosterBuilder() {
             if (obj.type === 'i-text' || obj.type === 'textbox') { 
                 (document.getElementById('elemText') as HTMLInputElement).value = obj.text; 
                 
-                // Sync Custom React Dropdown
                 if (typeof w.syncReactFontState === 'function') {
                     w.syncReactFontState(obj.fontFamily || 'Inter');
                 }
@@ -987,7 +992,7 @@ export default function AlbumPosterBuilder() {
   };
 
   return (
-    <div className="poster-pro-container" style={{ fontFamily: "'Inter', sans-serif", backgroundColor: "var(--bg-main)", color: "var(--text-main)", margin: 0, padding: 0, display: "flex", overflow: "hidden", height: "100vh" }}>
+    <div className="poster-pro-container" style={{ fontFamily: "'Inter', sans-serif", backgroundColor: "var(--bg-main)", color: "var(--text-main)", margin: 0, padding: 0, display: "flex", overflow: "hidden", height: "100vh", width: "100vw" }}>
         
         {/* Global Loader */}
         <div id="global-loader">
@@ -996,16 +1001,11 @@ export default function AlbumPosterBuilder() {
             <div id="loader-subtext" className="loader-subtext"></div>
         </div>
 
-        {/* LEFT SIDEBAR */}
-        <div className="sidebar-pro" style={{ paddingBottom: '100px' }}>
+        {/* LEFT SIDEBAR (GLOBAL SETTINGS) */}
+        <div className="sidebar-pro-left">
             <div className="sidebar-logo">
                 <div className="icon">A</div>
                 <div className="text">POSTER.PRO</div>
-            </div>
-
-            <div className="sidebar-group" style={{ flexDirection: "row", gap: "10px" }}>
-                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).undo()} title="Undo" id="btn_undo_tooltip"><i className="fas fa-undo"></i></button>
-                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).redo()} title="Redo" id="btn_redo_tooltip"><i className="fas fa-redo"></i></button>
             </div>
             
             <div className="sidebar-group">
@@ -1052,224 +1052,52 @@ export default function AlbumPosterBuilder() {
                     <option value="blurry" id="opt_theme_blurry">Theme: Blurry</option>
                     <option value="colorful" id="opt_theme_colorful">Theme: Colorful</option>
                 </select>
-                <button className="sidebar-download-btn btn-dark" onClick={() => (window as any).confirmGenerateAll()} style={{ marginTop: "5px", color: "var(--text-muted)" }} id="btn_regenerate_all"><i className="fas fa-magic"></i> REGENERATE ALL</button>
             </div>
 
-            {/* Advanced Tools & Editing Panels */}
-            <details open>
-                <summary id="title_advanced_settings">+ Advanced Settings</summary>
-                <div style={{ display: "flex", flexDirection: "column", gap: "24px", marginTop: "10px" }}>
-                    
-                    {/* Spotify Module */}
-                    <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(29, 185, 84, 0.25)" }}>
-                        <span className="sidebar-title" style={{ color: "var(--spotify)", marginBottom: "5px", fontSize: "0.7rem" }} id="title_spotify_barcode"><i className="fab fa-spotify"></i> SPOTIFY BARCODE</span>
-                        <a id="spotifySearchBtn" href="https://open.spotify.com/search" target="_blank" rel="noreferrer" className="sidebar-download-btn" style={{ background: "var(--bg-main)", color: "var(--spotify)", padding: "12px", marginBottom: "10px", border: "1px solid transparent", boxShadow: "inset 0 0 0 1px rgba(29,185,84,0.1)" }}>1. FIND ON SPOTIFY</a>
-                        <input type="text" id="spotifyLink" className="sidebar-control" placeholder="2. Paste Copied Link" style={{ background: "var(--bg-main)", borderColor: "var(--border-color)", marginBottom: "10px" }} />
-                        <button className="sidebar-download-btn" onClick={() => (window as any).addSpotifyCode()} style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "12px" }} id="btn_add_barcode">ADD BARCODE</button>
-                    </div>
-
-                    {/* Branding & QR Toggle Module */}
-                    <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px", border: "1px solid var(--border-color)", marginTop: "-10px" }}>
-                        <span className="sidebar-title" style={{ marginBottom: "10px" }} id="title_shop_branding"><i className="fas fa-qrcode"></i> BRANDING & QR</span>
-                        
-                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer" }}>
-                            <input type="checkbox" id="textToggle" onChange={() => (window as any).handleBrandingUI()} style={{ width: "16px", height: "16px" }} defaultChecked /><span id="lbl_text_toggle">Show Website Text</span>
-                        </label>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px", marginTop: "5px" }}>
-                            <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Opacity:</span>
-                            <input type="range" id="textOpacity" min="0" max="1" step="0.05" defaultValue="1" onInput={() => (window as any).handleBrandingUI()} style={{ flex: 1 }} />
-                        </div>
-
-                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer" }}>
-                            <input type="checkbox" id="qrToggle" onChange={() => (window as any).handleBrandingUI()} style={{ width: "16px", height: "16px" }} defaultChecked /><span id="lbl_qr_toggle">Show QR Code</span>
-                        </label>
-                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "5px" }}>
-                            <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Opacity:</span>
-                            <input type="range" id="qrOpacity" min="0" max="1" step="0.05" defaultValue="1" onInput={() => (window as any).handleBrandingUI()} style={{ flex: 1 }} />
-                        </div>
-
-                        <div style={{ marginTop: "15px", borderTop: "1px dashed var(--border-color)", paddingTop: "10px" }}>
-                            <label style={{ fontSize: "0.65rem", color: "var(--accent)", marginBottom: "5px", display: "block" }}>Select your PNG to prevent CORS (Save) errors:</label>
-                            <input type="file" id="qrFileUpload" accept="image/png, image/jpeg" className="sidebar-control" style={{ padding: "8px", fontSize: "0.7rem", background: "var(--bg-main)" }} />
-                        </div>
-                    </div>
-                        
-                    {/* Custom Image */}
-                    <div className="sidebar-group">
-                        <span className="sidebar-title" id="title_or_upload_custom">Custom Upload</span>
-                        <input type="file" id="customUpload" accept="image/*" className="sidebar-control" style={{ padding: "10px" }} />
-                    </div>
-
-                    <div className="sidebar-group" style={{ borderTop: "1px solid var(--border-color)", paddingTop: "15px", marginTop: "-5px" }}>
-                        <span className="sidebar-title" id="title_preview_zoom">Preview Zoom</span>
-                        <input type="range" id="zoom-slider" min="0.05" max="0.25" step="0.01" defaultValue="0.08" onInput={(e: any) => (window as any).rescale(e.target.value)} />
-                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer", marginTop: "5px", background: "var(--bg-input)", padding: "12px", borderRadius: "10px" }}>
-                            <input type="checkbox" id="gridToggle" onChange={() => (window as any).toggleGrid()} style={{ width: "16px", height: "16px" }} /><span id="lbl_grid_toggle">Show Grid & Snap</span>
-                        </label>
-                    </div>
-                    
-                    <div className="sidebar-group">
-                        <span className="sidebar-title" id="title_frame_separator">Frame & Separator</span>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-                            <div><label style={{ fontSize: "0.6rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_frame_bg">Frame BG</label><input type="color" id="frameColorPicker" className="sidebar-control" defaultValue="#f5f5f5" onInput={(e: any) => (window as any).updateFrameColor(e.target.value)} /></div>
-                            <div><label style={{ fontSize: "0.6rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_line_color">Line Color</label><input type="color" id="lineColorPicker" className="sidebar-control" defaultValue="#222222" onInput={(e: any) => (window as any).updateLineColor(e.target.value)} /></div>
-                        </div>
-                    </div>
-
-                    <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px" }}>
-                        <span className="sidebar-title" id="title_blur_settings" style={{ marginBottom: "10px" }}>Blur Settings</span>
-                        <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer", marginBottom: "15px" }}>
-                            <input type="checkbox" id="blurToggle" onChange={() => (window as any).updateBlurSettings()} style={{ width: "16px", height: "16px" }} /><span id="lbl_enable_blur_bg">Enable Blur BG</span>
-                        </label>
-                        <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "5px" }} id="lbl_blur_amount">Blur Amount</label>
-                        <input type="range" id="blurAmount" min="0" max="300" step="5" defaultValue="150" onInput={() => (window as any).updateBlurSettings()} />
-                        <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "15px", marginBottom: "5px" }} id="lbl_overlay_brightness">Overlay Brightness</label>
-                        <input type="range" id="blurBrightness" min="0" max="1" step="0.05" defaultValue="0.4" onInput={() => (window as any).updateBlurSettings()} />
-                    </div>
-
-                    <div className="sidebar-group">
-                        <span className="sidebar-title" id="title_manual_palette">Manual Palette</span>
-                        <div style={{ display: "flex", gap: "5px" }}>
-                            <input type="color" id="p1" className="sidebar-control" onInput={(e: any) => (window as any).setPalette(0, e.target.value)} defaultValue="#d68c5b" />
-                            <input type="color" id="p2" className="sidebar-control" onInput={(e: any) => (window as any).setPalette(1, e.target.value)} defaultValue="#b95856" />
-                            <input type="color" id="p3" className="sidebar-control" onInput={(e: any) => (window as any).setPalette(2, e.target.value)} defaultValue="#a83a6b" />
-                            <input type="color" id="p4" className="sidebar-control" onInput={(e: any) => (window as any).setPalette(3, e.target.value)} defaultValue="#772b7a" />
-                            <input type="color" id="p5" className="sidebar-control" onInput={(e: any) => (window as any).setPalette(4, e.target.value)} defaultValue="#471868" />
-                        </div>
-                        <button className="sidebar-download-btn btn-dark" onClick={() => (window as any).forceExtractPalette()} style={{ marginTop: "5px", fontSize: "0.65rem" }} id="btn_auto_extract_colors">AUTO EXTRACT</button>
-                    </div>
-
-                    {/* EDIT SELECTED PANEL */}
-                    <div className="sidebar-group" id="element-editor" style={{ display: "none", paddingTop: "15px", borderTop: "1px solid var(--border-color)", marginTop: "5px" }}>
-                        <span className="sidebar-title" style={{ color: "#fff" }} id="title_edit_selected">EDIT SELECTED</span>
-                        
-                        <div id="basic-tools" style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "5px" }}>
-                            <div>
-                                <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_text_content">Text Content</label>
-                                <textarea id="elemText" className="sidebar-control" style={{ resize: "vertical", minHeight: "45px", cursor: "text" }} onInput={(e: any) => (window as any).updateElementText(e.target.value)}></textarea>
-                            </div>
-                            
-                            {/* CUSTOM FONT PICKER WITH PREVIEWS */}
-                            <div className="relative">
-                                <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_font_family">Font Family</label>
-                                <div 
-                                    className="sidebar-control flex justify-between items-center bg-[#222232]" 
-                                    onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
-                                >
-                                    <span id="elemFontValue" style={{ fontFamily: activeFont, fontSize: '14px' }}>{activeFont}</span>
-                                    <i className={`fas fa-chevron-${isFontDropdownOpen ? 'up' : 'down'}`}></i>
-                                </div>
-                                {isFontDropdownOpen && (
-                                    <div className="absolute top-full left-0 w-full mt-1 bg-[#181824] border border-[#2b2b3d] rounded-lg max-h-[220px] overflow-y-auto z-[9999] shadow-2xl">
-                                    {GOOGLE_FONTS.map(font => (
-                                        <div 
-                                            key={font}
-                                            className="p-3 hover:bg-[#5a4fcb] cursor-pointer text-white border-b border-[#2b2b3d] last:border-0 transition-colors"
-                                            style={{ fontFamily: font, fontSize: '18px' }}
-                                            onClick={() => {
-                                                setActiveFont(font);
-                                                setIsFontDropdownOpen(false);
-                                                if (typeof (window as any).applyStyle === 'function') {
-                                                    (window as any).applyStyle('fontFamily', font);
-                                                }
-                                            }}
-                                        >
-                                            {font}
-                                        </div>
-                                    ))}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-
-                        <div id="image-filters" style={{ display: "none", flexDirection: "column", gap: "5px", marginBottom: "5px" }}>
-                            <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "2px" }} id="lbl_image_filters">Image Filters</label>
-                            <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
-                                <button className="sidebar-control btn-icon btn-dark" style={{ fontSize: "0.75rem" }} onClick={() => (window as any).applyImageFilter('none')} id="btn_filter_normal">Normal</button>
-                                <button className="sidebar-control btn-icon btn-dark" style={{ fontSize: "0.75rem" }} onClick={() => (window as any).applyImageFilter('grayscale')} id="btn_filter_bw">B&W</button>
-                                <button className="sidebar-control btn-icon btn-dark" style={{ fontSize: "0.75rem" }} onClick={() => (window as any).applyImageFilter('sepia')} id="btn_filter_sepia">Sepia</button>
-                                <button className="sidebar-control btn-icon btn-dark" style={{ fontSize: "0.75rem" }} onClick={() => (window as any).applyImageFilter('vintage')} id="btn_filter_vintage">Vintage</button>
-                            </div>
-                        </div>
-
-                        <div id="size-color-row" style={{ display: "flex", gap: "10px", marginTop: "5px" }}>
-                            <div id="size-col" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px" }}>
-                                <label style={{ fontSize: "0.7rem", color: "var(--text-muted)" }} id="lbl_size_px">Size (px)</label>
-                                <input type="number" id="elemSize" className="sidebar-control" style={{ cursor: "text", padding: "10px" }} onInput={(e: any) => (window as any).applyStyle('fontSize', e.target.value)} />
-                            </div>
-                            <div id="color-col" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px" }}>
-                                <label style={{ fontSize: "0.7rem", color: "var(--text-muted)" }} id="lbl_color">Color</label>
-                                <input type="color" id="elemColor" className="sidebar-control" onInput={(e: any) => (window as any).applyStyle('fill', e.target.value)} />
-                            </div>
-                        </div>
-
-                        <div id="text-style-align" style={{ display: "flex", flexDirection: "column", gap: "5px", marginTop: "10px" }}>
-                            <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "2px" }} id="lbl_text_style_align">Style & Align</label>
-                            <div style={{ display: "flex", gap: "5px" }}>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).toggleStyle('fontWeight', 'bold', 'normal')} id="btn_style_bold_tooltip"><i className="fas fa-bold"></i></button>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).toggleStyle('fontStyle', 'italic', 'normal')} id="btn_style_italic_tooltip"><i className="fas fa-italic"></i></button>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).applyStyle('textAlign', 'left')} id="btn_align_left_tooltip"><i className="fas fa-align-left"></i></button>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).applyStyle('textAlign', 'center')} id="btn_align_center_tooltip"><i className="fas fa-align-center"></i></button>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).applyStyle('textAlign', 'right')} id="btn_align_right_tooltip"><i className="fas fa-align-right"></i></button>
-                            </div>
-                        </div>
-
-                        {/* OBJECT ALIGNMENT TOOLS */}
-                        <div id="object-align-tools" style={{ display: "none", flexDirection: "column", gap: "5px", marginTop: "10px" }}>
-                            <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "2px" }} id="lbl_object_align">Align Objects</label>
-                            <div style={{ display: "flex", gap: "5px" }}>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('left')} title="Align Left"><i className="fas fa-align-left"></i></button>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('center')} title="Align Center"><i className="fas fa-align-center"></i></button>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('right')} title="Align Right"><i className="fas fa-align-right"></i></button>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('top')} title="Align Top"><i className="fas fa-align-left" style={{ transform: "rotate(90deg)" }}></i></button>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('middle')} title="Align Middle"><i className="fas fa-align-center" style={{ transform: "rotate(90deg)" }}></i></button>
-                                <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('bottom')} title="Align Bottom"><i className="fas fa-align-right" style={{ transform: "rotate(90deg)" }}></i></button>
-                            </div>
-                        </div>
-
-                        <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "15px", marginBottom: "5px" }} id="lbl_opacity">Opacity</label>
-                        <input type="range" id="elemOpacity" min="0" max="1" step="0.01" defaultValue="1" onInput={(e: any) => (window as any).applyStyle('opacity', parseFloat(e.target.value))} />
-
-                        <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "15px" }} id="lbl_arrange_options">Arrange & Options</label>
-                        <div style={{ display: "flex", gap: "5px" }}>
-                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).bringForward()} id="btn_bring_forward_tooltip"><i className="fas fa-arrow-up"></i></button>
-                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).sendBackward()} id="btn_send_backward_tooltip"><i className="fas fa-arrow-down"></i></button>
-                            <button className="sidebar-control btn-icon btn-dark" id="btn-lock" onClick={() => (window as any).toggleLock()}><i className="fas fa-lock"></i></button>
-                            <button className="sidebar-control btn-icon btn-danger" onClick={() => (window as any).deleteSelected()} id="btn_delete_selected_tooltip"><i className="fas fa-trash"></i></button>
-                        </div>
-                    </div>
-
-                    {/* Layers Panel */}
-                    <div className="sidebar-group" style={{ marginTop: "5px", borderTop: "1px solid var(--border-color)", paddingTop: "15px" }}>
-                        <span className="sidebar-title" id="title_layers"><i className="fas fa-layer-group"></i> Layers</span>
-                        <div id="layers-panel" style={{ display: "flex", flexDirection: "column", maxHeight: "200px", overflowY: "auto", background: "var(--bg-input)", borderRadius: "12px", padding: "5px", border: "1px solid var(--border-color)" }}>
-                        </div>
-                    </div>
+            <div className="sidebar-group">
+                <span className="sidebar-title" id="title_frame_separator">Frame & Separator</span>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+                    <div><label style={{ fontSize: "0.6rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_frame_bg">Frame BG</label><input type="color" id="frameColorPicker" className="sidebar-control" defaultValue="#f5f5f5" onInput={(e: any) => (window as any).updateFrameColor(e.target.value)} /></div>
+                    <div><label style={{ fontSize: "0.6rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_line_color">Line Color</label><input type="color" id="lineColorPicker" className="sidebar-control" defaultValue="#222222" onInput={(e: any) => (window as any).updateLineColor(e.target.value)} /></div>
                 </div>
-            </details>
+            </div>
 
+            <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px" }}>
+                <span className="sidebar-title" id="title_blur_settings" style={{ marginBottom: "10px" }}>Blur Settings</span>
+                <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer", marginBottom: "15px" }}>
+                    <input type="checkbox" id="blurToggle" onChange={() => (window as any).updateBlurSettings()} style={{ width: "16px", height: "16px" }} /><span id="lbl_enable_blur_bg">Enable Blur BG</span>
+                </label>
+                <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "5px" }} id="lbl_blur_amount">Blur Amount</label>
+                <input type="range" id="blurAmount" min="0" max="300" step="5" defaultValue="150" onInput={() => (window as any).updateBlurSettings()} />
+                <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "15px", marginBottom: "5px" }} id="lbl_overlay_brightness">Overlay Brightness</label>
+                <input type="range" id="blurBrightness" min="0" max="1" step="0.05" defaultValue="0.4" onInput={() => (window as any).updateBlurSettings()} />
+            </div>
+
+            <div className="sidebar-group">
+                <span className="sidebar-title" id="title_manual_palette">Manual Palette</span>
+                <div style={{ display: "flex", gap: "5px" }}>
+                    <input type="color" id="p1" className="sidebar-control" onInput={(e: any) => (window as any).setPalette(0, e.target.value)} defaultValue="#d68c5b" />
+                    <input type="color" id="p2" className="sidebar-control" onInput={(e: any) => (window as any).setPalette(1, e.target.value)} defaultValue="#b95856" />
+                    <input type="color" id="p3" className="sidebar-control" onInput={(e: any) => (window as any).setPalette(2, e.target.value)} defaultValue="#a83a6b" />
+                    <input type="color" id="p4" className="sidebar-control" onInput={(e: any) => (window as any).setPalette(3, e.target.value)} defaultValue="#772b7a" />
+                    <input type="color" id="p5" className="sidebar-control" onInput={(e: any) => (window as any).setPalette(4, e.target.value)} defaultValue="#471868" />
+                </div>
+                <button className="sidebar-download-btn btn-dark" onClick={() => (window as any).forceExtractPalette()} style={{ marginTop: "5px", fontSize: "0.65rem" }} id="btn_auto_extract_colors">AUTO EXTRACT</button>
+            </div>
+
+            <div className="sidebar-group">
+                <span className="sidebar-title" id="title_or_upload_custom">Custom Upload</span>
+                <input type="file" id="customUpload" accept="image/*" className="sidebar-control" style={{ padding: "10px" }} />
+            </div>
         </div>
 
-        {/* BOTTOM FIXED ADD TO CART PANEL */}
-        <div style={{ position: "fixed", bottom: 0, left: 0, width: "340px", backgroundColor: "var(--bg-sidebar)", padding: "20px 25px", borderTop: "1px solid var(--border-color)", zIndex: 2000 }}>
-            <button 
-                className="sidebar-download-btn" 
-                style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "16px", fontSize: "1rem", boxShadow: "0 10px 20px rgba(29, 185, 84, 0.3)" }} 
-                onClick={() => (window as any).handleAddToCart()}
-            >
-                <i className="fas fa-shopping-cart" style={{ marginRight: "10px" }}></i> 
-                <span>ADD TO CART</span>
-            </button>
-        </div>
-
-        {/* MAIN VIEW */}
+        {/* MAIN VIEW (CANVAS) */}
         <div className="main-view">
             <div id="top-bar">
                 <div className="top-bar-left">
                     <h2 id="top_title" className="glitch-text">DESIGNER</h2>
                     <p id="top_subtitle">Make your music visual.</p>
                 </div>
-
                 <div className="view-toggle">
                     <button onClick={() => (window as any).showVariantsView()} id="btn-show-gallery" className="toggle-btn active">GALLERY</button>
                     <button onClick={() => (window as any).showSingleEditor()} id="btn-show-editor" className="toggle-btn">EDITOR</button>
@@ -1288,6 +1116,177 @@ export default function AlbumPosterBuilder() {
                         </div>
                     </div>
                 </div>
+            </div>
+        </div>
+
+        {/* RIGHT SIDEBAR (TOOLS & ELEMENTS) */}
+        <div className="sidebar-pro-right-wrapper">
+            <div className="sidebar-pro-right-scroll">
+                <div className="sidebar-group" style={{ flexDirection: "row", gap: "10px" }}>
+                    <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).undo()} title="Undo" id="btn_undo_tooltip"><i className="fas fa-undo"></i></button>
+                    <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).redo()} title="Redo" id="btn_redo_tooltip"><i className="fas fa-redo"></i></button>
+                </div>
+
+                <div className="sidebar-group">
+                    <span className="sidebar-title" id="title_preview_zoom">Preview Zoom</span>
+                    <input type="range" id="zoom-slider" min="0.05" max="0.25" step="0.01" defaultValue="0.08" onInput={(e: any) => (window as any).rescale(e.target.value)} />
+                    <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer", marginTop: "5px", background: "var(--bg-input)", padding: "12px", borderRadius: "10px" }}>
+                        <input type="checkbox" id="gridToggle" onChange={() => (window as any).toggleGrid()} style={{ width: "16px", height: "16px" }} /><span id="lbl_grid_toggle">Show Grid & Snap</span>
+                    </label>
+                </div>
+
+                {/* EDIT SELECTED PANEL */}
+                <div className="sidebar-group" id="element-editor" style={{ display: "none", paddingTop: "15px", borderTop: "1px solid var(--border-color)", marginTop: "5px" }}>
+                    <span className="sidebar-title" style={{ color: "#fff" }} id="title_edit_selected">EDIT SELECTED</span>
+                    
+                    <div id="basic-tools" style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: "5px" }}>
+                        <div>
+                            <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_text_content">Text Content</label>
+                            <textarea id="elemText" className="sidebar-control" style={{ resize: "vertical", minHeight: "45px", cursor: "text" }} onInput={(e: any) => (window as any).updateElementText(e.target.value)}></textarea>
+                        </div>
+                        
+                        {/* CUSTOM FONT PICKER WITH PREVIEWS */}
+                        <div className="relative">
+                            <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_font_family">Font Family</label>
+                            <div 
+                                className="sidebar-control flex justify-between items-center bg-[#222232]" 
+                                onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
+                            >
+                                <span id="elemFontValue" style={{ fontFamily: activeFont, fontSize: '14px' }}>{activeFont}</span>
+                                <i className={`fas fa-chevron-${isFontDropdownOpen ? 'up' : 'down'}`}></i>
+                            </div>
+                            {isFontDropdownOpen && (
+                                <div className="absolute top-full left-0 w-full mt-1 bg-[#181824] border border-[#2b2b3d] rounded-lg max-h-[220px] overflow-y-auto z-[9999] shadow-2xl">
+                                {GOOGLE_FONTS.map(font => (
+                                    <div 
+                                        key={font}
+                                        className="p-3 hover:bg-[#5a4fcb] cursor-pointer text-white border-b border-[#2b2b3d] last:border-0 transition-colors"
+                                        style={{ fontFamily: font, fontSize: '18px' }}
+                                        onClick={() => {
+                                            setActiveFont(font);
+                                            setIsFontDropdownOpen(false);
+                                            if (typeof (window as any).applyStyle === 'function') {
+                                                (window as any).applyStyle('fontFamily', font);
+                                            }
+                                        }}
+                                    >
+                                        {font}
+                                    </div>
+                                ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div id="image-filters" style={{ display: "none", flexDirection: "column", gap: "5px", marginBottom: "5px" }}>
+                        <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "2px" }} id="lbl_image_filters">Image Filters</label>
+                        <div style={{ display: "flex", gap: "5px", flexWrap: "wrap" }}>
+                            <button className="sidebar-control btn-icon btn-dark" style={{ fontSize: "0.75rem" }} onClick={() => (window as any).applyImageFilter('none')} id="btn_filter_normal">Normal</button>
+                            <button className="sidebar-control btn-icon btn-dark" style={{ fontSize: "0.75rem" }} onClick={() => (window as any).applyImageFilter('grayscale')} id="btn_filter_bw">B&W</button>
+                            <button className="sidebar-control btn-icon btn-dark" style={{ fontSize: "0.75rem" }} onClick={() => (window as any).applyImageFilter('sepia')} id="btn_filter_sepia">Sepia</button>
+                            <button className="sidebar-control btn-icon btn-dark" style={{ fontSize: "0.75rem" }} onClick={() => (window as any).applyImageFilter('vintage')} id="btn_filter_vintage">Vintage</button>
+                        </div>
+                    </div>
+
+                    <div id="size-color-row" style={{ display: "flex", gap: "10px", marginTop: "5px" }}>
+                        <div id="size-col" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px" }}>
+                            <label style={{ fontSize: "0.7rem", color: "var(--text-muted)" }} id="lbl_size_px">Size (px)</label>
+                            <input type="number" id="elemSize" className="sidebar-control" style={{ cursor: "text", padding: "10px" }} onInput={(e: any) => (window as any).applyStyle('fontSize', e.target.value)} />
+                        </div>
+                        <div id="color-col" style={{ flex: 1, display: "flex", flexDirection: "column", gap: "5px" }}>
+                            <label style={{ fontSize: "0.7rem", color: "var(--text-muted)" }} id="lbl_color">Color</label>
+                            <input type="color" id="elemColor" className="sidebar-control" onInput={(e: any) => (window as any).applyStyle('fill', e.target.value)} />
+                        </div>
+                    </div>
+
+                    <div id="text-style-align" style={{ display: "flex", flexDirection: "column", gap: "5px", marginTop: "10px" }}>
+                        <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "2px" }} id="lbl_text_style_align">Style & Align</label>
+                        <div style={{ display: "flex", gap: "5px" }}>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).toggleStyle('fontWeight', 'bold', 'normal')} id="btn_style_bold_tooltip"><i className="fas fa-bold"></i></button>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).toggleStyle('fontStyle', 'italic', 'normal')} id="btn_style_italic_tooltip"><i className="fas fa-italic"></i></button>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).applyStyle('textAlign', 'left')} id="btn_align_left_tooltip"><i className="fas fa-align-left"></i></button>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).applyStyle('textAlign', 'center')} id="btn_align_center_tooltip"><i className="fas fa-align-center"></i></button>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).applyStyle('textAlign', 'right')} id="btn_align_right_tooltip"><i className="fas fa-align-right"></i></button>
+                        </div>
+                    </div>
+
+                    {/* OBJECT ALIGNMENT TOOLS */}
+                    <div id="object-align-tools" style={{ display: "none", flexDirection: "column", gap: "5px", marginTop: "10px" }}>
+                        <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "2px" }} id="lbl_object_align">Align Objects</label>
+                        <div style={{ display: "flex", gap: "5px" }}>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('left')} title="Align Left"><i className="fas fa-align-left"></i></button>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('center')} title="Align Center"><i className="fas fa-align-center"></i></button>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('right')} title="Align Right"><i className="fas fa-align-right"></i></button>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('top')} title="Align Top"><i className="fas fa-align-left" style={{ transform: "rotate(90deg)" }}></i></button>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('middle')} title="Align Middle"><i className="fas fa-align-center" style={{ transform: "rotate(90deg)" }}></i></button>
+                            <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).alignObjects('bottom')} title="Align Bottom"><i className="fas fa-align-right" style={{ transform: "rotate(90deg)" }}></i></button>
+                        </div>
+                    </div>
+
+                    <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "15px", marginBottom: "5px" }} id="lbl_opacity">Opacity</label>
+                    <input type="range" id="elemOpacity" min="0" max="1" step="0.01" defaultValue="1" onInput={(e: any) => (window as any).applyStyle('opacity', parseFloat(e.target.value))} />
+
+                    <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginTop: "15px" }} id="lbl_arrange_options">Arrange & Options</label>
+                    <div style={{ display: "flex", gap: "5px" }}>
+                        <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).bringForward()} id="btn_bring_forward_tooltip"><i className="fas fa-arrow-up"></i></button>
+                        <button className="sidebar-control btn-icon btn-dark" onClick={() => (window as any).sendBackward()} id="btn_send_backward_tooltip"><i className="fas fa-arrow-down"></i></button>
+                        <button className="sidebar-control btn-icon btn-dark" id="btn-lock" onClick={() => (window as any).toggleLock()}><i className="fas fa-lock"></i></button>
+                        <button className="sidebar-control btn-icon btn-danger" onClick={() => (window as any).deleteSelected()} id="btn_delete_selected_tooltip"><i className="fas fa-trash"></i></button>
+                    </div>
+                </div>
+
+                {/* Layers Panel */}
+                <div className="sidebar-group" style={{ marginTop: "5px", borderTop: "1px solid var(--border-color)", paddingTop: "15px" }}>
+                    <span className="sidebar-title" id="title_layers"><i className="fas fa-layer-group"></i> Layers</span>
+                    <div id="layers-panel" style={{ display: "flex", flexDirection: "column", maxHeight: "200px", overflowY: "auto", background: "var(--bg-input)", borderRadius: "12px", padding: "5px", border: "1px solid var(--border-color)" }}>
+                    </div>
+                </div>
+
+                {/* Branding & QR Toggle Module */}
+                <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px", border: "1px solid var(--border-color)", marginTop: "15px" }}>
+                    <span className="sidebar-title" style={{ marginBottom: "10px" }} id="title_shop_branding"><i className="fas fa-qrcode"></i> BRANDING & QR</span>
+                    
+                    <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer" }}>
+                        <input type="checkbox" id="textToggle" onChange={() => (window as any).handleBrandingUI()} style={{ width: "16px", height: "16px" }} defaultChecked /><span id="lbl_text_toggle">Show Website Text</span>
+                    </label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px", marginTop: "5px" }}>
+                        <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Opacity:</span>
+                        <input type="range" id="textOpacity" min="0" max="1" step="0.05" defaultValue="1" onInput={() => (window as any).handleBrandingUI()} style={{ flex: 1 }} />
+                    </div>
+
+                    <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer" }}>
+                        <input type="checkbox" id="qrToggle" onChange={() => (window as any).handleBrandingUI()} style={{ width: "16px", height: "16px" }} defaultChecked /><span id="lbl_qr_toggle">Show QR Code</span>
+                    </label>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "5px" }}>
+                        <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Opacity:</span>
+                        <input type="range" id="qrOpacity" min="0" max="1" step="0.05" defaultValue="1" onInput={() => (window as any).handleBrandingUI()} style={{ flex: 1 }} />
+                    </div>
+
+                    <div style={{ marginTop: "15px", borderTop: "1px dashed var(--border-color)", paddingTop: "10px" }}>
+                        <label style={{ fontSize: "0.65rem", color: "var(--accent)", marginBottom: "5px", display: "block" }}>Select your PNG to prevent CORS (Save) errors:</label>
+                        <input type="file" id="qrFileUpload" accept="image/png, image/jpeg" className="sidebar-control" style={{ padding: "8px", fontSize: "0.7rem", background: "var(--bg-main)" }} />
+                    </div>
+                </div>
+
+                {/* Spotify Module - FIXED AT BOTTOM OF SCROLL */}
+                <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(29, 185, 84, 0.25)", marginTop: "auto" }}>
+                    <span className="sidebar-title" style={{ color: "var(--spotify)", marginBottom: "5px", fontSize: "0.7rem" }} id="title_spotify_barcode"><i className="fab fa-spotify"></i> SPOTIFY BARCODE</span>
+                    <a id="spotifySearchBtn" href="https://open.spotify.com/search" target="_blank" rel="noreferrer" className="sidebar-download-btn" style={{ background: "var(--bg-main)", color: "var(--spotify)", padding: "12px", marginBottom: "10px", border: "1px solid transparent", boxShadow: "inset 0 0 0 1px rgba(29,185,84,0.1)" }}>1. FIND ON SPOTIFY</a>
+                    <input type="text" id="spotifyLink" className="sidebar-control" placeholder="2. Paste Copied Link" style={{ background: "var(--bg-main)", borderColor: "var(--border-color)", marginBottom: "10px" }} />
+                    <button className="sidebar-download-btn" onClick={() => (window as any).addSpotifyCode()} style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "12px" }} id="btn_add_barcode">ADD BARCODE</button>
+                </div>
+            </div>
+            
+            {/* Fixed Add To Cart Bottom Panel */}
+            <div style={{ padding: "20px 25px", borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-sidebar)" }}>
+                <button 
+                    className="sidebar-download-btn" 
+                    style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "16px", fontSize: "1rem", boxShadow: "0 10px 20px rgba(29, 185, 84, 0.3)" }} 
+                    onClick={() => (window as any).handleAddToCart()}
+                >
+                    <i className="fas fa-shopping-cart" style={{ marginRight: "10px" }}></i> 
+                    <span>ADD TO CART</span>
+                </button>
             </div>
         </div>
 
