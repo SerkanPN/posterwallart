@@ -9,8 +9,9 @@ import { Profile } from './pages/Profile';
 import { SellerDashboard } from './pages/SellerDashboard';
 import { Wishlist } from './pages/Wishlist';
 import { ProductDetail } from './pages/ProductDetail';
-import { SpecialForRoom } from './pages/SpecialForRoom'; // Added missing import
-import { HDTools } from './pages/HDTools';             // Added missing import
+import { SpecialForRoom } from './pages/SpecialForRoom';
+import { HDTools } from './pages/HDTools';
+import AlbumPosterBuilder from './pages/AlbumPosterBuilder'; // Eklenen Import
 import { useStore } from './store/useStore';
 
 export default function App() {
@@ -38,6 +39,7 @@ export default function App() {
           {/* AI SERVICES */}
           <Route path="special" element={<SpecialForRoom />} />
           <Route path="lab" element={<HDTools />} />
+          <Route path="custom-album" element={<AlbumPosterBuilder />} /> {/* Eklenen Rota */}
           
           {/* USER SYSTEM */}
           <Route path="cart" element={<Cart />} />
