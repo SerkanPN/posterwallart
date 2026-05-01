@@ -231,31 +231,34 @@ export default function AlbumPosterBuilder() {
     w.updateFrameColor("#f5f5f5"); 
     w.showVariantsView(); 
 
-    w.search = function() {
-        const q = (document.getElementById('query') as HTMLInputElement).value; if(!q) return;
+    w.executeDeezerSearch = function() {
+        const q = (document.getElementById('query') as HTMLInputElement).value; 
+        if(!q) return;
         const s = document.createElement('script');
-        s.src = `https://api.deezer.com/search/album?q=${encodeURIComponent(q)}&output=jsonp&callback=showResults`;
-        document.body.appendChild(s); document.body.removeChild(s);
+        s.src = `https://api.deezer.com/search/album?q=${encodeURIComponent(q)}&output=jsonp&callback=showDeezerResults`;
+        s.onload = () => document.body.removeChild(s);
+        document.body.appendChild(s);
     };
 
-    w.showResults = function(res: any) {
+    w.showDeezerResults = function(res: any) {
         document.getElementById('search-results')!.style.display = 'block';
         document.getElementById('results-grid')!.innerHTML = res.data.map((a: any) => `
-            <div class="album-item" onclick="loadAlbum(${a.id})">
+            <div class="album-item" onclick="window.fetchDeezerAlbum(${a.id})">
                 <img src="${a.cover_medium}"><h3>${a.title}</h3>
             </div>
         `).join('');
     };
 
-    w.loadAlbum = function(id: string) {
+    w.fetchDeezerAlbum = function(id: string) {
         w.showLoading("Fetching album data..."); 
         document.getElementById('search-results')!.style.display = 'none'; 
         const s = document.createElement('script');
-        s.src = `https://api.deezer.com/album/${id}?output=jsonp&callback=handleAlbumLoaded`; 
-        document.body.appendChild(s); document.body.removeChild(s);
+        s.src = `https://api.deezer.com/album/${id}?output=jsonp&callback=handleDeezerAlbumLoaded`; 
+        s.onload = () => document.body.removeChild(s);
+        document.body.appendChild(s);
     };
 
-    w.handleAlbumLoaded = function(d: any) {
+    w.handleDeezerAlbumLoaded = function(d: any) {
         w.activeAlbumData = d; w.currentSpotifyUri = null; (document.getElementById('spotifyLink') as HTMLInputElement).value = "";
         const spotifySearchBtn = document.getElementById('spotifySearchBtn') as HTMLAnchorElement;
         const query = encodeURIComponent(d.artist.name + " " + d.title);
@@ -660,14 +663,14 @@ export default function AlbumPosterBuilder() {
         const grid = document.getElementById('variants-grid');
         if(grid) {
             grid.innerHTML = variantsData.map((v) => `
-                <div class="variant-card" onclick="editVariant('${v.layout}', '${v.theme}')">
+                <div class="variant-card" onclick="window.editVariant('${v.layout}', '${v.theme}')">
                     <img id="preview_${v.key}" src="${v.url}">
                     <div class="variant-info">
                         <div class="variant-layout">${v.layout === 'standart' ? 'Minimalist' : 'bBoxes'}</div>
                         <div class="variant-theme">${v.theme} THEME</div>
                     </div>
                     <div class="variant-actions">
-                        <button onclick="event.stopPropagation(); downloadVariant('${v.layout}', '${v.theme}')" class="sidebar-download-btn btn-dark" style="padding:10px;"><i class="fas fa-download"></i></button>
+                        <button onclick="event.stopPropagation(); window.downloadVariant('${v.layout}', '${v.theme}')" class="sidebar-download-btn btn-dark" style="padding:10px;"><i class="fas fa-download"></i></button>
                         <button class="sidebar-download-btn btn-accent" style="padding:10px; flex:2;">EDIT</button>
                     </div>
                 </div>
@@ -869,7 +872,7 @@ export default function AlbumPosterBuilder() {
             if (alignType === 'left') {
                 if (activeObj.originX === 'left') activeObj.set({ left: 0 });
                 else if (activeObj.originX === 'center') activeObj.set({ left: wObj/2 });
-                else if (activeObj.originX === 'right') activeObj.set({ left: wObj });
+                else if (activeObj.originX === 'right') activeObj.set({ left: w });
             } else if (alignType === 'center') {
                 activeObj.centerH();
             } else if (alignType === 'right') {
@@ -1023,7 +1026,6 @@ export default function AlbumPosterBuilder() {
         if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) { e.preventDefault(); obj.setCoords(); w.canvas.requestRenderAll(); w.saveState(); w.updateEditorPanel(); }
     });
 
-    // Add To Cart Integration Function
     w.handleAddToCart = function() {
         if (!w.activeAlbumData) {
             alert("Please search and select an album first!");
@@ -1076,8 +1078,8 @@ export default function AlbumPosterBuilder() {
             <div className="sidebar-group">
                 <span className="sidebar-title" id="title_search_music"><i className="fas fa-music"></i> Search Music</span>
                 <div style={{ position: "relative" }}>
-                    <input type="text" id="query" className="sidebar-control" placeholder="Artist or Album..." onKeyDown={(e) => { if(e.key === 'Enter') (window as any).search(); }} style={{ paddingRight: "40px" }} />
-                    <i className="fas fa-search" style={{ position: "absolute", right: "15px", top: "14px", color: "var(--text-muted)", cursor: "pointer" }} onClick={() => (window as any).search()}></i>
+                    <input type="text" id="query" className="sidebar-control" placeholder="Artist or Album..." onKeyDown={(e) => { if(e.key === 'Enter') (window as any).executeDeezerSearch(); }} style={{ paddingRight: "40px" }} />
+                    <i className="fas fa-search" style={{ position: "absolute", right: "15px", top: "14px", color: "var(--text-muted)", cursor: "pointer" }} onClick={() => (window as any).executeDeezerSearch()}></i>
                 </div>
             </div>
 
