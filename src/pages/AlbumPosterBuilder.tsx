@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import InteractiveCanvas from '../components/InteractiveCanvas';
 import { useStore } from '../store/useStore';
 
 interface Track {
@@ -25,7 +24,6 @@ const AlbumPosterBuilder: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [selectedSize, setSelectedSize] = useState('18x24');
   
-  // useStore yapına göre burayı kendi sepete ekleme fonksiyonunun adıyla değiştirebilirsin
   const addToCart = useStore((state: any) => state.addToCart); 
 
   const searchiTunes = async () => {
@@ -79,10 +77,9 @@ const AlbumPosterBuilder: React.FC = () => {
   const handleAddToCart = () => {
     if (!selectedAlbum) return;
     
-    // Sepet reçetesi oluşturuluyor
     addToCart({
-      id: `custom_${selectedAlbum.collectionId}_${Date.now()}`,
-      name: `${selectedAlbum.artist} - ${selectedAlbum.title} Custom Poster`,
+      id: `custom_album_${selectedAlbum.collectionId}_${Date.now()}`,
+      name: `${selectedAlbum.artist} - ${selectedAlbum.title} Poster`,
       price: 29.99,
       image: selectedAlbum.coverUrl,
       type: 'custom_album',
@@ -97,17 +94,17 @@ const AlbumPosterBuilder: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4 flex flex-col md:flex-row gap-8 text-white min-h-screen bg-[#121212]">
-      {/* Sol Panel: Arama ve Liste */}
+      {/* SOL PANEL: ARAMA */}
       <div className="w-full md:w-1/3 flex flex-col">
-        <h1 className="text-2xl font-bold mb-4">Create Your Album Poster</h1>
+        <h1 className="text-2xl font-bold mb-4 text-[#1db954]">Custom Album Poster</h1>
         <div className="flex gap-2 mb-6">
           <input 
             type="text" 
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && searchiTunes()}
-            placeholder="Sanatçı adı girin..."
-            className="w-full p-3 border border-gray-700 rounded bg-[#181818] text-white focus:outline-none focus:border-green-500"
+            placeholder="Sanatçı veya albüm ara..."
+            className="w-full p-3 border border-gray-700 rounded bg-[#181818] text-white focus:outline-none focus:border-[#1db954]"
           />
           <button 
             onClick={searchiTunes}
@@ -117,7 +114,7 @@ const AlbumPosterBuilder: React.FC = () => {
           </button>
         </div>
 
-        {loading && <p className="text-gray-400 mb-4">Veriler getiriliyor...</p>}
+        {loading && <p className="text-gray-400 mb-4">Aranıyor...</p>}
 
         <div className="grid grid-cols-2 gap-4 overflow-y-auto max-h-[calc(100vh-200px)] pr-2 custom-scrollbar">
           {results.map((album) => (
@@ -138,16 +135,54 @@ const AlbumPosterBuilder: React.FC = () => {
         </div>
       </div>
 
-      {/* Sağ Panel: Canvas Önizleme ve İşlemler */}
+      {/* SAĞ PANEL: BAĞIMSIZ POSTER ÖNİZLEME VE SEPET */}
       <div className="w-full md:w-2/3 flex flex-col items-center justify-start pt-10">
         {selectedAlbum ? (
-          <div className="w-full max-w-2xl flex flex-col items-center">
+          <div className="w-full flex flex-col items-center">
             
-            <div className="w-full bg-[#181818] rounded-xl p-6 mb-6 flex justify-center shadow-2xl border border-gray-800 min-h-[500px]">
-              <InteractiveCanvas albumData={selectedAlbum} />
+            {/* BAĞIMSIZ TASARIM ŞABLONU (İzole HTML/CSS) */}
+            <div className="bg-[#f4f4f0] text-black w-full max-w-[400px] aspect-[2/3] p-6 shadow-2xl flex flex-col mb-8 relative">
+              {/* Beyaz Poster Çerçevesi */}
+              <div className="border border-gray-300 w-full h-full p-4 flex flex-col">
+                <img 
+                  src={selectedAlbum.hdCoverUrl} 
+                  alt="Album Cover" 
+                  className="w-full aspect-square object-cover shadow-sm"
+                />
+                <div className="mt-4 flex flex-col items-center text-center">
+                  <h2 className="text-2xl font-black uppercase tracking-tighter leading-tight">
+                    {selectedAlbum.artist}
+                  </h2>
+                  <h3 className="text-sm font-bold uppercase tracking-widest text-gray-600 mt-1">
+                    {selectedAlbum.title}
+                  </h3>
+                </div>
+                
+                {/* Şarkı Listesi - Sadece ilk 8 şarkı sığması için */}
+                <div className="mt-auto pt-4 border-t border-gray-300">
+                  <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-[8px] uppercase font-medium text-gray-800">
+                    {selectedAlbum.tracklist.slice(0, 8).map((track, idx) => (
+                      <li key={idx} className="flex justify-between w-full truncate">
+                        <span className="truncate pr-2">{idx + 1}. {track.title}</span>
+                        <span>{track.duration}</span>
+                      </li>
+                    ))}
+                    {selectedAlbum.tracklist.length > 8 && (
+                      <li className="col-span-2 text-center text-[7px] text-gray-500 mt-1">
+                        + {selectedAlbum.tracklist.length - 8} MORE TRACKS
+                      </li>
+                    )}
+                  </ul>
+                  <div className="flex justify-between w-full text-[8px] mt-3 font-bold text-gray-500 tracking-widest">
+                    <span>{selectedAlbum.genre}</span>
+                    <span>{selectedAlbum.year}</span>
+                  </div>
+                </div>
+              </div>
             </div>
+            {/* BAĞIMSIZ TASARIM BİTİŞ */}
             
-            <div className="flex gap-4 w-full">
+            <div className="flex gap-4 w-full max-w-[400px]">
               <select 
                 value={selectedSize}
                 onChange={(e) => setSelectedSize(e.target.value)}
@@ -167,7 +202,7 @@ const AlbumPosterBuilder: React.FC = () => {
             </div>
           </div>
         ) : (
-          <div className="h-[500px] w-full max-w-2xl flex items-center justify-center border-2 border-dashed border-gray-700 rounded-xl text-gray-500 bg-[#181818] bg-opacity-50">
+          <div className="h-[500px] w-full max-w-[400px] flex items-center justify-center border-2 border-dashed border-gray-700 rounded-xl text-gray-500 bg-[#181818] bg-opacity-50">
             Tasarımı görmek için listeden bir albüm seçin.
           </div>
         )}
