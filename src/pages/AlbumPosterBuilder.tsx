@@ -12,14 +12,29 @@ const GOOGLE_FONTS = [
   "Fredoka One", "Carter One", "Patua One", "Chewy", "Shrikhand"
 ];
 
+const LAYOUT_STYLES = [
+    { id: 'style1', name: 'STYLE 1', desc: 'Minimalist Standard' },
+    { id: 'style2', name: 'STYLE 2', desc: 'Signature Edition' },
+    { id: 'style3', name: 'STYLE 3', desc: 'Color Palette Focus' },
+    { id: 'style4', name: 'STYLE 4', desc: 'Right Aligned' },
+    { id: 'style5', name: 'STYLE 5', desc: 'Split Details' },
+    { id: 'style6', name: 'STYLE 6', desc: 'Centered Tracklist' },
+    { id: 'style7', name: 'STYLE 7', desc: 'Bold Header' },
+    { id: 'style8', name: 'STYLE 8', desc: 'Full Bleed Image' },
+    { id: 'vinyl', name: 'VINYL EDITION', desc: 'Gold/Black Record' }
+];
+
 export default function AlbumPosterBuilder() {
   const addToCart = useStore((state: any) => state.addToCart);
   const isInitialized = useRef(false);
   
+  const [appView, setAppView] = useState<'select' | 'editor'>('select');
+  const [selectedLayout, setSelectedLayout] = useState('style1');
   const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
   const [activeFont, setActiveFont] = useState("Inter");
 
   useEffect(() => {
+    if (appView !== 'editor') return;
     if (isInitialized.current) return;
     isInitialized.current = true;
 
@@ -142,23 +157,83 @@ export default function AlbumPosterBuilder() {
     return () => {
       // Cleanup if needed
     };
-  }, []);
+  }, [appView]);
+
+  const handleStyleSelection = (id: string) => {
+      setSelectedLayout(id);
+      setAppView('editor');
+  };
+
+  if (appView === 'select') {
+      return (
+          <div className="min-h-screen bg-[#0e0e15] text-white p-8 font-sans overflow-y-auto w-full">
+              <div className="max-w-6xl mx-auto">
+                  <div className="text-center mb-12">
+                      <h1 className="text-5xl font-black italic tracking-tighter uppercase mb-3">CHOOSE YOUR STYLE</h1>
+                      <p className="text-gray-400">Select a structural template to begin designing your custom album poster.</p>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                      {LAYOUT_STYLES.map((style) => (
+                          <div 
+                              key={style.id} 
+                              className="bg-[#181824] rounded-2xl border border-[#2b2b3d] p-6 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 hover:border-[#5a4fcb] hover:-translate-y-2 hover:shadow-[0_15px_30px_rgba(90,79,203,0.3)] group"
+                              onClick={() => handleStyleSelection(style.id)}
+                          >
+                              <div className="w-full aspect-[2/3] bg-[#222232] rounded-lg mb-6 flex items-center justify-center border border-[#3a3a52] overflow-hidden relative">
+                                  {/* Dummy Wireframes representing styles */}
+                                  {style.id === 'vinyl' ? (
+                                      <div className="w-32 h-32 rounded-full border-[10px] border-yellow-600 bg-gray-900 flex items-center justify-center">
+                                          <div className="w-10 h-10 rounded-full border-2 border-yellow-500 bg-[#222232]"></div>
+                                      </div>
+                                  ) : (
+                                      <div className="w-full h-full p-4 flex flex-col justify-end opacity-50 group-hover:opacity-100 transition-opacity">
+                                          <div className="w-full h-1/2 bg-gray-700 rounded mb-4"></div>
+                                          <div className="h-4 w-3/4 bg-gray-500 mb-2"></div>
+                                          <div className="h-2 w-1/2 bg-gray-600 mb-4"></div>
+                                          <div className="flex gap-2 mb-2">
+                                            <div className="h-8 w-8 bg-gray-600 rounded"></div>
+                                            <div className="h-8 w-8 bg-gray-600 rounded"></div>
+                                          </div>
+                                      </div>
+                                  )}
+                              </div>
+                              <h3 className="text-xl font-black italic tracking-wider mb-1">{style.name}</h3>
+                              <p className="text-sm text-gray-400">{style.desc}</p>
+                              
+                              <button className="mt-6 w-full bg-[#5a4fcb] hover:bg-[#6b5cdb] text-white py-3 rounded-xl font-bold uppercase tracking-wider text-xs transition-colors">
+                                  Select Style
+                              </button>
+                          </div>
+                      ))}
+                  </div>
+              </div>
+          </div>
+      );
+  }
 
   const initApplicationLogic = () => {
     const w = window as any;
     
+    // Pass the React State down to the Window object so Fabric JS knows which style to build
+    w.globalLayoutPreference = selectedLayout;
+
     w.syncReactFontState = function(fontName: string) {
         setActiveFont(fontName);
     };
 
     w.showLoading = function(textKey: string, subtextKey = "") {
-        document.getElementById('loader-text')!.innerText = textKey;
-        document.getElementById('loader-subtext')!.innerText = subtextKey || "";
-        document.getElementById('global-loader')!.style.display = 'flex';
+        const el = document.getElementById('loader-text');
+        const el2 = document.getElementById('loader-subtext');
+        const loader = document.getElementById('global-loader');
+        if (el) el.innerText = textKey;
+        if (el2) el2.innerText = subtextKey || "";
+        if (loader) loader.style.display = 'flex';
     };
     
     w.hideLoading = function() {
-        document.getElementById('global-loader')!.style.display = 'none';
+        const loader = document.getElementById('global-loader');
+        if (loader) loader.style.display = 'none';
     };
 
     w.variantStates = {};
@@ -241,9 +316,7 @@ export default function AlbumPosterBuilder() {
         w.rescale((document.getElementById('zoom-slider') as HTMLInputElement).value);
         if (w.activeAlbumData) {
             w.generateAllVariants();
-        } else if (w.currentImg) {
-            document.getElementById('layoutSelect')!.dispatchEvent(new Event('change'));
-        }
+        } 
     };
 
     w.rescale = function(sliderVal: string) { 
@@ -260,7 +333,6 @@ export default function AlbumPosterBuilder() {
             frame.style.width = targetW + 'px'; 
             frame.style.height = targetH + 'px';
         }
-
         w.toggleGridVisuals(); 
     };
 
@@ -338,55 +410,11 @@ export default function AlbumPosterBuilder() {
         if(w.currentImg) { 
             w.showLoading("Processing...");
             w.extractPalettePromise(w.currentImg).then(()=> {
-                w.applyTheme((document.getElementById('themeSelect') as HTMLSelectElement).value);
+                w.applyTheme('light'); // Re-apply current theme
                 w.hideLoading();
             }).catch(() => w.hideLoading()); 
         } 
         else { alert("Please upload an image first."); } 
-    };
-
-    w.initFooterBrandingPromise = function() {
-        return new Promise((resolve) => {
-            const theme = (document.getElementById('themeSelect') as HTMLSelectElement).value;
-            let elemColor = (theme === 'dark' || theme === 'blurry' || theme === 'colorful') ? "#eeeeee" : "#222222";
-            const m = w.getLayoutMetrics();
-
-            let textObj = w.canvas.getObjects().find((o: any) => o.id === 'branding-text');
-            if (textObj) w.canvas.remove(textObj);
-
-            let qrObj = w.canvas.getObjects().find((o: any) => o.id === 'branding-qr');
-            if (qrObj) w.canvas.remove(qrObj); 
-
-            let qrSource = '/musicpostershop.png'; 
-
-            w.fabric.Image.fromURL(qrSource, function(img: any) {
-                try {
-                    if (img && img.width) {
-                        img.scaleToHeight(170 * m.S);
-                        if (elemColor === "#eeeeee") { 
-                            img.filters = [new w.fabric.Image.filters.Invert()]; 
-                            img.applyFilters(); 
-                        }
-                        
-                        const canvasW = 4961 * m.S;
-                        const bottomY = m.OY + (7016 * m.S) - (150 * m.S); 
-
-                        img.set({ 
-                            left: m.OX + (canvasW / 2), 
-                            top: bottomY,
-                            originX: 'center', 
-                            originY: 'center', 
-                            id: 'branding-qr', 
-                            selectable: true,
-                            opacity: 0.7 
-                        });
-                        w.canvas.add(img);
-                    }
-                } catch(e) { console.error("QR Code Error:", e); }
-                w.canvas.requestRenderAll();
-                resolve(true);
-            }, { crossOrigin: 'anonymous' });
-        });
     };
 
     w.updateBlurSettingsPromise = function() {
@@ -493,7 +521,7 @@ export default function AlbumPosterBuilder() {
                     w.canvas.add(mLbl, mVal); metaY += Math.max(mVal.height, mLbl.height) + (80 * m.S);
                 });
 
-                await w.extractPalettePromise(d.cover_xl); await w.applyTheme((document.getElementById('themeSelect') as HTMLSelectElement).value);
+                await w.extractPalettePromise(d.cover_xl); await w.applyTheme('light');
                 w.canvas.requestRenderAll(); setTimeout(() => resolve(true), 50); 
             }, { crossOrigin: 'anonymous' });
         });
@@ -541,20 +569,76 @@ export default function AlbumPosterBuilder() {
                 let r1 = new w.fabric.IText(`RELEASED ON`, { left: rightColX, top: footerY - (80 * m.S), fontSize: 50 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: textColor, originX: 'right', textAlign: 'right', id: 'layout2-meta' });
                 let r2 = new w.fabric.IText(dateStr.toUpperCase(), { left: rightColX, top: footerY, fontSize: 50 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: textColor, originX: 'right', textAlign: 'right', id: 'layout2-meta' }); w.canvas.add(r1, r2);
 
-                await w.extractPalettePromise(d.cover_xl); await w.applyTheme((document.getElementById('themeSelect') as HTMLSelectElement).value);
+                await w.extractPalettePromise(d.cover_xl); await w.applyTheme('light');
                 w.canvas.requestRenderAll(); setTimeout(() => resolve(true), 50);
             }, { crossOrigin: 'anonymous' });
         });
     };
 
+    w.renderVinyl = async function(d: any) {
+        return new Promise(async (resolve) => {
+            w.currentImg = d.cover_xl; w.albumTitle = d.title;
+            const m = w.getLayoutMetrics();
+            
+            w.canvas.clear(); w.paletteRects = [];
+            w.canvas.setBackgroundColor('#111111', () => {});
+
+            // Draw Vinyl Record
+            const centerX = m.OX + (4961 * m.S / 2);
+            const centerY = m.OY + (3000 * m.S);
+            
+            let recordBase = new w.fabric.Circle({ radius: 1800 * m.S, fill: '#1a1a1a', stroke: '#000', strokeWidth: 20 * m.S, left: centerX, top: centerY, originX: 'center', originY: 'center', selectable: false });
+            w.canvas.add(recordBase);
+
+            for (let i = 1; i <= 6; i++) {
+                w.canvas.add(new w.fabric.Circle({ radius: (1800 - (i * 150)) * m.S, fill: 'transparent', stroke: 'rgba(255,255,255,0.05)', strokeWidth: 5 * m.S, left: centerX, top: centerY, originX: 'center', originY: 'center', selectable: false }));
+            }
+
+            // Draw center label
+            w.fabric.Image.fromURL(d.cover_xl, async function(img: any) {
+                img.scaleToWidth(1200 * m.S);
+                img.set({ left: centerX, top: centerY, originX: 'center', originY: 'center', id: 'main-cover' });
+                
+                let clipPath = new w.fabric.Circle({ radius: 600 * m.S, originX: 'center', originY: 'center' });
+                img.set({ clipPath: clipPath });
+                w.canvas.add(img);
+
+                // Center hole
+                w.canvas.add(new w.fabric.Circle({ radius: 50 * m.S, fill: '#111111', left: centerX, top: centerY, originX: 'center', originY: 'center', selectable: false }));
+
+                // Plaque
+                let rectPlaque = new w.fabric.Rect({ left: centerX, top: m.OY + 6200 * m.S, width: 3500 * m.S, height: 1000 * m.S, fill: '#1a1a1a', stroke: '#d6a052', strokeWidth: 15 * m.S, originX: 'center', originY: 'center', rx: 20 * m.S, ry: 20 * m.S, id: 'plaque-bg' });
+                w.canvas.add(rectPlaque);
+
+                let artistText = new w.fabric.IText(d.artist.name, { left: centerX, top: m.OY + 6000 * m.S, fontSize: 250 * m.S, fontFamily: 'Allura', fill: '#ffffff', originX: 'center', originY: 'center', id: 'artist-text' });
+                w.canvas.add(artistText);
+
+                let titleClean = d.title.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim().toUpperCase();
+                let titleText = new w.fabric.IText(titleClean, { left: centerX, top: m.OY + 6350 * m.S, fontSize: 120 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: '#d6a052', originX: 'center', originY: 'center', id: 'title-text' });
+                w.canvas.add(titleText);
+
+                await w.extractPalettePromise(d.cover_xl); 
+                w.canvas.requestRenderAll(); setTimeout(() => resolve(true), 50);
+            }, { crossOrigin: 'anonymous' });
+        });
+    }
+
     w.applyTheme = async function(theme: string) {
-        let layout = (document.getElementById('layoutSelect') as HTMLSelectElement).value;
+        if (w.globalLayoutPreference === 'vinyl') {
+            (document.getElementById('blurToggle') as HTMLInputElement).checked = false; 
+            return;
+        }
+
         let frameColor = "#ffffff"; let textColor = "#212121"; let subTextColor = "#444444"; let descColor = "#333333"; let lineColor = "#222222"; let isBlur = false;
         
         if (theme === 'light') { frameColor = "#f5f5f5"; textColor = "#212121"; subTextColor = "#444444"; descColor = "#333333"; lineColor = "#222222"; } 
         else if (theme === 'dark') { frameColor = "#111111"; textColor = "#f5f5f5"; subTextColor = "#cccccc"; descColor = "#dddddd"; lineColor = "#eeeeee"; } 
         else if (theme === 'blurry') { isBlur = true; textColor = "#f5f5f5"; subTextColor = "#eeeeee"; descColor = "#f5f5f5"; lineColor = "#ffffff"; } 
         else if (theme === 'colorful') { frameColor = (document.getElementById('p1') as HTMLInputElement).value || "#d68c5b"; textColor = "#f5f5f5"; subTextColor = "#eeeeee"; descColor = "#f5f5f5"; lineColor = "#ffffff"; }
+        else if (theme === 'vintage') { frameColor = "#dcd0c0"; textColor = "#3e2723"; subTextColor = "#5d4037"; lineColor = "#4e342e"; }
+        else if (theme === 'bw') { frameColor = "#ffffff"; textColor = "#000000"; subTextColor = "#333333"; lineColor = "#000000"; }
+        else if (theme === 'sepia') { frameColor = "#f4ecd8"; textColor = "#5e4d3a"; subTextColor = "#8d7966"; lineColor = "#705d49"; }
+        else if (theme === 'neon') { frameColor = "#000000"; textColor = "#00ffcc"; subTextColor = "#ff00ff"; lineColor = "#00ffcc"; }
 
         (document.getElementById('frameColorPicker') as HTMLInputElement).value = frameColor; 
         if (!isBlur) { w.canvas.setBackgroundImage(null, () => {}); w.canvas.setBackgroundColor(frameColor, () => {}); }
@@ -563,43 +647,21 @@ export default function AlbumPosterBuilder() {
         await w.updateBlurSettingsPromise();
 
         w.canvas.getObjects().forEach((obj: any) => {
-            if (['artist-text', 'meta-val', 'meta-lbl', 'title-text', 'track-text', 'signature-text', 'layout2-meta'].includes(obj.id)) { if (obj.type !== 'rect') obj.set('fill', (obj.id === 'meta-val' || (obj.id === 'artist-text' && layout === 'standart')) ? subTextColor : textColor); }
+            if (['artist-text', 'meta-val', 'meta-lbl', 'title-text', 'track-text', 'signature-text', 'layout2-meta'].includes(obj.id)) { if (obj.type !== 'rect') obj.set('fill', (obj.id === 'meta-val' || (obj.id === 'artist-text' && w.globalLayoutPreference === 'style1')) ? subTextColor : textColor); }
             if (obj.id === 'desc-text') obj.set('fill', descColor);
         });
         if(w.currentSpotifyUri || (document.getElementById('spotifyLink') as HTMLInputElement).value.trim()) { await w.addSpotifyCodePromise(); }
         
-        await w.initFooterBrandingPromise(); 
         w.canvas.requestRenderAll();
     };
 
     w.handleThemeChange = async function(newTheme: string) {
-        let l = (document.getElementById('layoutSelect') as HTMLSelectElement).value;
         if (!w.activeAlbumData) { await w.applyTheme(newTheme); return; }
         w.saveCurrentStateToMemory(); 
         await w.applyTheme(newTheme);
-        w.currentVariantKey = `${l}_${newTheme}`;
+        w.currentVariantKey = `${w.globalLayoutPreference}_${newTheme}`;
         w.saveCurrentStateToMemory();
         w.saveState();
-    };
-
-    w.handleLayoutChange = async function(newLayout: string) {
-        let t_theme = (document.getElementById('themeSelect') as HTMLSelectElement).value; 
-        if (!w.activeAlbumData) { await w.applyTheme(t_theme); return; }
-        w.saveCurrentStateToMemory();
-        let newKey = `${newLayout}_${t_theme}`;
-        if (w.variantStates[newKey]) {
-            w.editVariant(newLayout, t_theme); 
-        } else {
-            w.currentVariantKey = newKey;
-            w.showLoading("Loading editor..."); 
-            w.isBatchGenerating = true;
-            try {
-                if(newLayout === 'standart') await w.renderStandard(w.activeAlbumData); else await w.renderMinimal(w.activeAlbumData);
-            } catch(e) {} finally {
-                w.isBatchGenerating = false;
-                w.saveState(); w.saveCurrentStateToMemory(); w.hideLoading();
-            }
-        }
     };
 
     w.applyImageFilter = function(type: string) {
@@ -612,13 +674,6 @@ export default function AlbumPosterBuilder() {
     w.updateLineColor = function(v: string) { if(w.separatorLine) { w.separatorLine.set('fill', v); w.canvas.requestRenderAll(); if(!w.isBatchGenerating) w.saveState(); w.saveCurrentStateToMemory(); } };
     w.setPalette = function(i: number, c: string) { const b = document.getElementById('box'+i); if(b) b.style.backgroundColor = c; if(w.paletteRects && w.paletteRects[i]) { w.paletteRects[i].set('fill', c); w.canvas.requestRenderAll(); w.saveCurrentStateToMemory(); } };
 
-    w.confirmGenerateAll = function() {
-        if(Object.keys(w.variantStates).length > 0) {
-            if(!confirm("Are you sure you want to regenerate all variants? Current unsaved edits will be lost.")) return;
-        }
-        w.generateAllVariants();
-    };
-
     w.generateAllVariants = async function() {
         if(!w.activeAlbumData) { alert("Please search and select an album first!"); return; }
 
@@ -626,22 +681,29 @@ export default function AlbumPosterBuilder() {
         w.isBatchGenerating = true; w.variantStates = {}; 
         const wasGridOn = w.isGridEnabled; if (wasGridOn) w.toggleGrid(false);
 
-        const layouts = ['standart', 'minimal']; const themes = ['light', 'dark', 'blurry', 'colorful']; const variantsData = [];
+        // Generate 8 variations of the chosen structural layout
+        const themes = ['light', 'dark', 'blurry', 'colorful', 'vintage', 'bw', 'sepia', 'neon']; 
+        const variantsData = [];
         await w.extractPalettePromise(w.activeAlbumData.cover_xl);
 
-        for (let l of layouts) {
-            for (let t_theme of themes) { 
-                (document.getElementById('layoutSelect') as HTMLSelectElement).value = l; (document.getElementById('themeSelect') as HTMLSelectElement).value = t_theme;
-                if (l === 'standart') await w.renderStandard(w.activeAlbumData); else await w.renderMinimal(w.activeAlbumData);
-                let key = `${l}_${t_theme}`;
-                w.variantStates[key] = w.canvas.toJSON(w.PROPS_TO_SAVE);
-                
-                try {
-                    const previewUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 0.8, multiplier: 0.4 });
-                    variantsData.push({ layout: l, theme: t_theme, url: previewUrl, key: key });
-                } catch(e) {
-                    variantsData.push({ layout: l, theme: t_theme, url: '', key: key });
-                }
+        const currentLyt = w.globalLayoutPreference;
+
+        for (let t_theme of themes) { 
+            if (currentLyt === 'style1') await w.renderStandard(w.activeAlbumData); 
+            else if (currentLyt === 'style2') await w.renderMinimal(w.activeAlbumData);
+            else if (currentLyt === 'vinyl') await w.renderVinyl(w.activeAlbumData);
+            else await w.renderStandard(w.activeAlbumData); // Fallback for styles 3-8 placeholder
+            
+            await w.applyTheme(t_theme);
+            
+            let key = `${currentLyt}_${t_theme}`;
+            w.variantStates[key] = w.canvas.toJSON(w.PROPS_TO_SAVE);
+            
+            try {
+                const previewUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 0.8, multiplier: 0.4 });
+                variantsData.push({ layout: currentLyt, theme: t_theme, url: previewUrl, key: key });
+            } catch(e) {
+                variantsData.push({ layout: currentLyt, theme: t_theme, url: '', key: key });
             }
         }
 
@@ -655,7 +717,7 @@ export default function AlbumPosterBuilder() {
                 <div class="variant-card" onclick="window.editVariant('${v.layout}', '${v.theme}')">
                     <img id="preview_${v.key}" src="${v.url}">
                     <div class="variant-info">
-                        <div class="variant-layout">${v.layout === 'standart' ? 'Minimalist' : 'bBoxes'}</div>
+                        <div class="variant-layout">${v.layout.toUpperCase()}</div>
                         <div class="variant-theme">${v.theme} THEME</div>
                     </div>
                     <div class="variant-actions">
@@ -665,8 +727,7 @@ export default function AlbumPosterBuilder() {
             `).join('');
         }
 
-        w.currentVariantKey = 'standart_light';
-        (document.getElementById('layoutSelect') as HTMLSelectElement).value = 'standart'; (document.getElementById('themeSelect') as HTMLSelectElement).value = 'light';
+        w.currentVariantKey = `${currentLyt}_light`;
         w.canvas.loadFromJSON(w.variantStates[w.currentVariantKey], () => { w.canvas.requestRenderAll(); w.historyStack=[]; w.redoStack=[]; w.saveState(); w.hideLoading(); w.showVariantsView(); });
     };
 
@@ -675,7 +736,6 @@ export default function AlbumPosterBuilder() {
         
         w.saveCurrentStateToMemory();
         w.currentVariantKey = `${layout}_${theme}`;
-        (document.getElementById('layoutSelect') as HTMLSelectElement).value = layout; (document.getElementById('themeSelect') as HTMLSelectElement).value = theme;
         
         w.showLoading("Loading editor..."); 
         w.isBatchGenerating = true; 
@@ -684,7 +744,10 @@ export default function AlbumPosterBuilder() {
             if (w.variantStates[w.currentVariantKey]) {
                 await new Promise(r => { w.canvas.loadFromJSON(w.variantStates[w.currentVariantKey], () => { w.canvas.requestRenderAll(); r(true); }); });
             } else {
-                if (layout === 'standart') await w.renderStandard(w.activeAlbumData); else await w.renderMinimal(w.activeAlbumData);
+                if (layout === 'style1') await w.renderStandard(w.activeAlbumData); 
+                else if (layout === 'style2') await w.renderMinimal(w.activeAlbumData);
+                else if (layout === 'vinyl') await w.renderVinyl(w.activeAlbumData);
+                else await w.renderStandard(w.activeAlbumData);
             }
         } catch(e) {} finally {
             w.isBatchGenerating = false; w.historyStack=[]; w.redoStack=[]; w.saveState(); w.hideLoading(); w.showSingleEditor();
@@ -823,8 +886,6 @@ export default function AlbumPosterBuilder() {
             if(obj.type === 'i-text' || obj.type === 'textbox') text = obj.text.substring(0, 15) + '...'; 
             if(obj.id === 'main-cover') text = "Album Cover"; 
             if(obj.id === 'spotify-code') text = "Spotify Barcode";
-            if(obj.id === 'branding-text') text = "Branding Text";
-            if(obj.id === 'branding-qr') text = "Branding QR";
             
             let div = document.createElement('div'); div.className = 'layer-item'; if(w.canvas.getActiveObject() === obj) div.style.borderLeft = "3px solid var(--accent)";
             let nameSpan = document.createElement('span'); nameSpan.innerText = text; nameSpan.style.cursor = 'pointer'; nameSpan.style.flex = '1'; nameSpan.style.marginLeft = '8px';
@@ -938,31 +999,31 @@ export default function AlbumPosterBuilder() {
                     w.latestVariantsData.forEach((v: any, index: number) => {
                         addToCart({
                             id: `custom_pro_${w.activeAlbumData.id}_${v.key}_${Date.now()}_${index}`,
-                            name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} (${v.layout} - ${v.theme})`,
+                            name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} (${w.globalLayoutPreference} - ${v.theme})`,
                             price: 29.99,
-                            image: w.activeAlbumData.cover_xl, 
+                            image: w.activeAlbumData.cover_xl, // RAW URL
                             type: 'custom_pro_album',
                             metadata: {
                                 format: w.currentFormat,
-                                layout: v.layout,
+                                layout: w.globalLayoutPreference,
                                 theme: v.theme,
-                                designState: w.variantStates[v.key]
+                                designState: w.variantStates[v.key] // JSON payload
                             }
                         });
                     });
-                    alert("Added 8 designs to cart successfully!");
+                    alert(`Added 8 variations of ${w.globalLayoutPreference} to cart successfully!`);
                 } else {
                     addToCart({
                         id: `custom_pro_${w.activeAlbumData.id}_${Date.now()}`,
                         name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} Poster`,
                         price: 29.99,
-                        image: w.activeAlbumData.cover_xl, 
+                        image: w.activeAlbumData.cover_xl, // RAW URL
                         type: 'custom_pro_album',
                         metadata: {
                             format: w.currentFormat,
-                            layout: (document.getElementById('layoutSelect') as HTMLSelectElement).value,
-                            theme: (document.getElementById('themeSelect') as HTMLSelectElement).value,
-                            designState: w.canvas.toJSON(w.PROPS_TO_SAVE)
+                            layout: w.globalLayoutPreference,
+                            theme: "custom",
+                            designState: w.canvas.toJSON(w.PROPS_TO_SAVE) // JSON payload
                         }
                     });
                     alert("Added to cart successfully!");
@@ -980,7 +1041,6 @@ export default function AlbumPosterBuilder() {
     w.rescale((document.getElementById('zoom-slider') as HTMLInputElement).value);
     (document.getElementById('frameColorPicker') as HTMLInputElement).value = "#f5f5f5";
     w.updateFrameColor("#f5f5f5"); 
-    w.showVariantsView(); 
   };
 
   return (
@@ -1033,20 +1093,6 @@ export default function AlbumPosterBuilder() {
             </div>
 
             <div className="sidebar-group">
-                <span className="sidebar-title" id="title_templates_theme"><i className="fas fa-palette"></i> Styles & Layout</span>
-                <select id="layoutSelect" className="sidebar-control" onChange={(e) => (window as any).handleLayoutChange(e.target.value)}>
-                    <option value="standart" id="opt_layout_minimalist">Minimalist</option>
-                    <option value="minimal" id="opt_layout_bbox">bBoxes</option>
-                </select>
-                <select id="themeSelect" className="sidebar-control" onChange={(e) => (window as any).handleThemeChange(e.target.value)} style={{ marginTop: "5px" }}>
-                    <option value="light" id="opt_theme_light">Theme: Light</option>
-                    <option value="dark" id="opt_theme_dark">Theme: Dark</option>
-                    <option value="blurry" id="opt_theme_blurry">Theme: Blurry</option>
-                    <option value="colorful" id="opt_theme_colorful">Theme: Colorful</option>
-                </select>
-            </div>
-
-            <div className="sidebar-group">
                 <span className="sidebar-title" id="title_frame_separator">Frame & Separator</span>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                     <div><label style={{ fontSize: "0.6rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_frame_bg">Frame BG</label><input type="color" id="frameColorPicker" className="sidebar-control" defaultValue="#f5f5f5" onInput={(e: any) => (window as any).updateFrameColor(e.target.value)} /></div>
@@ -1054,7 +1100,7 @@ export default function AlbumPosterBuilder() {
                 </div>
             </div>
 
-            <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px" }}>
+            <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px", display: selectedLayout === 'vinyl' ? 'none' : 'block' }}>
                 <span className="sidebar-title" id="title_blur_settings" style={{ marginBottom: "10px" }}>Blur Settings</span>
                 <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer", marginBottom: "15px" }}>
                     <input type="checkbox" id="blurToggle" onChange={() => (window as any).updateBlurSettings()} style={{ width: "16px", height: "16px" }} /><span id="lbl_enable_blur_bg">Enable Blur BG</span>
@@ -1105,8 +1151,9 @@ export default function AlbumPosterBuilder() {
                 </div>
 
                 {/* Right Side */}
-                <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end' }}>
+                <div style={{ flex: 1, display: 'flex', justifyContent: 'flex-end', gap: '20px' }}>
                     <div className="view-toggle">
+                        <button onClick={() => setAppView('select')} className="toggle-btn" style={{ marginRight: '10px' }}><i className="fas fa-arrow-left"></i> STYLES</button>
                         <button onClick={() => (window as any).showVariantsView()} id="btn-show-gallery" className="toggle-btn active">GALLERY</button>
                         <button onClick={() => (window as any).showSingleEditor()} id="btn-show-editor" className="toggle-btn">EDITOR</button>
                     </div>
@@ -1121,7 +1168,7 @@ export default function AlbumPosterBuilder() {
                 <div id="variants-view" style={{ display: "flex", width: "100%", flexDirection: "column", paddingBottom: "50px" }}>
                     <div id="variants-grid" className="grid-pro">
                         <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "1rem", padding: "50px", gridColumn: "1 / -1", background: "var(--bg-sidebar)", borderRadius: "20px", border: "1px dashed var(--border-color)" }} id="msg_no_design_created">
-                            No design has been created yet. Search for an album to generate 8 beautiful variants.
+                            No design has been created yet. Search for an album to generate 8 beautiful variations of your selected style.
                         </div>
                     </div>
                 </div>
