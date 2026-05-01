@@ -1,9 +1,23 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/useStore';
+
+const GOOGLE_FONTS = [
+  "Inter", "Montserrat", "Roboto", "Open Sans", "Oswald", "Lato", "Poppins", 
+  "Playfair Display", "Raleway", "Ubuntu", "Merriweather", "Nunito", "Cinzel", 
+  "Dancing Script", "Pacifico", "Caveat", "Bebas Neue", "Anton", "Josefin Sans", 
+  "Lobster", "Righteous", "Permanent Marker", "Abril Fatface", "Vampiro One", 
+  "Alfa Slab One", "Syncopate", "Bangers", "Creepster", "Sacramento", "Satisfy",
+  "Amatic SC", "Kalam", "Courgette", "Great Vibes", "Teko", "Russo One",
+  "Prata", "Vollkorn", "Lora", "Crimson Text", "Zilla Slab", "Bungee", 
+  "Fredoka One", "Carter One", "Patua One", "Chewy", "Shrikhand"
+];
 
 export default function AlbumPosterBuilder() {
   const addToCart = useStore((state: any) => state.addToCart);
   const isInitialized = useRef(false);
+  
+  const [isFontDropdownOpen, setIsFontDropdownOpen] = useState(false);
+  const [activeFont, setActiveFont] = useState("Inter");
 
   useEffect(() => {
     if (isInitialized.current) return;
@@ -21,11 +35,20 @@ export default function AlbumPosterBuilder() {
     };
 
     const initScripts = async () => {
+      // Load Google Fonts dynamically
+      const fontUrl = `https://fonts.googleapis.com/css?family=${GOOGLE_FONTS.map(f => f.replace(/ /g, '+')).join('|')}&display=swap`;
+      if (!document.getElementById('google-fonts-custom')) {
+          const link = document.createElement('link');
+          link.id = 'google-fonts-custom';
+          link.rel = 'stylesheet';
+          link.href = fontUrl;
+          document.head.appendChild(link);
+      }
+
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js');
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/node-vibrant/3.1.6/vibrant.min.js');
       
-      // Inject CSS
       if (!document.getElementById('pro-poster-styles')) {
         const style = document.createElement('style');
         style.id = 'pro-poster-styles';
@@ -116,6 +139,10 @@ export default function AlbumPosterBuilder() {
   const initApplicationLogic = () => {
     const w = window as any;
     
+    w.syncReactFontState = function(fontName: string) {
+        setActiveFont(fontName);
+    };
+
     w.showLoading = function(textKey: string, subtextKey = "") {
         document.getElementById('loader-text')!.innerText = textKey;
         document.getElementById('loader-subtext')!.innerText = subtextKey || "";
@@ -338,25 +365,18 @@ export default function AlbumPosterBuilder() {
                 w.canvas.add(textObj);
             }
 
-            // GÜNCELLEME: public klasorune (kök dizine) giden path '/' eklendi.
             let qrSource = localStorage.getItem('saved_qr_base64') || '/musicpostershop.png';
             if (qrObj) w.canvas.remove(qrObj); 
 
             w.fabric.Image.fromURL(qrSource, function(img: any) {
                 try {
-                    // GÜNCELLEME: img.width kontrolü ile "naturalWidth" çökmesi engellendi
                     if (img && img.width) {
                         img.scaleToHeight(85 * m.S);
                         if (elemColor === "#eeeeee") { img.filters = [new w.fabric.Image.filters.Invert()]; img.applyFilters(); }
                         img.set({ originX: 'center', originY: 'center', id: 'branding-qr', selectable: true });
                         w.canvas.add(img);
-                    } else {
-                        console.warn("[WARN] QR Image not found, rendering text only.");
                     }
-                } catch(e) { 
-                    console.error("QR Code rendering error:", e); 
-                }
-                
+                } catch(e) { console.error("QR Code Error:", e); }
                 w.handleBrandingUI();
                 resolve(true);
             }, { crossOrigin: 'anonymous' });
@@ -454,7 +474,6 @@ export default function AlbumPosterBuilder() {
             const length = hr > 0 ? `${hr}:${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}` : `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
 
             w.canvas.clear(); w.paletteRects = [];
-            await document.fonts.load('100px Inter'); await document.fonts.load('700 140px Inter'); await document.fonts.load('500 55px Inter'); await document.fonts.load('700 60px Montserrat');
 
             w.fabric.Image.fromURL(d.cover_xl, async function(img: any) {
                 const px = m.OX + (250 * m.S); const py = m.OY + (250 * m.S); const contentW = (4961 - 500) * m.S; 
@@ -521,7 +540,6 @@ export default function AlbumPosterBuilder() {
             let h = Math.floor(totalMs / 3600000); let mMin = Math.floor((totalMs % 3600000) / 60000); let durationStr = h > 0 ? `${h} HR ${mMin} MIN` : `${mMin} MIN`;
 
             w.canvas.clear(); w.paletteRects = [];
-            await document.fonts.load('100px Inter'); await document.fonts.load('700 140px Inter'); await document.fonts.load('500 55px Inter'); await document.fonts.load('700 60px Montserrat'); await document.fonts.load('400 80px Allura');
             let textColor = (document.getElementById('lineColorPicker') as HTMLInputElement).value || "#212121";
 
             w.fabric.Image.fromURL(d.cover_xl, async function(img: any) {
@@ -673,8 +691,7 @@ export default function AlbumPosterBuilder() {
                         <div class="variant-theme">${v.theme} THEME</div>
                     </div>
                     <div class="variant-actions">
-                        <button onclick="event.stopPropagation(); window.downloadVariant('${v.layout}', '${v.theme}')" class="sidebar-download-btn btn-dark" style="padding:10px;"><i class="fas fa-download"></i></button>
-                        <button class="sidebar-download-btn btn-accent" style="padding:10px; flex:2;">EDIT</button>
+                        <button class="sidebar-download-btn btn-accent" style="padding:10px; flex:2;">EDIT THIS POSTER</button>
                     </div>
                 </div>
             `).join('');
@@ -704,104 +721,6 @@ export default function AlbumPosterBuilder() {
         } catch(e) {} finally {
             w.isBatchGenerating = false; w.historyStack=[]; w.redoStack=[]; w.saveState(); w.hideLoading(); w.showSingleEditor();
         }
-    };
-
-    w.downloadPDF = async function() {
-        let wasGridOn = w.isGridEnabled; if(wasGridOn) w.toggleGrid(false); w.canvas.discardActiveObject(); w.canvas.requestRenderAll();
-        const btn = document.getElementById('dlPdfBtn')!; const originalText = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> PDF...';
-        
-        try { 
-            await new Promise(r => setTimeout(r, 100)); 
-            const exportMultiplier = (1 / w.BASE_PREVIEW_SCALE) / w.canvas.getZoom(); 
-            const dataUrl = w.canvas.toDataURL({ format: 'png', multiplier: exportMultiplier }); 
-            const dims = w.getCurrentDimensions();
-            const doc = new w.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format: [dims.w / 23.5, dims.h / 23.5] }); 
-            doc.addImage(dataUrl, 'PNG', 0, 0, dims.w / 23.5, dims.h / 23.5); 
-            doc.save(`${w.albumTitle}_${w.currentFormat}.pdf`); 
-        } catch (e) { 
-            alert("Security Alert: Browser blocked saving due to local files. Use the 'Select your PNG' button in Branding.");
-        }
-        
-        if(wasGridOn) w.toggleGrid(true); btn.innerHTML = originalText;
-    };
-
-    w.downloadPoster = async function() {
-        let wasGridOn = w.isGridEnabled; if(wasGridOn) w.toggleGrid(false); w.canvas.discardActiveObject(); w.canvas.requestRenderAll();
-        const btn = document.getElementById('dlBtn')!; const originalText = btn.innerHTML; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> PNG...';
-        
-        try { 
-            await new Promise(r => setTimeout(r, 100)); 
-            const exportMultiplier = (1 / w.BASE_PREVIEW_SCALE) / w.canvas.getZoom(); 
-            const dataUrl = w.canvas.toDataURL({ format: 'png', multiplier: exportMultiplier }); 
-            const link = document.createElement('a'); link.download = `${w.albumTitle}_${w.currentFormat}.png`; link.href = dataUrl; link.click(); 
-        } catch (e) { 
-            alert("Security Alert: Browser blocked saving due to local files. Use the 'Select your PNG' button in Branding.");
-        }
-        
-        if(wasGridOn) w.toggleGrid(true); btn.innerHTML = originalText;
-    };
-
-    w.downloadVariant = async function(layout: string, theme: string) {
-        if (!w.activeAlbumData) return; 
-        w.saveCurrentStateToMemory();
-        w.showLoading("Downloading: High Resolution", ""); 
-        let key = `${layout}_${theme}`;
-        
-        if (w.variantStates[key]) {
-            await new Promise(r => { w.canvas.loadFromJSON(w.variantStates[key], () => { w.canvas.requestRenderAll(); r(true); }); });
-        } else {
-            (document.getElementById('layoutSelect') as HTMLSelectElement).value = layout; (document.getElementById('themeSelect') as HTMLSelectElement).value = theme;
-            if (layout === 'standart') await w.renderStandard(w.activeAlbumData); else await w.renderMinimal(w.activeAlbumData);
-        }
-        
-        try {
-            await new Promise(r => setTimeout(r, 200)); 
-            const exportMultiplier = (1 / w.BASE_PREVIEW_SCALE) / w.canvas.getZoom(); 
-            const dataUrl = w.canvas.toDataURL({ format: 'png', multiplier: exportMultiplier }); 
-            const link = document.createElement('a'); link.download = `${w.albumTitle}_${layout}_${theme}_${w.currentFormat}.png`; link.href = dataUrl; link.click();
-        } catch (e) {
-            alert("Security Alert: Browser blocked saving due to local files. Use the 'Select your PNG' button in Branding.");
-        }
-
-        if(w.currentVariantKey && w.variantStates[w.currentVariantKey]) {
-            await new Promise(r => { w.canvas.loadFromJSON(w.variantStates[w.currentVariantKey], () => { w.canvas.requestRenderAll(); r(true); }); });
-            (document.getElementById('layoutSelect') as HTMLSelectElement).value = w.currentVariantKey.split('_')[0]; (document.getElementById('themeSelect') as HTMLSelectElement).value = w.currentVariantKey.split('_')[1];
-        }
-        w.hideLoading();
-    };
-
-    w.downloadAllVariants = async function() {
-        if(!w.activeAlbumData) { alert("Please search and select an album first!"); return; }
-        w.saveCurrentStateToMemory();
-
-        w.showLoading("Downloading all designs in high quality...", `Downloading 8 high-res posters in ${w.currentFormat.toUpperCase()} format...`); 
-        
-        const layouts = ['standart', 'minimal']; const themes = ['light', 'dark', 'blurry', 'colorful'];
-        const yieldThread = () => new Promise(r => setTimeout(r, 200));
-
-        try {
-            for (let l of layouts) {
-                for (let t_theme of themes) { 
-                    let key = `${l}_${t_theme}`;
-                    if (w.variantStates[key]) {
-                        await new Promise(r => { w.canvas.loadFromJSON(w.variantStates[key], () => { w.canvas.requestRenderAll(); r(true); }); });
-                        await yieldThread();
-                        const exportMultiplier = (1 / w.BASE_PREVIEW_SCALE) / w.canvas.getZoom(); 
-                        const dataUrl = w.canvas.toDataURL({ format: 'png', multiplier: exportMultiplier }); 
-                        const link = document.createElement('a'); link.download = `${w.albumTitle}_${l}_${t_theme}_${w.currentFormat}.png`; link.href = dataUrl; link.click();
-                        await yieldThread();
-                    }
-                }
-            }
-        } catch(e) {
-            alert("Security Alert: Browser blocked saving due to local files. Use the 'Select your PNG' button in Branding.");
-        }
-
-        if(w.currentVariantKey && w.variantStates[w.currentVariantKey]) {
-            await new Promise(r => { w.canvas.loadFromJSON(w.variantStates[w.currentVariantKey], () => { w.canvas.requestRenderAll(); r(true); }); });
-            (document.getElementById('layoutSelect') as HTMLSelectElement).value = w.currentVariantKey.split('_')[0]; (document.getElementById('themeSelect') as HTMLSelectElement).value = w.currentVariantKey.split('_')[1];
-        }
-        w.hideLoading();
     };
 
     w.historyStack = []; w.redoStack = []; w.isHistoryAction = false;
@@ -980,7 +899,12 @@ export default function AlbumPosterBuilder() {
             
             if (obj.type === 'i-text' || obj.type === 'textbox') { 
                 (document.getElementById('elemText') as HTMLInputElement).value = obj.text; 
-                (document.getElementById('elemFont') as HTMLSelectElement).value = obj.fontFamily; 
+                
+                // Sync Custom React Dropdown
+                if (typeof w.syncReactFontState === 'function') {
+                    w.syncReactFontState(obj.fontFamily || 'Inter');
+                }
+
                 const m = w.getLayoutMetrics();
                 (document.getElementById('elemSize') as HTMLInputElement).value = Math.round((obj.fontSize * obj.scaleX) / m.S).toString(); 
                 (document.getElementById('elemColor') as HTMLInputElement).value = obj.fill; 
@@ -1055,7 +979,6 @@ export default function AlbumPosterBuilder() {
         }, 100);
     };
 
-    // TETIKLEYICILER EN SONA TASINDI:
     (document.getElementById('formatSelect') as HTMLSelectElement).value = 'a2';
     w.rescale((document.getElementById('zoom-slider') as HTMLInputElement).value);
     (document.getElementById('frameColorPicker') as HTMLInputElement).value = "#f5f5f5";
@@ -1074,7 +997,7 @@ export default function AlbumPosterBuilder() {
         </div>
 
         {/* LEFT SIDEBAR */}
-        <div className="sidebar-pro">
+        <div className="sidebar-pro" style={{ paddingBottom: '100px' }}>
             <div className="sidebar-logo">
                 <div className="icon">A</div>
                 <div className="text">POSTER.PRO</div>
@@ -1225,11 +1148,37 @@ export default function AlbumPosterBuilder() {
                                 <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_text_content">Text Content</label>
                                 <textarea id="elemText" className="sidebar-control" style={{ resize: "vertical", minHeight: "45px", cursor: "text" }} onInput={(e: any) => (window as any).updateElementText(e.target.value)}></textarea>
                             </div>
-                            <div>
+                            
+                            {/* CUSTOM FONT PICKER WITH PREVIEWS */}
+                            <div className="relative">
                                 <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_font_family">Font Family</label>
-                                <select id="elemFont" className="sidebar-control" onChange={(e: any) => (window as any).applyStyle('fontFamily', e.target.value)}>
-                                    <option value="Inter">Inter</option><option value="Montserrat">Montserrat</option><option value="Arial">Arial</option><option value="Times New Roman">Times New Roman</option><option value="Courier New">Courier New</option><option value="Allura">Allura</option>
-                                </select>
+                                <div 
+                                    className="sidebar-control flex justify-between items-center bg-[#222232]" 
+                                    onClick={() => setIsFontDropdownOpen(!isFontDropdownOpen)}
+                                >
+                                    <span id="elemFontValue" style={{ fontFamily: activeFont, fontSize: '14px' }}>{activeFont}</span>
+                                    <i className={`fas fa-chevron-${isFontDropdownOpen ? 'up' : 'down'}`}></i>
+                                </div>
+                                {isFontDropdownOpen && (
+                                    <div className="absolute top-full left-0 w-full mt-1 bg-[#181824] border border-[#2b2b3d] rounded-lg max-h-[220px] overflow-y-auto z-[9999] shadow-2xl">
+                                    {GOOGLE_FONTS.map(font => (
+                                        <div 
+                                            key={font}
+                                            className="p-3 hover:bg-[#5a4fcb] cursor-pointer text-white border-b border-[#2b2b3d] last:border-0 transition-colors"
+                                            style={{ fontFamily: font, fontSize: '18px' }}
+                                            onClick={() => {
+                                                setActiveFont(font);
+                                                setIsFontDropdownOpen(false);
+                                                if (typeof (window as any).applyStyle === 'function') {
+                                                    (window as any).applyStyle('fontFamily', font);
+                                                }
+                                            }}
+                                        >
+                                            {font}
+                                        </div>
+                                    ))}
+                                    </div>
+                                )}
                             </div>
                         </div>
 
@@ -1299,12 +1248,18 @@ export default function AlbumPosterBuilder() {
                 </div>
             </details>
 
-            {/* Bottom Export & Cart Buttons */}
-            <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "10px", paddingTop: "20px" }}>
-                <button className="sidebar-download-btn btn-dark" id="dlBtn" onClick={() => (window as any).downloadPoster()}><i className="far fa-image"></i> <span id="btn_txt_png">EXPORT IMAGE</span></button>
-                <button className="sidebar-download-btn btn-danger" id="dlPdfBtn" onClick={() => (window as any).downloadPDF()}><i className="far fa-file-pdf"></i> <span id="btn_txt_pdf">EXPORT HIGH-RES PDF</span></button>
-                <button className="sidebar-download-btn" style={{ background: "var(--spotify)", color: "#fff", border: "none" }} onClick={() => (window as any).handleAddToCart()}><i className="fas fa-shopping-cart"></i> <span>ADD TO CART</span></button>
-            </div>
+        </div>
+
+        {/* BOTTOM FIXED ADD TO CART PANEL */}
+        <div style={{ position: "fixed", bottom: 0, left: 0, width: "340px", backgroundColor: "var(--bg-sidebar)", padding: "20px 25px", borderTop: "1px solid var(--border-color)", zIndex: 2000 }}>
+            <button 
+                className="sidebar-download-btn" 
+                style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "16px", fontSize: "1rem", boxShadow: "0 10px 20px rgba(29, 185, 84, 0.3)" }} 
+                onClick={() => (window as any).handleAddToCart()}
+            >
+                <i className="fas fa-shopping-cart" style={{ marginRight: "10px" }}></i> 
+                <span>ADD TO CART</span>
+            </button>
         </div>
 
         {/* MAIN VIEW */}
@@ -1319,10 +1274,6 @@ export default function AlbumPosterBuilder() {
                     <button onClick={() => (window as any).showVariantsView()} id="btn-show-gallery" className="toggle-btn active">GALLERY</button>
                     <button onClick={() => (window as any).showSingleEditor()} id="btn-show-editor" className="toggle-btn">EDITOR</button>
                 </div>
-
-                <button onClick={() => (window as any).downloadAllVariants()} className="sidebar-download-btn btn-dark" style={{ width: "auto", padding: "12px 25px", display: "flex", alignItems: "center", gap: "10px" }} id="btn_download_all">
-                    <i className="fas fa-download"></i> DOWNLOAD BUNDLE
-                </button>
             </div>
             
             <div id="content-area">
