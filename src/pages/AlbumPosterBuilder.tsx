@@ -338,19 +338,28 @@ export default function AlbumPosterBuilder() {
                 w.canvas.add(textObj);
             }
 
-            let qrSource = localStorage.getItem('saved_qr_base64') || 'musicpostershop.png';
+            // GÜNCELLEME: public klasorune (kök dizine) giden path '/' eklendi.
+            let qrSource = localStorage.getItem('saved_qr_base64') || '/musicpostershop.png';
             if (qrObj) w.canvas.remove(qrObj); 
 
             w.fabric.Image.fromURL(qrSource, function(img: any) {
-                if (img) {
-                    img.scaleToHeight(85 * m.S);
-                    if (elemColor === "#eeeeee") { img.filters = [new w.fabric.Image.filters.Invert()]; img.applyFilters(); }
-                    img.set({ originX: 'center', originY: 'center', id: 'branding-qr', selectable: true });
-                    w.canvas.add(img);
+                try {
+                    // GÜNCELLEME: img.width kontrolü ile "naturalWidth" çökmesi engellendi
+                    if (img && img.width) {
+                        img.scaleToHeight(85 * m.S);
+                        if (elemColor === "#eeeeee") { img.filters = [new w.fabric.Image.filters.Invert()]; img.applyFilters(); }
+                        img.set({ originX: 'center', originY: 'center', id: 'branding-qr', selectable: true });
+                        w.canvas.add(img);
+                    } else {
+                        console.warn("[WARN] QR Image not found, rendering text only.");
+                    }
+                } catch(e) { 
+                    console.error("QR Code rendering error:", e); 
                 }
+                
                 w.handleBrandingUI();
                 resolve(true);
-            });
+            }, { crossOrigin: 'anonymous' });
         });
     };
 
