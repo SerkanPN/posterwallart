@@ -35,7 +35,6 @@ export default function AlbumPosterBuilder() {
     };
 
     const initScripts = async () => {
-      // Load FontAwesome for Icons
       if (!document.getElementById('font-awesome-cdn')) {
           const faLink = document.createElement('link');
           faLink.id = 'font-awesome-cdn';
@@ -44,7 +43,6 @@ export default function AlbumPosterBuilder() {
           document.head.appendChild(faLink);
       }
 
-      // Load Google Fonts dynamically
       const fontUrl = `https://fonts.googleapis.com/css?family=${GOOGLE_FONTS.map(f => f.replace(/ /g, '+')).join('|')}&display=swap`;
       if (!document.getElementById('google-fonts-custom')) {
           const link = document.createElement('link');
@@ -347,20 +345,6 @@ export default function AlbumPosterBuilder() {
         else { alert("Please upload an image first."); } 
     };
 
-    document.getElementById('qrFileUpload')?.addEventListener('change', function(e: any) {
-        const file = e.target.files[0]; if(!file) return;
-        const reader = new FileReader();
-        reader.onload = function(f: any) {
-            localStorage.setItem('saved_qr_base64', f.target.result);
-            w.initFooterBrandingPromise().then(() => {
-                w.saveState();
-                w.saveCurrentStateToMemory();
-                w.updateLayersPanel();
-            });
-        };
-        reader.readAsDataURL(file);
-    });
-
     w.initFooterBrandingPromise = function() {
         return new Promise((resolve) => {
             const theme = (document.getElementById('themeSelect') as HTMLSelectElement).value;
@@ -368,69 +352,41 @@ export default function AlbumPosterBuilder() {
             const m = w.getLayoutMetrics();
 
             let textObj = w.canvas.getObjects().find((o: any) => o.id === 'branding-text');
+            if (textObj) w.canvas.remove(textObj);
+
             let qrObj = w.canvas.getObjects().find((o: any) => o.id === 'branding-qr');
-
-            if (textObj) {
-                textObj.set({ fill: elemColor });
-            } else {
-                textObj = new w.fabric.IText("musicposter.shop", {
-                    fontSize: 55 * m.S, fontFamily: 'Inter', fontWeight: 700, fill: elemColor, originX: 'center', originY: 'center', id: 'branding-text', selectable: true
-                });
-                w.canvas.add(textObj);
-            }
-
-            let qrSource = localStorage.getItem('saved_qr_base64') || '/musicpostershop.png';
             if (qrObj) w.canvas.remove(qrObj); 
+
+            let qrSource = '/musicpostershop.png'; 
 
             w.fabric.Image.fromURL(qrSource, function(img: any) {
                 try {
                     if (img && img.width) {
-                        img.scaleToHeight(85 * m.S);
-                        if (elemColor === "#eeeeee") { img.filters = [new w.fabric.Image.filters.Invert()]; img.applyFilters(); }
-                        img.set({ originX: 'center', originY: 'center', id: 'branding-qr', selectable: true });
+                        img.scaleToHeight(170 * m.S);
+                        if (elemColor === "#eeeeee") { 
+                            img.filters = [new w.fabric.Image.filters.Invert()]; 
+                            img.applyFilters(); 
+                        }
+                        
+                        const canvasW = 4961 * m.S;
+                        const bottomY = m.OY + (7016 * m.S) - (150 * m.S); 
+
+                        img.set({ 
+                            left: m.OX + (canvasW / 2), 
+                            top: bottomY,
+                            originX: 'center', 
+                            originY: 'center', 
+                            id: 'branding-qr', 
+                            selectable: true,
+                            opacity: 0.7 
+                        });
                         w.canvas.add(img);
                     }
-                } catch(e) {}
-                w.handleBrandingUI();
+                } catch(e) { console.error("QR Code Error:", e); }
+                w.canvas.requestRenderAll();
                 resolve(true);
             }, { crossOrigin: 'anonymous' });
         });
-    };
-
-    w.handleBrandingUI = function() {
-        w.canvas.discardActiveObject(); 
-        let textObj = w.canvas.getObjects().find((o: any) => o.id === 'branding-text');
-        let qrObj = w.canvas.getObjects().find((o: any) => o.id === 'branding-qr');
-        
-        const showText = (document.getElementById('textToggle') as HTMLInputElement).checked;
-        const textOpacity = parseFloat((document.getElementById('textOpacity') as HTMLInputElement).value);
-        const showQR = (document.getElementById('qrToggle') as HTMLInputElement).checked;
-        const qrOpacity = parseFloat((document.getElementById('qrOpacity') as HTMLInputElement).value);
-        
-        if (textObj) textObj.set({ visible: showText, opacity: textOpacity });
-        if (qrObj) qrObj.set({ visible: showQR, opacity: qrOpacity });
-
-        const m = w.getLayoutMetrics();
-        const canvasW = 4961 * m.S;
-        const bottomY = m.OY + (7016 * m.S) - (120 * m.S);
-        const gap = 30 * m.S; 
-
-        if (textObj && qrObj && showText && showQR) {
-            let tW = textObj.getScaledWidth(); let qW = qrObj.getScaledWidth(); let totalW = qW + gap + tW;
-            let startX = m.OX + (canvasW / 2) - (totalW / 2);
-            qrObj.set({ left: startX + (qW / 2), top: bottomY });
-            textObj.set({ left: startX + qW + gap + (tW / 2), top: bottomY });
-        } else if (textObj && showText) {
-            textObj.set({ left: m.OX + (canvasW / 2), top: bottomY });
-        } else if (qrObj && showQR) {
-            qrObj.set({ left: m.OX + (canvasW / 2), top: bottomY });
-        }
-        w.canvas.requestRenderAll();
-    };
-
-    w.toggleFooterBranding = async function() {
-        w.handleBrandingUI(); 
-        if (!w.isBatchGenerating) { w.saveState(); w.saveCurrentStateToMemory(); w.updateLayersPanel(); }
     };
 
     w.updateBlurSettingsPromise = function() {
@@ -1292,32 +1248,6 @@ export default function AlbumPosterBuilder() {
                 <div className="sidebar-group" style={{ marginTop: "5px", borderTop: "1px solid var(--border-color)", paddingTop: "15px" }}>
                     <span className="sidebar-title" id="title_layers"><i className="fas fa-layer-group"></i> Layers</span>
                     <div id="layers-panel" style={{ display: "flex", flexDirection: "column", maxHeight: "200px", overflowY: "auto", background: "var(--bg-input)", borderRadius: "12px", padding: "5px", border: "1px solid var(--border-color)" }}>
-                    </div>
-                </div>
-
-                {/* Branding & QR Toggle Module */}
-                <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px", border: "1px solid var(--border-color)", marginTop: "15px" }}>
-                    <span className="sidebar-title" style={{ marginBottom: "10px" }} id="title_shop_branding"><i className="fas fa-qrcode"></i> BRANDING & QR</span>
-                    
-                    <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer" }}>
-                        <input type="checkbox" id="textToggle" onChange={() => (window as any).handleBrandingUI()} style={{ width: "16px", height: "16px" }} defaultChecked /><span id="lbl_text_toggle">Show Website Text</span>
-                    </label>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "15px", marginTop: "5px" }}>
-                        <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Opacity:</span>
-                        <input type="range" id="textOpacity" min="0" max="1" step="0.05" defaultValue="1" onInput={() => (window as any).handleBrandingUI()} style={{ flex: 1 }} />
-                    </div>
-
-                    <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "0.8rem", cursor: "pointer" }}>
-                        <input type="checkbox" id="qrToggle" onChange={() => (window as any).handleBrandingUI()} style={{ width: "16px", height: "16px" }} defaultChecked /><span id="lbl_qr_toggle">Show QR Code</span>
-                    </label>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px", marginTop: "5px" }}>
-                        <span style={{ fontSize: "0.65rem", color: "var(--text-muted)" }}>Opacity:</span>
-                        <input type="range" id="qrOpacity" min="0" max="1" step="0.05" defaultValue="1" onInput={() => (window as any).handleBrandingUI()} style={{ flex: 1 }} />
-                    </div>
-
-                    <div style={{ marginTop: "15px", borderTop: "1px dashed var(--border-color)", paddingTop: "10px" }}>
-                        <label style={{ fontSize: "0.65rem", color: "var(--accent)", marginBottom: "5px", display: "block" }}>Select your PNG to prevent CORS (Save) errors:</label>
-                        <input type="file" id="qrFileUpload" accept="image/png, image/jpeg" className="sidebar-control" style={{ padding: "8px", fontSize: "0.7rem", background: "var(--bg-main)" }} />
                     </div>
                 </div>
 
