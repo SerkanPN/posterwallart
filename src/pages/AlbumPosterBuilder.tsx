@@ -34,7 +34,7 @@ const AlbumPosterBuilder: React.FC = () => {
       const data = await res.json();
       setResults(data.results || []);
     } catch (error) {
-      console.error('API Hatası:', error);
+      console.error('API Error:', error);
     } finally {
       setLoading(false);
     }
@@ -68,7 +68,7 @@ const AlbumPosterBuilder: React.FC = () => {
         genre: album.primaryGenreName
       });
     } catch (error) {
-      console.error('Detay çekme hatası:', error);
+      console.error('Detail fetch error:', error);
     } finally {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ const AlbumPosterBuilder: React.FC = () => {
 
   return (
     <div className="container mx-auto p-4 flex flex-col md:flex-row gap-8 text-white min-h-screen bg-[#121212]">
-      {/* SOL PANEL: ARAMA */}
+      {/* LEFT PANEL: SEARCH */}
       <div className="w-full md:w-1/3 flex flex-col">
         <h1 className="text-2xl font-bold mb-4 text-[#1db954]">Custom Album Poster</h1>
         <div className="flex gap-2 mb-6">
@@ -103,18 +103,18 @@ const AlbumPosterBuilder: React.FC = () => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && searchiTunes()}
-            placeholder="Sanatçı veya albüm ara..."
+            placeholder="Search artist or album..."
             className="w-full p-3 border border-gray-700 rounded bg-[#181818] text-white focus:outline-none focus:border-[#1db954]"
           />
           <button 
             onClick={searchiTunes}
             className="bg-[#1db954] hover:bg-[#1ed760] px-6 py-3 rounded text-white font-bold transition-colors"
           >
-            Ara
+            Search
           </button>
         </div>
 
-        {loading && <p className="text-gray-400 mb-4">Aranıyor...</p>}
+        {loading && <p className="text-gray-400 mb-4">Searching...</p>}
 
         <div className="grid grid-cols-2 gap-4 overflow-y-auto max-h-[calc(100vh-200px)] pr-2 custom-scrollbar">
           {results.map((album) => (
@@ -135,14 +135,14 @@ const AlbumPosterBuilder: React.FC = () => {
         </div>
       </div>
 
-      {/* SAĞ PANEL: BAĞIMSIZ POSTER ÖNİZLEME VE SEPET */}
+      {/* RIGHT PANEL: INDEPENDENT POSTER PREVIEW AND CART */}
       <div className="w-full md:w-2/3 flex flex-col items-center justify-start pt-10">
         {selectedAlbum ? (
           <div className="w-full flex flex-col items-center">
             
-            {/* BAĞIMSIZ TASARIM ŞABLONU (İzole HTML/CSS) */}
+            {/* INDEPENDENT DESIGN TEMPLATE (Isolated HTML/CSS) */}
             <div className="bg-[#f4f4f0] text-black w-full max-w-[400px] aspect-[2/3] p-6 shadow-2xl flex flex-col mb-8 relative">
-              {/* Beyaz Poster Çerçevesi */}
+              {/* White Poster Frame */}
               <div className="border border-gray-300 w-full h-full p-4 flex flex-col">
                 <img 
                   src={selectedAlbum.hdCoverUrl} 
@@ -158,7 +158,7 @@ const AlbumPosterBuilder: React.FC = () => {
                   </h3>
                 </div>
                 
-                {/* Şarkı Listesi - Sadece ilk 8 şarkı sığması için */}
+                {/* Tracklist - Only first 8 tracks to fit */}
                 <div className="mt-auto pt-4 border-t border-gray-300">
                   <ul className="grid grid-cols-2 gap-x-4 gap-y-1 text-[8px] uppercase font-medium text-gray-800">
                     {selectedAlbum.tracklist.slice(0, 8).map((track, idx) => (
@@ -180,7 +180,7 @@ const AlbumPosterBuilder: React.FC = () => {
                 </div>
               </div>
             </div>
-            {/* BAĞIMSIZ TASARIM BİTİŞ */}
+            {/* INDEPENDENT DESIGN END */}
             
             <div className="flex gap-4 w-full max-w-[400px]">
               <select 
@@ -188,22 +188,22 @@ const AlbumPosterBuilder: React.FC = () => {
                 onChange={(e) => setSelectedSize(e.target.value)}
                 className="flex-1 p-3 bg-[#181818] border border-gray-700 rounded-lg text-white focus:outline-none focus:border-gray-500"
               >
-                <option value="12x18">12x18 inç - Print</option>
-                <option value="18x24">18x24 inç - Print</option>
-                <option value="24x36">24x36 inç - Print</option>
+                <option value="12x18">12x18 inches - Print</option>
+                <option value="18x24">18x24 inches - Print</option>
+                <option value="24x36">24x36 inches - Print</option>
                 <option value="digital">Digital Download</option>
               </select>
               <button 
                 onClick={handleAddToCart}
                 className="flex-1 bg-white text-black font-bold py-3 px-6 rounded-lg hover:bg-gray-200 transition-colors shadow-lg"
               >
-                Sepete Ekle
+                Add to Cart
               </button>
             </div>
           </div>
         ) : (
-          <div className="h-[500px] w-full max-w-[400px] flex items-center justify-center border-2 border-dashed border-gray-700 rounded-xl text-gray-500 bg-[#181818] bg-opacity-50">
-            Tasarımı görmek için listeden bir albüm seçin.
+          <div className="h-[500px] w-full max-w-[400px] flex items-center justify-center border-2 border-dashed border-gray-700 rounded-xl text-gray-500 bg-[#181818] bg-opacity-50 text-center px-4">
+            Select an album from the list to preview the design.
           </div>
         )}
       </div>
