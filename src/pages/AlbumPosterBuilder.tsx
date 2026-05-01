@@ -173,7 +173,7 @@ export default function AlbumPosterBuilder() {
         if (w.currentVariantKey && !w.isBatchGenerating) {
             try {
                 w.variantStates[w.currentVariantKey] = w.canvas.toJSON(w.PROPS_TO_SAVE);
-                const previewUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 0.7, multiplier: 0.5 });
+                const previewUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 0.5, multiplier: 0.08 });
                 const imgEl = document.getElementById(`preview_${w.currentVariantKey}`) as HTMLImageElement;
                 if (imgEl) imgEl.src = previewUrl;
             } catch(e) {}
@@ -390,7 +390,7 @@ export default function AlbumPosterBuilder() {
                         img.set({ originX: 'center', originY: 'center', id: 'branding-qr', selectable: true });
                         w.canvas.add(img);
                     }
-                } catch(e) { console.error("QR Code Error:", e); }
+                } catch(e) {}
                 w.handleBrandingUI();
                 resolve(true);
             }, { crossOrigin: 'anonymous' });
@@ -681,7 +681,8 @@ export default function AlbumPosterBuilder() {
                 w.variantStates[key] = w.canvas.toJSON(w.PROPS_TO_SAVE);
                 
                 try {
-                    const previewUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 0.7, multiplier: 0.5 });
+                    // FIX: Generate tiny thumbnails for gallery to save localStorage space
+                    const previewUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 0.5, multiplier: 0.08 });
                     variantsData.push({ layout: l, theme: t_theme, url: previewUrl, key: key });
                 } catch(e) {
                     variantsData.push({ layout: l, theme: t_theme, url: '', key: key });
@@ -972,46 +973,54 @@ export default function AlbumPosterBuilder() {
         w.showLoading("Adding to Cart...", "Processing your request...");
         
         setTimeout(() => {
-            if (w.currentViewMode === 'gallery') {
-                if (!w.latestVariantsData || w.latestVariantsData.length === 0) {
-                    alert("No variants found. Please generate them first.");
-                    w.hideLoading();
-                    return;
-                }
-                
-                w.latestVariantsData.forEach((v: any, index: number) => {
+            try {
+                if (w.currentViewMode === 'gallery') {
+                    if (!w.latestVariantsData || w.latestVariantsData.length === 0) {
+                        alert("No variants found. Please generate them first.");
+                        return;
+                    }
+                    
+                    w.latestVariantsData.forEach((v: any, index: number) => {
+                        addToCart({
+                            id: `custom_pro_${w.activeAlbumData.id}_${v.key}_${Date.now()}_${index}`,
+                            name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} (${v.layout} - ${v.theme})`,
+                            price: 29.99,
+                            image: v.url, 
+                            type: 'custom_pro_album',
+                            metadata: {
+                                format: w.currentFormat,
+                                layout: v.layout,
+                                theme: v.theme
+                            }
+                        });
+                    });
+                    alert("Added 8 designs to cart successfully!");
+                } else {
+                    // FIX: Save tiny thumbnail to prevent QuotaExceededError in localStorage
+                    const dataUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 0.5, multiplier: 0.08 });
                     addToCart({
-                        id: `custom_pro_${w.activeAlbumData.id}_${v.key}_${Date.now()}_${index}`,
-                        name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} (${v.layout} - ${v.theme})`,
+                        id: `custom_pro_${w.activeAlbumData.id}_${Date.now()}`,
+                        name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} Poster`,
                         price: 29.99,
-                        image: v.url, 
+                        image: dataUrl,
                         type: 'custom_pro_album',
                         metadata: {
                             format: w.currentFormat,
-                            layout: v.layout,
-                            theme: v.theme
+                            layout: (document.getElementById('layoutSelect') as HTMLSelectElement).value,
+                            theme: (document.getElementById('themeSelect') as HTMLSelectElement).value
                         }
                     });
-                });
+                    alert("Added to cart successfully!");
+                }
+            } catch (error: any) {
+                console.error("Cart Error:", error);
+                if (error.name === 'QuotaExceededError') {
+                    alert("Storage limit exceeded. Please clear your cart or browser storage.");
+                } else {
+                    alert("An error occurred while adding to cart.");
+                }
+            } finally {
                 w.hideLoading();
-                alert("Added 8 designs to cart successfully!");
-            } else {
-                const exportMultiplier = (1 / w.BASE_PREVIEW_SCALE) / w.canvas.getZoom();
-                const dataUrl = w.canvas.toDataURL({ format: 'png', multiplier: exportMultiplier });
-                addToCart({
-                    id: `custom_pro_${w.activeAlbumData.id}_${Date.now()}`,
-                    name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} Poster`,
-                    price: 29.99,
-                    image: dataUrl,
-                    type: 'custom_pro_album',
-                    metadata: {
-                        format: w.currentFormat,
-                        layout: (document.getElementById('layoutSelect') as HTMLSelectElement).value,
-                        theme: (document.getElementById('themeSelect') as HTMLSelectElement).value
-                    }
-                });
-                w.hideLoading();
-                alert("Added to cart successfully!");
             }
         }, 100);
     };
