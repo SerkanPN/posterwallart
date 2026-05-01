@@ -165,6 +165,8 @@ export default function AlbumPosterBuilder() {
 
     w.variantStates = {};
     w.currentVariantKey = null;
+    w.currentViewMode = 'gallery';
+    w.latestVariantsData = [];
     w.PROPS_TO_SAVE = ['id', 'selectable', 'evented', 'lockMovementX', 'lockMovementY', 'lockScalingX', 'lockScalingY', 'lockRotation', 'hasControls', 'crossOrigin'];
 
     w.saveCurrentStateToMemory = function() {
@@ -180,6 +182,7 @@ export default function AlbumPosterBuilder() {
 
     w.showVariantsView = function() {
         w.saveCurrentStateToMemory(); 
+        w.currentViewMode = 'gallery';
         document.getElementById('poster-frame')!.style.display = 'none';
         document.getElementById('variants-view')!.style.display = 'flex';
         document.getElementById('btn-show-gallery')!.classList.add('active');
@@ -187,6 +190,7 @@ export default function AlbumPosterBuilder() {
     };
 
     w.showSingleEditor = function() {
+        w.currentViewMode = 'editor';
         document.getElementById('variants-view')!.style.display = 'none';
         document.getElementById('poster-frame')!.style.display = 'block';
         document.getElementById('btn-show-editor')!.classList.add('active');
@@ -386,7 +390,7 @@ export default function AlbumPosterBuilder() {
                         img.set({ originX: 'center', originY: 'center', id: 'branding-qr', selectable: true });
                         w.canvas.add(img);
                     }
-                } catch(e) {}
+                } catch(e) { console.error("QR Code Error:", e); }
                 w.handleBrandingUI();
                 resolve(true);
             }, { crossOrigin: 'anonymous' });
@@ -685,6 +689,8 @@ export default function AlbumPosterBuilder() {
             }
         }
 
+        w.latestVariantsData = variantsData;
+
         if (wasGridOn) w.toggleGrid(true); w.isBatchGenerating = false;
 
         const grid = document.getElementById('variants-grid');
@@ -963,24 +969,50 @@ export default function AlbumPosterBuilder() {
             alert("Please search and select an album first!");
             return;
         }
-        w.showLoading("Adding to Cart...", "Preparing high-res image...");
+        w.showLoading("Adding to Cart...", "Processing your request...");
+        
         setTimeout(() => {
-            const exportMultiplier = (1 / w.BASE_PREVIEW_SCALE) / w.canvas.getZoom();
-            const dataUrl = w.canvas.toDataURL({ format: 'png', multiplier: exportMultiplier });
-            addToCart({
-                id: `custom_pro_${w.activeAlbumData.id}_${Date.now()}`,
-                name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} Poster`,
-                price: 29.99,
-                image: dataUrl,
-                type: 'custom_pro_album',
-                metadata: {
-                    format: w.currentFormat,
-                    layout: (document.getElementById('layoutSelect') as HTMLSelectElement).value,
-                    theme: (document.getElementById('themeSelect') as HTMLSelectElement).value
+            if (w.currentViewMode === 'gallery') {
+                if (!w.latestVariantsData || w.latestVariantsData.length === 0) {
+                    alert("No variants found. Please generate them first.");
+                    w.hideLoading();
+                    return;
                 }
-            });
-            w.hideLoading();
-            alert("Added to cart successfully!");
+                
+                w.latestVariantsData.forEach((v: any, index: number) => {
+                    addToCart({
+                        id: `custom_pro_${w.activeAlbumData.id}_${v.key}_${Date.now()}_${index}`,
+                        name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} (${v.layout} - ${v.theme})`,
+                        price: 29.99,
+                        image: v.url, 
+                        type: 'custom_pro_album',
+                        metadata: {
+                            format: w.currentFormat,
+                            layout: v.layout,
+                            theme: v.theme
+                        }
+                    });
+                });
+                w.hideLoading();
+                alert("Added 8 designs to cart successfully!");
+            } else {
+                const exportMultiplier = (1 / w.BASE_PREVIEW_SCALE) / w.canvas.getZoom();
+                const dataUrl = w.canvas.toDataURL({ format: 'png', multiplier: exportMultiplier });
+                addToCart({
+                    id: `custom_pro_${w.activeAlbumData.id}_${Date.now()}`,
+                    name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} Poster`,
+                    price: 29.99,
+                    image: dataUrl,
+                    type: 'custom_pro_album',
+                    metadata: {
+                        format: w.currentFormat,
+                        layout: (document.getElementById('layoutSelect') as HTMLSelectElement).value,
+                        theme: (document.getElementById('themeSelect') as HTMLSelectElement).value
+                    }
+                });
+                w.hideLoading();
+                alert("Added to cart successfully!");
+            }
         }, 100);
     };
 
@@ -1093,14 +1125,24 @@ export default function AlbumPosterBuilder() {
 
         {/* MAIN VIEW (CANVAS) */}
         <div className="main-view">
-            <div id="top-bar">
+            <div id="top-bar" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '25px 40px' }}>
                 <div className="top-bar-left">
                     <h2 id="top_title" className="glitch-text">DESIGNER</h2>
-                    <p id="top_subtitle">Make your music visual.</p>
+                    <p id="top_subtitle" style={{ margin: '2px 0 0 0', color: 'var(--accent)', fontStyle: 'italic', fontWeight: 600, fontSize: '0.9rem' }}>Make your music visual.</p>
                 </div>
-                <div className="view-toggle">
-                    <button onClick={() => (window as any).showVariantsView()} id="btn-show-gallery" className="toggle-btn active">GALLERY</button>
-                    <button onClick={() => (window as any).showSingleEditor()} id="btn-show-editor" className="toggle-btn">EDITOR</button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+                    <div className="view-toggle">
+                        <button onClick={() => (window as any).showVariantsView()} id="btn-show-gallery" className="toggle-btn active">GALLERY</button>
+                        <button onClick={() => (window as any).showSingleEditor()} id="btn-show-editor" className="toggle-btn">EDITOR</button>
+                    </div>
+                    <button 
+                        className="sidebar-download-btn" 
+                        style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "10px 25px", fontSize: "0.85rem", width: "auto", margin: 0, borderRadius: "50px" }} 
+                        onClick={() => (window as any).handleAddToCart()}
+                    >
+                        <i className="fas fa-shopping-cart" style={{ marginRight: "8px" }}></i> 
+                        ADD TO CART
+                    </button>
                 </div>
             </div>
             
@@ -1275,18 +1317,6 @@ export default function AlbumPosterBuilder() {
                     <input type="text" id="spotifyLink" className="sidebar-control" placeholder="2. Paste Copied Link" style={{ background: "var(--bg-main)", borderColor: "var(--border-color)", marginBottom: "10px" }} />
                     <button className="sidebar-download-btn" onClick={() => (window as any).addSpotifyCode()} style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "12px" }} id="btn_add_barcode">ADD BARCODE</button>
                 </div>
-            </div>
-            
-            {/* Fixed Add To Cart Bottom Panel */}
-            <div style={{ padding: "20px 25px", borderTop: "1px solid var(--border-color)", backgroundColor: "var(--bg-sidebar)" }}>
-                <button 
-                    className="sidebar-download-btn" 
-                    style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "16px", fontSize: "1rem", boxShadow: "0 10px 20px rgba(29, 185, 84, 0.3)" }} 
-                    onClick={() => (window as any).handleAddToCart()}
-                >
-                    <i className="fas fa-shopping-cart" style={{ marginRight: "10px" }}></i> 
-                    <span>ADD TO CART</span>
-                </button>
             </div>
         </div>
 
