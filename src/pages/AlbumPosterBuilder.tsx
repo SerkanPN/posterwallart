@@ -140,7 +140,7 @@ export default function AlbumPosterBuilder() {
     initScripts();
 
     return () => {
-      // Cleanup if needed
+      // Cleanup
     };
   }, []);
 
@@ -345,50 +345,6 @@ export default function AlbumPosterBuilder() {
         else { alert("Please upload an image first."); } 
     };
 
-    w.initFooterBrandingPromise = function() {
-        return new Promise((resolve) => {
-            const theme = (document.getElementById('themeSelect') as HTMLSelectElement).value;
-            let elemColor = (theme === 'dark' || theme === 'blurry' || theme === 'colorful') ? "#eeeeee" : "#222222";
-            const m = w.getLayoutMetrics();
-
-            let textObj = w.canvas.getObjects().find((o: any) => o.id === 'branding-text');
-            if (textObj) w.canvas.remove(textObj);
-
-            let qrObj = w.canvas.getObjects().find((o: any) => o.id === 'branding-qr');
-            if (qrObj) w.canvas.remove(qrObj); 
-
-            let qrSource = '/musicpostershop.png'; 
-
-            w.fabric.Image.fromURL(qrSource, function(img: any) {
-                try {
-                    if (img && img.width) {
-                        img.scaleToHeight(170 * m.S);
-                        if (elemColor === "#eeeeee") { 
-                            img.filters = [new w.fabric.Image.filters.Invert()]; 
-                            img.applyFilters(); 
-                        }
-                        
-                        const canvasW = 4961 * m.S;
-                        const bottomY = m.OY + (7016 * m.S) - (150 * m.S); 
-
-                        img.set({ 
-                            left: m.OX + (canvasW / 2), 
-                            top: bottomY,
-                            originX: 'center', 
-                            originY: 'center', 
-                            id: 'branding-qr', 
-                            selectable: true,
-                            opacity: 0.7 
-                        });
-                        w.canvas.add(img);
-                    }
-                } catch(e) { console.error("QR Code Error:", e); }
-                w.canvas.requestRenderAll();
-                resolve(true);
-            }, { crossOrigin: 'anonymous' });
-        });
-    };
-
     w.updateBlurSettingsPromise = function() {
         return new Promise((resolve) => {
             const dims = w.getCurrentDimensions();
@@ -547,6 +503,101 @@ export default function AlbumPosterBuilder() {
         });
     };
 
+    // YENİ EKLENEN VİNYL (PLAK) TASARIMI
+    w.renderVinyl = async function(d: any) {
+        return new Promise(async (resolve) => {
+            w.currentImg = d.cover_xl; w.albumTitle = d.title;
+            const m = w.getLayoutMetrics();
+            const dateArr = d.release_date.split('-'); const day = parseInt(dateArr[2]);
+            const getOrdinal = (n: number) => { let s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
+            const dateStr = `${months[parseInt(dateArr[1])-1]} ${getOrdinal(day)} ${dateArr[0]}`.trim();
+            
+            w.canvas.clear(); w.paletteRects = [];
+            
+            await document.fonts.load('100px Inter');
+            await document.fonts.load('700 140px Inter');
+            await document.fonts.load('700 60px Montserrat');
+            await document.fonts.load('400 250px Allura');
+
+            let goldColor = "#d4af37";
+
+            w.fabric.Image.fromURL(d.cover_xl, async function(coverImg: any) {
+                const coverSize = 1600 * m.S;
+                const bottomY = m.OY + (7016 * m.S) - coverSize - (600 * m.S);
+                const coverX = m.OX + (500 * m.S);
+                
+                coverImg.scaleToWidth(coverSize);
+                coverImg.set({ left: coverX, top: bottomY, id: 'main-cover' });
+
+                let fullSVG: any = null, halfSVG: any = null;
+
+                try {
+                    await new Promise((r) => w.fabric.loadSVGFromURL('/goldfull.svg', (objs: any, opts: any) => {
+                        if(objs) { fullSVG = w.fabric.util.groupSVGElements(objs, opts); } r(true);
+                    }));
+                    await new Promise((r) => w.fabric.loadSVGFromURL('/goldhalf.svg', (objs: any, opts: any) => {
+                        if(objs) { halfSVG = w.fabric.util.groupSVGElements(objs, opts); } r(true);
+                    }));
+                } catch(e) { console.error("SVG Load Error", e); }
+
+                // Arka plandaki yarım plağı (CD'yi) kapağın soluna ekle
+                if (halfSVG) {
+                    halfSVG.scaleToHeight(coverSize * 0.95);
+                    halfSVG.set({ left: coverX + coverSize - (10 * m.S), top: bottomY + (coverSize * 0.025), id: 'vinyl-half' });
+                    w.canvas.add(halfSVG);
+                }
+                
+                // Kapak görselini yarım plağın üstüne (önüne) ekle
+                w.canvas.add(coverImg);
+
+                // Ana büyük plağı ve içindeki yazıları üst ortaya ekle
+                if (fullSVG) {
+                    const vinylSize = 3800 * m.S;
+                    fullSVG.scaleToWidth(vinylSize);
+                    fullSVG.set({ left: m.OX + (4961 * m.S / 2), top: m.OY + (600 * m.S) + (vinylSize / 2), originX: 'center', originY: 'center', id: 'vinyl-full' });
+                    w.canvas.add(fullSVG);
+
+                    let artistClean = d.artist.name.toUpperCase();
+                    let vLabel = new w.fabric.IText(`RELEASED BY ${d.label || 'RECORD LABEL'}`, { left: fullSVG.left, top: fullSVG.top - (350 * m.S), fontSize: 50 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: '#fff', originX: 'center', id: 'vinyl-text' });
+                    let vArtist = new w.fabric.IText(d.artist.name, { left: fullSVG.left, top: fullSVG.top - (80 * m.S), fontSize: 260 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', id: 'vinyl-text' });
+                    let vTitle = new w.fabric.IText(d.title.toUpperCase(), { left: fullSVG.left, top: fullSVG.top + (180 * m.S), fontSize: 90 * m.S, fontFamily: 'Montserrat', fontWeight: 900, fill: '#fff', originX: 'center', id: 'vinyl-text' });
+                    let vDate = new w.fabric.IText(dateStr, { left: fullSVG.left, top: fullSVG.top + (320 * m.S), fontSize: 50 * m.S, fontFamily: 'Inter', fill: '#ccc', originX: 'center', id: 'vinyl-text' });
+                    w.canvas.add(vLabel, vArtist, vTitle, vDate);
+                }
+
+                // Sağ Alt Altın Çerçeveli Bilgi Kutusu
+                const boxX = (halfSVG ? halfSVG.left + halfSVG.getScaledWidth() : coverX + coverSize) + (100 * m.S);
+                const boxW = m.OX + (4961 * m.S) - 500 * m.S - boxX;
+                const boxH = coverSize * 0.6;
+                const boxY = bottomY + (coverSize - boxH) / 2;
+
+                let infoBox = new w.fabric.Rect({
+                    left: boxX, top: boxY, width: boxW, height: boxH,
+                    fill: 'rgba(0,0,0,0.7)', stroke: goldColor, strokeWidth: 12 * m.S,
+                    id: 'info-box'
+                });
+                w.canvas.add(infoBox);
+
+                let bArtist = new w.fabric.IText(d.artist.name, { left: boxX + boxW/2, top: boxY + (boxH * 0.3), fontSize: 220 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', originY: 'center', id: 'box-text' });
+                let bCustom = new w.fabric.IText("ALBUM POSTER WALL ART", { left: boxX + boxW/2, top: boxY + (boxH * 0.6), fontSize: 60 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: '#ddd', originX: 'center', originY: 'center', id: 'box-text' });
+                let bDate = new w.fabric.IText(`RELEASED ${dateStr.toUpperCase()}`, { left: boxX + boxW/2, top: boxY + (boxH * 0.8), fontSize: 50 * m.S, fontFamily: 'Inter', fill: '#aaa', originX: 'center', originY: 'center', id: 'box-text' });
+                w.canvas.add(bArtist, bCustom, bDate);
+
+                // Vinyl düzeni için arka plan bluru ve koyu temayı zorla
+                (document.getElementById('blurToggle') as HTMLInputElement).checked = true;
+                (document.getElementById('blurAmount') as HTMLInputElement).value = "100";
+                (document.getElementById('blurBrightness') as HTMLInputElement).value = "0.3";
+                (document.getElementById('themeSelect') as HTMLSelectElement).value = 'colorful'; // Blur uygular
+
+                await w.extractPalettePromise(d.cover_xl);
+                await w.applyTheme('colorful');
+                w.canvas.requestRenderAll();
+                setTimeout(() => resolve(true), 100);
+
+            }, { crossOrigin: 'anonymous' });
+        });
+    };
+
     w.applyTheme = async function(theme: string) {
         let layout = (document.getElementById('layoutSelect') as HTMLSelectElement).value;
         let frameColor = "#ffffff"; let textColor = "#212121"; let subTextColor = "#444444"; let descColor = "#333333"; let lineColor = "#222222"; let isBlur = false;
@@ -568,7 +619,6 @@ export default function AlbumPosterBuilder() {
         });
         if(w.currentSpotifyUri || (document.getElementById('spotifyLink') as HTMLInputElement).value.trim()) { await w.addSpotifyCodePromise(); }
         
-        await w.initFooterBrandingPromise(); 
         w.canvas.requestRenderAll();
     };
 
@@ -594,7 +644,9 @@ export default function AlbumPosterBuilder() {
             w.showLoading("Loading editor..."); 
             w.isBatchGenerating = true;
             try {
-                if(newLayout === 'standart') await w.renderStandard(w.activeAlbumData); else await w.renderMinimal(w.activeAlbumData);
+                if(newLayout === 'standart') await w.renderStandard(w.activeAlbumData); 
+                else if (newLayout === 'vinyl') await w.renderVinyl(w.activeAlbumData);
+                else await w.renderMinimal(w.activeAlbumData);
             } catch(e) {} finally {
                 w.isBatchGenerating = false;
                 w.saveState(); w.saveCurrentStateToMemory(); w.hideLoading();
@@ -622,17 +674,22 @@ export default function AlbumPosterBuilder() {
     w.generateAllVariants = async function() {
         if(!w.activeAlbumData) { alert("Please search and select an album first!"); return; }
 
-        w.showLoading("Generating all variants...", "8 different designs are being created, please wait..."); 
+        // Vinyl eklendiği için artık 12 tasarım oluşturuluyor.
+        w.showLoading("Generating all variants...", "12 different designs are being created, please wait..."); 
         w.isBatchGenerating = true; w.variantStates = {}; 
         const wasGridOn = w.isGridEnabled; if (wasGridOn) w.toggleGrid(false);
 
-        const layouts = ['standart', 'minimal']; const themes = ['light', 'dark', 'blurry', 'colorful']; const variantsData = [];
+        const layouts = ['standart', 'minimal', 'vinyl']; 
+        const themes = ['light', 'dark', 'blurry', 'colorful']; 
+        const variantsData = [];
         await w.extractPalettePromise(w.activeAlbumData.cover_xl);
 
         for (let l of layouts) {
             for (let t_theme of themes) { 
                 (document.getElementById('layoutSelect') as HTMLSelectElement).value = l; (document.getElementById('themeSelect') as HTMLSelectElement).value = t_theme;
-                if (l === 'standart') await w.renderStandard(w.activeAlbumData); else await w.renderMinimal(w.activeAlbumData);
+                if (l === 'standart') await w.renderStandard(w.activeAlbumData); 
+                else if (l === 'vinyl') await w.renderVinyl(w.activeAlbumData);
+                else await w.renderMinimal(w.activeAlbumData);
                 let key = `${l}_${t_theme}`;
                 w.variantStates[key] = w.canvas.toJSON(w.PROPS_TO_SAVE);
                 
@@ -655,7 +712,7 @@ export default function AlbumPosterBuilder() {
                 <div class="variant-card" onclick="window.editVariant('${v.layout}', '${v.theme}')">
                     <img id="preview_${v.key}" src="${v.url}">
                     <div class="variant-info">
-                        <div class="variant-layout">${v.layout === 'standart' ? 'Minimalist' : 'bBoxes'}</div>
+                        <div class="variant-layout">${v.layout.toUpperCase()}</div>
                         <div class="variant-theme">${v.theme} THEME</div>
                     </div>
                     <div class="variant-actions">
@@ -684,7 +741,9 @@ export default function AlbumPosterBuilder() {
             if (w.variantStates[w.currentVariantKey]) {
                 await new Promise(r => { w.canvas.loadFromJSON(w.variantStates[w.currentVariantKey], () => { w.canvas.requestRenderAll(); r(true); }); });
             } else {
-                if (layout === 'standart') await w.renderStandard(w.activeAlbumData); else await w.renderMinimal(w.activeAlbumData);
+                if (layout === 'standart') await w.renderStandard(w.activeAlbumData); 
+                else if (layout === 'vinyl') await w.renderVinyl(w.activeAlbumData);
+                else await w.renderMinimal(w.activeAlbumData);
             }
         } catch(e) {} finally {
             w.isBatchGenerating = false; w.historyStack=[]; w.redoStack=[]; w.saveState(); w.hideLoading(); w.showSingleEditor();
@@ -698,12 +757,29 @@ export default function AlbumPosterBuilder() {
     
     w.canvas.on('object:modified', () => { w.saveState(); w.updateLayersPanel(); }); w.canvas.on('object:added', () => { w.updateLayersPanel(); }); w.canvas.on('object:removed', () => { w.updateLayersPanel(); });
 
-    w.applyStyle = function(prop: string, val: any) { let obj = w.canvas.getActiveObject(); if(!obj) return; const m = w.getLayoutMetrics(); if (obj.type === 'activeSelection') { obj.getObjects().forEach((o: any) => { if (prop === 'fontSize' && o.set) { o.set('fontSize', parseFloat(val) * m.S); o.set('scaleX', 1); o.set('scaleY', 1); } else o.set(prop, val); }); } else { if (prop === 'fontSize' && obj.set) { obj.set('fontSize', parseFloat(val) * m.S); obj.set('scaleX', 1); obj.set('scaleY', 1); } else obj.set(prop, val); } w.canvas.requestRenderAll(); w.saveState(); };
+    // Düzeltme: Font ve renk değişimlerinden sonra ekranın anında güncellenmesi sağlandı.
+    w.applyStyle = function(prop: string, val: any) { 
+        let obj = w.canvas.getActiveObject(); if(!obj) return; 
+        const m = w.getLayoutMetrics(); 
+        if (obj.type === 'activeSelection') { 
+            obj.getObjects().forEach((o: any) => { 
+                if (prop === 'fontSize' && o.set) { o.set('fontSize', parseFloat(val) * m.S); o.set('scaleX', 1); o.set('scaleY', 1); } 
+                else o.set(prop, val); 
+            }); 
+        } else { 
+            if (prop === 'fontSize' && obj.set) { obj.set('fontSize', parseFloat(val) * m.S); obj.set('scaleX', 1); obj.set('scaleY', 1); } 
+            else obj.set(prop, val); 
+        } 
+        w.canvas.requestRenderAll(); w.saveState(); w.updateEditorPanel();
+    };
     w.toggleStyle = function(prop: string, val1: string, val2: string) { let obj = w.canvas.getActiveObject(); if(!obj) return; w.applyStyle(prop, obj.get(prop) === val1 ? val2 : val1); };
     w.updateElementText = function(val: string) { let obj = w.canvas.getActiveObject(); if(obj && (obj.type === 'i-text' || obj.type === 'textbox')) { obj.set('text', val); w.canvas.requestRenderAll(); w.saveState(); } };
     w.deleteSelected = function() { let o = w.canvas.getActiveObjects(); if(o.length){ w.canvas.discardActiveObject(); o.forEach((x: any)=>w.canvas.remove(x)); w.saveState(); } };
-    w.bringForward = function() { let o = w.canvas.getActiveObject(); if(o){ w.canvas.bringForward(o); w.saveState(); } };
-    w.sendBackward = function() { let o = w.canvas.getActiveObject(); if(o){ w.canvas.sendBackwards(o); w.saveState(); } };
+    
+    // Düzeltme: Layer taşıma butonlarının tıklanmasının ardından canvas render edilip layer paneli güncelleniyor.
+    w.bringForward = function() { let o = w.canvas.getActiveObject(); if(o){ w.canvas.bringForward(o); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); } };
+    w.sendBackward = function() { let o = w.canvas.getActiveObject(); if(o){ w.canvas.sendBackwards(o); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); } };
+    
     w.toggleLock = function() { let o = w.canvas.getActiveObject(); if(!o) return; let l = !o.lockMovementX; o.set({ lockMovementX: l, lockMovementY: l, lockScalingX: l, lockScalingY: l, lockRotation: l, hasControls: !l, selectable: true }); w.canvas.requestRenderAll(); w.updateEditorPanel(); };
 
     w.alignObjects = function(alignType: string) {
@@ -823,8 +899,9 @@ export default function AlbumPosterBuilder() {
             if(obj.type === 'i-text' || obj.type === 'textbox') text = obj.text.substring(0, 15) + '...'; 
             if(obj.id === 'main-cover') text = "Album Cover"; 
             if(obj.id === 'spotify-code') text = "Spotify Barcode";
-            if(obj.id === 'branding-text') text = "Branding Text";
-            if(obj.id === 'branding-qr') text = "Branding QR";
+            if(obj.id === 'vinyl-full') text = "Vinyl Disc";
+            if(obj.id === 'vinyl-half') text = "Half Vinyl";
+            if(obj.id === 'info-box') text = "Info Box";
             
             let div = document.createElement('div'); div.className = 'layer-item'; if(w.canvas.getActiveObject() === obj) div.style.borderLeft = "3px solid var(--accent)";
             let nameSpan = document.createElement('span'); nameSpan.innerText = text; nameSpan.style.cursor = 'pointer'; nameSpan.style.flex = '1'; nameSpan.style.marginLeft = '8px';
@@ -834,11 +911,13 @@ export default function AlbumPosterBuilder() {
             eyeBtn.onclick = () => { obj.set('visible', !obj.visible); w.canvas.requestRenderAll(); w.updateLayersPanel(); w.saveState(); };
             
             let toolsDiv = document.createElement('div'); toolsDiv.style.display = 'flex'; toolsDiv.style.gap = '12px';
+            
+            // Düzeltme: Taşıma tıklanınca hem Canvas hem de Panel güncellenecek
             let upBtn = document.createElement('i'); upBtn.className = 'fas fa-arrow-up'; upBtn.title = "Bring Forward";
-            upBtn.onclick = () => { w.canvas.bringForward(obj); w.saveState(); };
+            upBtn.onclick = () => { w.canvas.bringForward(obj); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); };
             
             let downBtn = document.createElement('i'); downBtn.className = 'fas fa-arrow-down'; downBtn.title = "Send Backward";
-            downBtn.onclick = () => { w.canvas.sendBackwards(obj); w.saveState(); };
+            downBtn.onclick = () => { w.canvas.sendBackwards(obj); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); };
             
             toolsDiv.appendChild(upBtn); toolsDiv.appendChild(downBtn); div.appendChild(eyeBtn); div.appendChild(nameSpan); div.appendChild(toolsDiv); list.appendChild(div);
         }
@@ -938,7 +1017,7 @@ export default function AlbumPosterBuilder() {
                     w.latestVariantsData.forEach((v: any, index: number) => {
                         addToCart({
                             id: `custom_pro_${w.activeAlbumData.id}_${v.key}_${Date.now()}_${index}`,
-                            name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} (${v.layout} - ${v.theme})`,
+                            name: `${w.activeAlbumData.artist.name} - ${w.activeAlbumData.title} (${v.layout.toUpperCase()} - ${v.theme})`,
                             price: 29.99,
                             image: w.activeAlbumData.cover_xl, 
                             type: 'custom_pro_album',
@@ -950,7 +1029,7 @@ export default function AlbumPosterBuilder() {
                             }
                         });
                     });
-                    alert("Added 8 designs to cart successfully!");
+                    alert("Added all designs to cart successfully!");
                 } else {
                     addToCart({
                         id: `custom_pro_${w.activeAlbumData.id}_${Date.now()}`,
@@ -1037,6 +1116,7 @@ export default function AlbumPosterBuilder() {
                 <select id="layoutSelect" className="sidebar-control" onChange={(e) => (window as any).handleLayoutChange(e.target.value)}>
                     <option value="standart" id="opt_layout_minimalist">Minimalist</option>
                     <option value="minimal" id="opt_layout_bbox">bBoxes</option>
+                    <option value="vinyl" id="opt_layout_vinyl">Vinyl Record</option>
                 </select>
                 <select id="themeSelect" className="sidebar-control" onChange={(e) => (window as any).handleThemeChange(e.target.value)} style={{ marginTop: "5px" }}>
                     <option value="light" id="opt_theme_light">Theme: Light</option>
@@ -1121,7 +1201,7 @@ export default function AlbumPosterBuilder() {
                 <div id="variants-view" style={{ display: "flex", width: "100%", flexDirection: "column", paddingBottom: "50px" }}>
                     <div id="variants-grid" className="grid-pro">
                         <div style={{ textAlign: "center", color: "var(--text-muted)", fontSize: "1rem", padding: "50px", gridColumn: "1 / -1", background: "var(--bg-sidebar)", borderRadius: "20px", border: "1px dashed var(--border-color)" }} id="msg_no_design_created">
-                            No design has been created yet. Search for an album to generate 8 beautiful variants.
+                            No design has been created yet. Search for an album to generate beautiful variants.
                         </div>
                     </div>
                 </div>
