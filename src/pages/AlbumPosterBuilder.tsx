@@ -55,6 +55,7 @@ export default function AlbumPosterBuilder() {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js');
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/node-vibrant/3.1.6/vibrant.min.js');
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js');
       
       if (!document.getElementById('pro-poster-styles')) {
         const style = document.createElement('style');
@@ -130,6 +131,12 @@ export default function AlbumPosterBuilder() {
           @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
           .loader-text { font-size: 1.2rem; font-weight: 700; text-align: center; max-width: 80%; line-height: 1.5; font-family: 'Montserrat', sans-serif;}
           .loader-subtext { font-size: 0.85rem; color: var(--text-muted); margin-top: 10px; text-align: center; }
+          
+          .branding-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border-color); }
+          .branding-row:last-child { border-bottom: none; }
+          .branding-label { font-size: 0.8rem; flex: 1; }
+          .opacity-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; margin-bottom: 8px; }
+          .opacity-label { font-size: 0.65rem; color: var(--text-muted); width: 45px; flex-shrink: 0; }
         `;
         document.head.appendChild(style);
       }
@@ -140,13 +147,45 @@ export default function AlbumPosterBuilder() {
     initScripts();
 
     return () => {
-      // Cleanup
+      // Cleanup if needed
     };
   }, []);
 
   const initApplicationLogic = () => {
     const w = window as any;
     
+    // ============================================================
+    // QR CODE GENERATOR 
+    // ============================================================
+    w.generateQRDataURL = function(text: string, size: number, color: string) {
+        color = color || '#000000';
+        return new Promise((resolve) => {
+            const container = document.getElementById('qr-hidden');
+            if(!container) return resolve(null);
+            container.innerHTML = '';
+            
+            try {
+                new (w as any).QRCode(container, {
+                    text: text || 'https://musicposter.shop',
+                    width: size || 256,
+                    height: size || 256,
+                    colorDark: color,
+                    colorLight: 'rgba(0,0,0,0)',
+                    correctLevel: (w as any).QRCode.CorrectLevel.M
+                });
+                
+                setTimeout(() => {
+                    const img = container.querySelector('img');
+                    if (img && img.src) resolve(img.src);
+                    else {
+                        const cvs = container.querySelector('canvas');
+                        if (cvs) resolve(cvs.toDataURL()); else resolve(null);
+                    }
+                }, 100);
+            } catch(e) { resolve(null); }
+        });
+    };
+
     w.syncReactFontState = function(fontName: string) {
         setActiveFont(fontName);
     };
@@ -300,6 +339,96 @@ export default function AlbumPosterBuilder() {
         w.generateAllVariants();
     };
 
+    // ============================================================
+    // BRANDING & QR
+    // ============================================================
+    w.updateOpacityDisplays = function() {
+        const tOp = document.getElementById('textOpacity') as HTMLInputElement;
+        const qOp = document.getElementById('qrOpacity') as HTMLInputElement;
+        const tVal = document.getElementById('textOpacityVal');
+        const qVal = document.getElementById('qrOpacityVal');
+        if (tVal && tOp) tVal.textContent = parseFloat(tOp.value).toFixed(1);
+        if (qVal && qOp) qVal.textContent = parseFloat(qOp.value).toFixed(1);
+    };
+
+    w.applyBrandingSettings = function() {
+        w.updateOpacityDisplays();
+        const showText = (document.getElementById('textToggle') as HTMLInputElement).checked;
+        const textOpacity = parseFloat((document.getElementById('textOpacity') as HTMLInputElement).value);
+        const showQR = (document.getElementById('qrToggle') as HTMLInputElement).checked;
+        const qrOpacity = parseFloat((document.getElementById('qrOpacity') as HTMLInputElement).value);
+
+        const textObj = w.canvas.getObjects().find((o: any) => o.id === 'branding-text');
+        const qrObj = w.canvas.getObjects().find((o: any) => o.id === 'branding-qr');
+
+        if (textObj) textObj.set({ visible: showText, opacity: textOpacity });
+        if (qrObj) qrObj.set({ visible: showQR, opacity: qrOpacity });
+
+        w.canvas.requestRenderAll();
+        if (!w.isBatchGenerating) w.saveCurrentStateToMemory();
+    };
+
+    w.refreshBranding = async function() {
+        await w.initBrandingObjects();
+        if (!w.isBatchGenerating) { w.saveState(); w.saveCurrentStateToMemory(); w.updateLayersPanel(); }
+    };
+
+    w.initBrandingObjects = async function() {
+        return new Promise(async (resolve) => {
+            const theme = (document.getElementById('themeSelect') as HTMLSelectElement).value;
+            let elemColor = (theme === 'dark' || theme === 'blurry' || theme === 'colorful') ? "#eeeeee" : "#222222";
+            let webText = "musicposter.shop";
+            let qrUrl = "https://musicposter.shop";
+            const m = w.getLayoutMetrics();
+
+            const showText = (document.getElementById('textToggle') as HTMLInputElement).checked;
+            const textOpacity = parseFloat((document.getElementById('textOpacity') as HTMLInputElement).value);
+            const showQR = (document.getElementById('qrToggle') as HTMLInputElement).checked;
+            const qrOpacity = parseFloat((document.getElementById('qrOpacity') as HTMLInputElement).value);
+
+            const oldObjs = w.canvas.getObjects().filter((o: any) => o.id === 'branding-text' || o.id === 'branding-qr');
+            oldObjs.forEach((o: any) => w.canvas.remove(o));
+
+            const bottomY = m.OY + (7016 * m.S) - (120 * m.S);
+            const canvasCenterX = m.OX + (4961 * m.S) / 2;
+
+            let textObj = new w.fabric.IText(webText, {
+                fontSize: 55 * m.S, fontFamily: 'Inter', fontWeight: 700, fill: elemColor,
+                originX: 'center', originY: 'center', left: canvasCenterX, top: bottomY,
+                id: 'branding-text', visible: showText, opacity: textOpacity, selectable: true
+            });
+            w.canvas.add(textObj); w.canvas.bringToFront(textObj);
+
+            const qrSize = Math.round(256 * m.S * 3);
+            const qrDataUrl = await w.generateQRDataURL(qrUrl, Math.min(qrSize, 512), elemColor);
+            
+            if (qrDataUrl) {
+                w.fabric.Image.fromURL(qrDataUrl, function(qrImg: any) {
+                    if (!qrImg) { w.positionBrandingObjects(textObj, null, m, bottomY, canvasCenterX, showText, showQR); resolve(true); return; }
+                    qrImg.scaleToHeight(85 * m.S);
+                    qrImg.set({ originX: 'center', originY: 'center', id: 'branding-qr', visible: showQR, opacity: qrOpacity, selectable: true });
+                    w.canvas.add(qrImg); w.canvas.bringToFront(qrImg);
+                    w.positionBrandingObjects(textObj, qrImg, m, bottomY, canvasCenterX, showText, showQR);
+                    w.canvas.requestRenderAll(); resolve(true);
+                });
+            } else {
+                w.positionBrandingObjects(textObj, null, m, bottomY, canvasCenterX, showText, showQR);
+                w.canvas.requestRenderAll(); resolve(true);
+            }
+        });
+    };
+
+    w.positionBrandingObjects = function(textObj: any, qrObj: any, m: any, bottomY: number, canvasCenterX: number, showText: boolean, showQR: boolean) {
+        const gap = 30 * m.S;
+        if (textObj && qrObj && showText && showQR) {
+            let tW = textObj.getScaledWidth(); let qW = qrObj.getScaledWidth(); let totalW = qW + gap + tW;
+            let startX = canvasCenterX - (totalW / 2);
+            qrObj.set({ left: startX + (qW / 2), top: bottomY });
+            textObj.set({ left: startX + qW + gap + (tW / 2), top: bottomY });
+        } else if (textObj && showText) { textObj.set({ left: canvasCenterX, top: bottomY });
+        } else if (qrObj && showQR) { qrObj.set({ left: canvasCenterX, top: bottomY }); }
+    };
+
     w.addSpotifyCodePromise = function() {
         return new Promise((resolve) => {
             let uri = (document.getElementById('spotifyLink') as HTMLInputElement).value.trim();
@@ -388,6 +517,38 @@ export default function AlbumPosterBuilder() {
     });
 
     const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    // ============================================================
+    // VECTOR VINYL GENERATOR
+    // ============================================================
+    w.createVinylVector = function(radius: number, isHalf: boolean = false) {
+        let elements = [];
+        let baseRecord = new w.fabric.Circle({
+            radius: radius, left: -radius, top: -radius,
+            fill: new w.fabric.Gradient({
+                type: 'linear', coords: { x1: -radius, y1: -radius, x2: radius, y2: radius },
+                colorStops: [ { offset: 0, color: '#b5852a' }, { offset: 0.2, color: '#f9e596' }, { offset: 0.5, color: '#d4af37' }, { offset: 0.8, color: '#f9e596' }, { offset: 1, color: '#8a6327' } ]
+            })
+        });
+        elements.push(baseRecord);
+
+        const step = radius / 40;
+        for (let r = radius * 0.35; r < radius * 0.98; r += step) {
+            elements.push(new w.fabric.Circle({ radius: r, left: -r, top: -r, fill: 'transparent', stroke: 'rgba(0, 0, 0, 0.08)', strokeWidth: radius * 0.002 }));
+            elements.push(new w.fabric.Circle({ radius: r + (step/2), left: -(r + (step/2)), top: -(r + (step/2)), fill: 'transparent', stroke: 'rgba(255, 255, 255, 0.1)', strokeWidth: radius * 0.002 }));
+        }
+
+        let centerRadius = radius * 0.32;
+        elements.push(new w.fabric.Circle({ radius: centerRadius, left: -centerRadius, top: -centerRadius, fill: '#0a0a0a' }));
+        let innerRing = radius * 0.09;
+        elements.push(new w.fabric.Circle({ radius: innerRing, left: -innerRing, top: -innerRing, fill: 'transparent', stroke: '#d4af37', strokeWidth: radius * 0.008 }));
+        let holeRadius = radius * 0.035;
+        elements.push(new w.fabric.Circle({ radius: holeRadius, left: -holeRadius, top: -holeRadius, fill: '#ffffff' }));
+
+        let vinylGroup = new w.fabric.Group(elements, { originX: 'center', originY: 'center', selectable: true, id: isHalf ? 'vinyl-half' : 'vinyl-full' });
+        if (isHalf) { vinylGroup.set({ clipPath: new w.fabric.Rect({ left: 0, top: -radius, width: radius, height: radius * 2, originX: 'left', originY: 'center' }) }); }
+        return vinylGroup;
+    };
 
     w.renderStandard = async function(d: any) {
         return new Promise(async (resolve) => {
@@ -503,7 +664,6 @@ export default function AlbumPosterBuilder() {
         });
     };
 
-    // YENİ EKLENEN VİNYL (PLAK) TASARIMI
     w.renderVinyl = async function(d: any) {
         return new Promise(async (resolve) => {
             w.currentImg = d.cover_xl; w.albumTitle = d.title;
@@ -514,11 +674,6 @@ export default function AlbumPosterBuilder() {
             
             w.canvas.clear(); w.paletteRects = [];
             
-            await document.fonts.load('100px Inter');
-            await document.fonts.load('700 140px Inter');
-            await document.fonts.load('700 60px Montserrat');
-            await document.fonts.load('400 250px Allura');
-
             let goldColor = "#d4af37";
 
             w.fabric.Image.fromURL(d.cover_xl, async function(coverImg: any) {
@@ -529,53 +684,30 @@ export default function AlbumPosterBuilder() {
                 coverImg.scaleToWidth(coverSize);
                 coverImg.set({ left: coverX, top: bottomY, id: 'main-cover' });
 
-                let fullSVG: any = null, halfSVG: any = null;
-
-                try {
-                    await new Promise((r) => w.fabric.loadSVGFromURL('/goldfull.svg', (objs: any, opts: any) => {
-                        if(objs) { fullSVG = w.fabric.util.groupSVGElements(objs, opts); } r(true);
-                    }));
-                    await new Promise((r) => w.fabric.loadSVGFromURL('/goldhalf.svg', (objs: any, opts: any) => {
-                        if(objs) { halfSVG = w.fabric.util.groupSVGElements(objs, opts); } r(true);
-                    }));
-                } catch(e) { console.error("SVG Load Error", e); }
-
-                // Arka plandaki yarım plağı (CD'yi) kapağın soluna ekle
-                if (halfSVG) {
-                    halfSVG.scaleToHeight(coverSize * 0.95);
-                    halfSVG.set({ left: coverX + coverSize - (10 * m.S), top: bottomY + (coverSize * 0.025), id: 'vinyl-half' });
-                    w.canvas.add(halfSVG);
-                }
+                let halfVinyl = w.createVinylVector(coverSize * 0.48, true);
+                halfVinyl.set({ left: coverX + coverSize - (10 * m.S), top: bottomY + (coverSize / 2), originY: 'center' });
+                w.canvas.add(halfVinyl);
                 
-                // Kapak görselini yarım plağın üstüne (önüne) ekle
                 w.canvas.add(coverImg);
 
-                // Ana büyük plağı ve içindeki yazıları üst ortaya ekle
-                if (fullSVG) {
-                    const vinylSize = 3800 * m.S;
-                    fullSVG.scaleToWidth(vinylSize);
-                    fullSVG.set({ left: m.OX + (4961 * m.S / 2), top: m.OY + (600 * m.S) + (vinylSize / 2), originX: 'center', originY: 'center', id: 'vinyl-full' });
-                    w.canvas.add(fullSVG);
+                const vinylSize = 3800 * m.S;
+                let fullVinyl = w.createVinylVector(vinylSize / 2, false);
+                fullVinyl.set({ left: m.OX + (4961 * m.S / 2), top: m.OY + (600 * m.S) + (vinylSize / 2) });
+                w.canvas.add(fullVinyl);
 
-                    let artistClean = d.artist.name.toUpperCase();
-                    let vLabel = new w.fabric.IText(`RELEASED BY ${d.label || 'RECORD LABEL'}`, { left: fullSVG.left, top: fullSVG.top - (350 * m.S), fontSize: 50 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: '#fff', originX: 'center', id: 'vinyl-text' });
-                    let vArtist = new w.fabric.IText(d.artist.name, { left: fullSVG.left, top: fullSVG.top - (80 * m.S), fontSize: 260 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', id: 'vinyl-text' });
-                    let vTitle = new w.fabric.IText(d.title.toUpperCase(), { left: fullSVG.left, top: fullSVG.top + (180 * m.S), fontSize: 90 * m.S, fontFamily: 'Montserrat', fontWeight: 900, fill: '#fff', originX: 'center', id: 'vinyl-text' });
-                    let vDate = new w.fabric.IText(dateStr, { left: fullSVG.left, top: fullSVG.top + (320 * m.S), fontSize: 50 * m.S, fontFamily: 'Inter', fill: '#ccc', originX: 'center', id: 'vinyl-text' });
-                    w.canvas.add(vLabel, vArtist, vTitle, vDate);
-                }
+                let artistClean = d.artist.name.toUpperCase();
+                let vLabel = new w.fabric.IText(`RELEASED BY ${d.label || 'RECORD LABEL'}`, { left: fullVinyl.left, top: fullVinyl.top - (350 * m.S), fontSize: 50 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: '#fff', originX: 'center', id: 'vinyl-text' });
+                let vArtist = new w.fabric.IText(d.artist.name, { left: fullVinyl.left, top: fullVinyl.top - (80 * m.S), fontSize: 260 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', id: 'vinyl-text' });
+                let vTitle = new w.fabric.IText(d.title.toUpperCase(), { left: fullVinyl.left, top: fullVinyl.top + (180 * m.S), fontSize: 90 * m.S, fontFamily: 'Montserrat', fontWeight: 900, fill: '#fff', originX: 'center', id: 'vinyl-text' });
+                let vDate = new w.fabric.IText(dateStr, { left: fullVinyl.left, top: fullVinyl.top + (320 * m.S), fontSize: 50 * m.S, fontFamily: 'Inter', fill: '#ccc', originX: 'center', id: 'vinyl-text' });
+                w.canvas.add(vLabel, vArtist, vTitle, vDate);
 
-                // Sağ Alt Altın Çerçeveli Bilgi Kutusu
-                const boxX = (halfSVG ? halfSVG.left + halfSVG.getScaledWidth() : coverX + coverSize) + (100 * m.S);
+                const boxX = halfVinyl.left + halfVinyl.getScaledWidth() + (100 * m.S);
                 const boxW = m.OX + (4961 * m.S) - 500 * m.S - boxX;
                 const boxH = coverSize * 0.6;
                 const boxY = bottomY + (coverSize - boxH) / 2;
 
-                let infoBox = new w.fabric.Rect({
-                    left: boxX, top: boxY, width: boxW, height: boxH,
-                    fill: 'rgba(0,0,0,0.7)', stroke: goldColor, strokeWidth: 12 * m.S,
-                    id: 'info-box'
-                });
+                let infoBox = new w.fabric.Rect({ left: boxX, top: boxY, width: boxW, height: boxH, fill: 'rgba(0,0,0,0.7)', stroke: goldColor, strokeWidth: 12 * m.S, id: 'info-box' });
                 w.canvas.add(infoBox);
 
                 let bArtist = new w.fabric.IText(d.artist.name, { left: boxX + boxW/2, top: boxY + (boxH * 0.3), fontSize: 220 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', originY: 'center', id: 'box-text' });
@@ -583,11 +715,10 @@ export default function AlbumPosterBuilder() {
                 let bDate = new w.fabric.IText(`RELEASED ${dateStr.toUpperCase()}`, { left: boxX + boxW/2, top: boxY + (boxH * 0.8), fontSize: 50 * m.S, fontFamily: 'Inter', fill: '#aaa', originX: 'center', originY: 'center', id: 'box-text' });
                 w.canvas.add(bArtist, bCustom, bDate);
 
-                // Vinyl düzeni için arka plan bluru ve koyu temayı zorla
                 (document.getElementById('blurToggle') as HTMLInputElement).checked = true;
-                (document.getElementById('blurAmount') as HTMLInputElement).value = "100";
+                (document.getElementById('blurAmount') as HTMLInputElement).value = "150";
                 (document.getElementById('blurBrightness') as HTMLInputElement).value = "0.3";
-                (document.getElementById('themeSelect') as HTMLSelectElement).value = 'colorful'; // Blur uygular
+                (document.getElementById('themeSelect') as HTMLSelectElement).value = 'colorful'; 
 
                 await w.extractPalettePromise(d.cover_xl);
                 await w.applyTheme('colorful');
@@ -619,6 +750,7 @@ export default function AlbumPosterBuilder() {
         });
         if(w.currentSpotifyUri || (document.getElementById('spotifyLink') as HTMLInputElement).value.trim()) { await w.addSpotifyCodePromise(); }
         
+        await w.initBrandingObjects(); 
         w.canvas.requestRenderAll();
     };
 
@@ -662,7 +794,38 @@ export default function AlbumPosterBuilder() {
 
     w.updateFrameColor = function(v: string) { if (!(document.getElementById('blurToggle') as HTMLInputElement).checked) { w.canvas.setBackgroundImage(null, () => w.canvas.renderAll()); w.canvas.setBackgroundColor(v, () => w.canvas.renderAll()); } w.saveCurrentStateToMemory(); };
     w.updateLineColor = function(v: string) { if(w.separatorLine) { w.separatorLine.set('fill', v); w.canvas.requestRenderAll(); if(!w.isBatchGenerating) w.saveState(); w.saveCurrentStateToMemory(); } };
-    w.setPalette = function(i: number, c: string) { const b = document.getElementById('box'+i); if(b) b.style.backgroundColor = c; if(w.paletteRects && w.paletteRects[i]) { w.paletteRects[i].set('fill', c); w.canvas.requestRenderAll(); w.saveCurrentStateToMemory(); } };
+    
+    // ============================================================
+    // AUTO-SYNC LOGIC
+    // ============================================================
+    w.syncPropertyToAllVariants = function(activeObj: any, prop: string, val: any, exactIndex = -1) {
+        if (!activeObj || !activeObj.id || w.isBatchGenerating) return;
+        let allWithId = w.canvas.getObjects().filter((o: any) => o.id === activeObj.id);
+        let targetIndex = exactIndex > -1 ? exactIndex : allWithId.indexOf(activeObj);
+        if (targetIndex === -1) return;
+
+        for (let key in w.variantStates) {
+            if (key === w.currentVariantKey) continue; 
+            try {
+                let stateObj = JSON.parse(w.variantStates[key]);
+                let objects = stateObj.objects;
+                let matches = objects.filter((o: any) => o.id === activeObj.id);
+                if (matches[targetIndex]) {
+                    matches[targetIndex][prop] = val;
+                    if (prop === 'fontSize') { matches[targetIndex].scaleX = 1; matches[targetIndex].scaleY = 1; }
+                }
+                w.variantStates[key] = JSON.stringify(stateObj);
+            } catch(e) {}
+        }
+    };
+
+    w.setPalette = function(i: number, c: string) { 
+        const b = document.getElementById('p'+(i+1)) as HTMLInputElement; if(b) b.value = c; 
+        if(w.paletteRects && w.paletteRects[i]) { 
+            w.paletteRects[i].set('fill', c); w.canvas.requestRenderAll(); w.saveCurrentStateToMemory(); 
+            w.syncPropertyToAllVariants(w.paletteRects[i], 'fill', c, i);
+        } 
+    };
 
     w.confirmGenerateAll = function() {
         if(Object.keys(w.variantStates).length > 0) {
@@ -674,7 +837,6 @@ export default function AlbumPosterBuilder() {
     w.generateAllVariants = async function() {
         if(!w.activeAlbumData) { alert("Please search and select an album first!"); return; }
 
-        // Vinyl eklendiği için artık 12 tasarım oluşturuluyor.
         w.showLoading("Generating all variants...", "12 different designs are being created, please wait..."); 
         w.isBatchGenerating = true; w.variantStates = {}; 
         const wasGridOn = w.isGridEnabled; if (wasGridOn) w.toggleGrid(false);
@@ -696,14 +858,11 @@ export default function AlbumPosterBuilder() {
                 try {
                     const previewUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 0.8, multiplier: 0.4 });
                     variantsData.push({ layout: l, theme: t_theme, url: previewUrl, key: key });
-                } catch(e) {
-                    variantsData.push({ layout: l, theme: t_theme, url: '', key: key });
-                }
+                } catch(e) { variantsData.push({ layout: l, theme: t_theme, url: '', key: key }); }
             }
         }
 
         w.latestVariantsData = variantsData;
-
         if (wasGridOn) w.toggleGrid(true); w.isBatchGenerating = false;
 
         const grid = document.getElementById('variants-grid');
@@ -750,36 +909,130 @@ export default function AlbumPosterBuilder() {
         }
     };
 
+    // ============================================================
+    // MOCKUP EXPORT
+    // ============================================================
+    w.downloadMockup = async function() {
+        let wasGridOn = w.isGridEnabled; if(wasGridOn) w.toggleGrid(false); 
+        w.canvas.discardActiveObject(); w.canvas.requestRenderAll();
+        
+        w.showLoading("Generating Mockup...");
+        
+        try {
+            await new Promise(r => setTimeout(r, 100));
+            const exportMultiplier = (1/w.BASE_PREVIEW_SCALE) / w.canvas.getZoom();
+            const posterDataUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 1, multiplier: exportMultiplier });
+            
+            const mockupImg = new Image();
+            mockupImg.crossOrigin = "anonymous";
+            mockupImg.onload = () => {
+                const mCanvas = document.createElement('canvas');
+                mCanvas.width = mockupImg.width;
+                mCanvas.height = mockupImg.height;
+                const mCtx = mCanvas.getContext('2d');
+                
+                const posterImg = new Image();
+                posterImg.onload = () => {
+                    let pHeight = mockupImg.height * 0.65;
+                    let pWidth = pHeight * (4961 / 7016);
+                    let pX = (mockupImg.width - pWidth) / 2;
+                    let pY = (mockupImg.height - pHeight) / 2;
+                    
+                    if(mCtx) {
+                        mCtx.drawImage(posterImg, pX, pY, pWidth, pHeight); 
+                        mCtx.drawImage(mockupImg, 0, 0, mCanvas.width, mCanvas.height); 
+                    }
+                    
+                    const link = document.createElement('a'); 
+                    link.download = `${w.albumTitle}_mockup.png`; 
+                    link.href = mCanvas.toDataURL('image/png'); 
+                    link.click();
+                    
+                    if(wasGridOn) w.toggleGrid(true); 
+                    w.hideLoading();
+                };
+                posterImg.src = posterDataUrl;
+            };
+            mockupImg.onerror = () => {
+                alert("Error: 'mockup1.png' not found. Please ensure the file is in the public directory.");
+                if(wasGridOn) w.toggleGrid(true); 
+                w.hideLoading();
+            };
+            mockupImg.src = '/mockup1.png'; // React public folder path
+            
+        } catch(e: any) { 
+            alert('Error: ' + e.message); 
+            if(wasGridOn) w.toggleGrid(true); 
+            w.hideLoading();
+        }
+    };
+
+    w.downloadPDF = async function() {
+        let wasGridOn = w.isGridEnabled; if(wasGridOn) w.toggleGrid(false); w.canvas.discardActiveObject(); w.canvas.requestRenderAll();
+        w.showLoading("Generating PDF...");
+        try { 
+            await new Promise(r => setTimeout(r, 100)); 
+            const exportMultiplier = (1 / w.BASE_PREVIEW_SCALE) / w.canvas.getZoom(); 
+            const dataUrl = w.canvas.toDataURL({ format: 'png', multiplier: exportMultiplier }); 
+            const dims = w.getCurrentDimensions();
+            const doc = new w.jspdf.jsPDF({ orientation: 'portrait', unit: 'mm', format:[dims.w / 23.5, dims.h / 23.5] }); 
+            doc.addImage(dataUrl, 'PNG', 0, 0, dims.w / 23.5, dims.h / 23.5); 
+            doc.save(`${w.albumTitle}_${w.currentFormat}.pdf`); 
+        } catch (e: any) { alert('Error: ' + e.message); }
+        if(wasGridOn) w.toggleGrid(true); w.hideLoading();
+    };
+
+    w.downloadPoster = async function() {
+        let wasGridOn = w.isGridEnabled; if(wasGridOn) w.toggleGrid(false); w.canvas.discardActiveObject(); w.canvas.requestRenderAll();
+        w.showLoading("Generating Image...");
+        try { 
+            await new Promise(r => setTimeout(r, 100)); 
+            const exportMultiplier = (1 / w.BASE_PREVIEW_SCALE) / w.canvas.getZoom(); 
+            const dataUrl = w.canvas.toDataURL({ format: 'png', multiplier: exportMultiplier }); 
+            const link = document.createElement('a'); link.download = `${w.albumTitle}_${w.currentFormat}.png`; link.href = dataUrl; link.click(); 
+        } catch (e: any) { alert('Error: ' + e.message); }
+        if(wasGridOn) w.toggleGrid(true); w.hideLoading();
+    };
+
     w.historyStack = []; w.redoStack = []; w.isHistoryAction = false;
     w.saveState = function() { if(w.isHistoryAction || w.isBatchGenerating) return; w.redoStack = []; w.historyStack.push(JSON.stringify(w.canvas)); w.saveCurrentStateToMemory(); };
     w.undo = function() { if (w.historyStack.length > 1) { w.isHistoryAction = true; w.redoStack.push(w.historyStack.pop()); w.canvas.loadFromJSON(w.historyStack[w.historyStack.length - 1], () => { w.canvas.renderAll(); w.updateLayersPanel(); w.isHistoryAction = false; w.saveCurrentStateToMemory(); }); } };
     w.redo = function() { if (w.redoStack.length > 0) { w.isHistoryAction = true; const state = w.redoStack.pop(); w.historyStack.push(state); w.canvas.loadFromJSON(state, () => { w.canvas.renderAll(); w.updateLayersPanel(); w.isHistoryAction = false; w.saveCurrentStateToMemory(); }); } };
     
-    w.canvas.on('object:modified', () => { w.saveState(); w.updateLayersPanel(); }); w.canvas.on('object:added', () => { w.updateLayersPanel(); }); w.canvas.on('object:removed', () => { w.updateLayersPanel(); });
+    w.canvas.on('object:modified', (e: any) => { 
+        w.saveState(); w.updateLayersPanel(); 
+        if(e.target) {
+            if (e.target.type === 'activeSelection') {
+                 e.target.getObjects().forEach((o: any) => {
+                     w.syncPropertyToAllVariants(o, 'scaleX', o.scaleX); w.syncPropertyToAllVariants(o, 'scaleY', o.scaleY); w.syncPropertyToAllVariants(o, 'angle', o.angle);
+                 });
+            } else {
+                 w.syncPropertyToAllVariants(e.target, 'scaleX', e.target.scaleX); w.syncPropertyToAllVariants(e.target, 'scaleY', e.target.scaleY); w.syncPropertyToAllVariants(e.target, 'angle', e.target.angle);
+            }
+        }
+    }); 
+    w.canvas.on('object:added', () => { w.updateLayersPanel(); }); w.canvas.on('object:removed', () => { w.updateLayersPanel(); });
 
-    // Düzeltme: Font ve renk değişimlerinden sonra ekranın anında güncellenmesi sağlandı.
     w.applyStyle = function(prop: string, val: any) { 
-        let obj = w.canvas.getActiveObject(); if(!obj) return; 
-        const m = w.getLayoutMetrics(); 
+        let obj = w.canvas.getActiveObject(); if(!obj) return; const m = w.getLayoutMetrics(); 
         if (obj.type === 'activeSelection') { 
             obj.getObjects().forEach((o: any) => { 
-                if (prop === 'fontSize' && o.set) { o.set('fontSize', parseFloat(val) * m.S); o.set('scaleX', 1); o.set('scaleY', 1); } 
-                else o.set(prop, val); 
+                if (prop === 'fontSize' && o.set) { o.set('fontSize', parseFloat(val) * m.S); o.set('scaleX', 1); o.set('scaleY', 1); } else o.set(prop, val); 
+                w.syncPropertyToAllVariants(o, prop, o.get(prop));
             }); 
         } else { 
-            if (prop === 'fontSize' && obj.set) { obj.set('fontSize', parseFloat(val) * m.S); obj.set('scaleX', 1); obj.set('scaleY', 1); } 
-            else obj.set(prop, val); 
+            if (prop === 'fontSize' && obj.set) { obj.set('fontSize', parseFloat(val) * m.S); obj.set('scaleX', 1); obj.set('scaleY', 1); } else obj.set(prop, val); 
+            w.syncPropertyToAllVariants(obj, prop, obj.get(prop));
         } 
-        w.canvas.requestRenderAll(); w.saveState(); w.updateEditorPanel();
+        w.canvas.requestRenderAll(); w.saveState(); 
     };
     w.toggleStyle = function(prop: string, val1: string, val2: string) { let obj = w.canvas.getActiveObject(); if(!obj) return; w.applyStyle(prop, obj.get(prop) === val1 ? val2 : val1); };
-    w.updateElementText = function(val: string) { let obj = w.canvas.getActiveObject(); if(obj && (obj.type === 'i-text' || obj.type === 'textbox')) { obj.set('text', val); w.canvas.requestRenderAll(); w.saveState(); } };
+    w.updateElementText = function(val: string) { let obj = w.canvas.getActiveObject(); if(obj && (obj.type === 'i-text' || obj.type === 'textbox')) { obj.set('text', val); w.canvas.requestRenderAll(); w.saveState(); w.syncPropertyToAllVariants(obj, 'text', val); } };
     w.deleteSelected = function() { let o = w.canvas.getActiveObjects(); if(o.length){ w.canvas.discardActiveObject(); o.forEach((x: any)=>w.canvas.remove(x)); w.saveState(); } };
     
-    // Düzeltme: Layer taşıma butonlarının tıklanmasının ardından canvas render edilip layer paneli güncelleniyor.
+    // DÜZELTME: Katman sıralaması sonrası anında yenileme
     w.bringForward = function() { let o = w.canvas.getActiveObject(); if(o){ w.canvas.bringForward(o); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); } };
     w.sendBackward = function() { let o = w.canvas.getActiveObject(); if(o){ w.canvas.sendBackwards(o); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); } };
-    
     w.toggleLock = function() { let o = w.canvas.getActiveObject(); if(!o) return; let l = !o.lockMovementX; o.set({ lockMovementX: l, lockMovementY: l, lockScalingX: l, lockScalingY: l, lockRotation: l, hasControls: !l, selectable: true }); w.canvas.requestRenderAll(); w.updateEditorPanel(); };
 
     w.alignObjects = function(alignType: string) {
@@ -788,78 +1041,21 @@ export default function AlbumPosterBuilder() {
 
         if (activeObj.type === 'activeSelection') {
             const objs = activeObj.getObjects();
-            const aWidth = activeObj.width;
-            const aHeight = activeObj.height;
-
+            const aWidth = activeObj.width; const aHeight = activeObj.height;
             objs.forEach((obj: any) => {
-                let wObj = obj.width * obj.scaleX;
-                let hObj = obj.height * obj.scaleY;
-                
-                let leftEdge = -aWidth / 2;
-                let rightEdge = aWidth / 2;
-                let topEdge = -aHeight / 2;
-                let bottomEdge = aHeight / 2;
-
-                if (alignType === 'left') {
-                    if (obj.originX === 'left') obj.set({ left: leftEdge });
-                    else if (obj.originX === 'center') obj.set({ left: leftEdge + wObj/2 });
-                    else if (obj.originX === 'right') obj.set({ left: leftEdge + wObj });
-                } else if (alignType === 'center') {
-                    if (obj.originX === 'left') obj.set({ left: -wObj/2 });
-                    else if (obj.originX === 'center') obj.set({ left: 0 });
-                    else if (obj.originX === 'right') obj.set({ left: wObj/2 });
-                } else if (alignType === 'right') {
-                    if (obj.originX === 'left') obj.set({ left: rightEdge - wObj });
-                    else if (obj.originX === 'center') obj.set({ left: rightEdge - wObj/2 });
-                    else if (obj.originX === 'right') obj.set({ left: rightEdge });
-                }
-
-                if (alignType === 'top') {
-                    if (obj.originY === 'top') obj.set({ top: topEdge });
-                    else if (obj.originY === 'center') obj.set({ top: topEdge + hObj/2 });
-                    else if (obj.originY === 'bottom') obj.set({ top: topEdge + hObj });
-                } else if (alignType === 'middle') {
-                    if (obj.originY === 'top') obj.set({ top: -hObj/2 });
-                    else if (obj.originY === 'center') obj.set({ top: 0 });
-                    else if (obj.originY === 'bottom') obj.set({ top: hObj/2 });
-                } else if (alignType === 'bottom') {
-                    if (obj.originY === 'top') obj.set({ top: bottomEdge - hObj });
-                    else if (obj.originY === 'center') obj.set({ top: bottomEdge - hObj/2 });
-                    else if (obj.originY === 'bottom') obj.set({ top: bottomEdge });
-                }
+                let wObj = obj.width * obj.scaleX; let hObj = obj.height * obj.scaleY;
+                let leftEdge = -aWidth / 2; let rightEdge = aWidth / 2; let topEdge = -aHeight / 2; let bottomEdge = aHeight / 2;
+                if (alignType === 'left') { if (obj.originX === 'left') obj.set({ left: leftEdge }); else if (obj.originX === 'center') obj.set({ left: leftEdge + wObj/2 }); else if (obj.originX === 'right') obj.set({ left: leftEdge + wObj }); } else if (alignType === 'center') { if (obj.originX === 'left') obj.set({ left: -wObj/2 }); else if (obj.originX === 'center') obj.set({ left: 0 }); else if (obj.originX === 'right') obj.set({ left: wObj/2 }); } else if (alignType === 'right') { if (obj.originX === 'left') obj.set({ left: rightEdge - wObj }); else if (obj.originX === 'center') obj.set({ left: rightEdge - wObj/2 }); else if (obj.originX === 'right') obj.set({ left: rightEdge }); }
+                if (alignType === 'top') { if (obj.originY === 'top') obj.set({ top: topEdge }); else if (obj.originY === 'center') obj.set({ top: topEdge + hObj/2 }); else if (obj.originY === 'bottom') obj.set({ top: topEdge + hObj }); } else if (alignType === 'middle') { if (obj.originY === 'top') obj.set({ top: -hObj/2 }); else if (obj.originY === 'center') obj.set({ top: 0 }); else if (obj.originY === 'bottom') obj.set({ top: hObj/2 }); } else if (alignType === 'bottom') { if (obj.originY === 'top') obj.set({ top: bottomEdge - hObj }); else if (obj.originY === 'center') obj.set({ top: bottomEdge - hObj/2 }); else if (obj.originY === 'bottom') obj.set({ top: bottomEdge }); }
             });
             activeObj.setCoords();
         } else {
-            const cw = w.canvas.getWidth();
-            const ch = w.canvas.getHeight();
-            let wObj = activeObj.getScaledWidth();
-            let hObj = activeObj.getScaledHeight();
-
-            if (alignType === 'left') {
-                if (activeObj.originX === 'left') activeObj.set({ left: 0 });
-                else if (activeObj.originX === 'center') activeObj.set({ left: wObj/2 });
-                else if (activeObj.originX === 'right') activeObj.set({ left: w });
-            } else if (alignType === 'center') {
-                activeObj.centerH();
-            } else if (alignType === 'right') {
-                if (activeObj.originX === 'left') activeObj.set({ left: cw - wObj });
-                else if (activeObj.originX === 'center') activeObj.set({ left: cw - wObj/2 });
-                else if (activeObj.originX === 'right') activeObj.set({ left: cw });
-            } else if (alignType === 'top') {
-                if (activeObj.originY === 'top') activeObj.set({ top: 0 });
-                else if (activeObj.originY === 'center') activeObj.set({ top: hObj/2 });
-                else if (activeObj.originY === 'bottom') activeObj.set({ top: hObj });
-            } else if (alignType === 'middle') {
-                activeObj.centerV();
-            } else if (alignType === 'bottom') {
-                if (activeObj.originY === 'top') activeObj.set({ top: ch - hObj });
-                else if (activeObj.originY === 'center') activeObj.set({ top: ch - hObj/2 });
-                else if (activeObj.originY === 'bottom') activeObj.set({ top: ch });
-            }
+            const cw = w.canvas.getWidth(); const ch = w.canvas.getHeight();
+            let wObj = activeObj.getScaledWidth(); let hObj = activeObj.getScaledHeight();
+            if (alignType === 'left') { if (activeObj.originX === 'left') activeObj.set({ left: 0 }); else if (activeObj.originX === 'center') activeObj.set({ left: wObj/2 }); else if (activeObj.originX === 'right') activeObj.set({ left: w }); } else if (alignType === 'center') { activeObj.centerH(); } else if (alignType === 'right') { if (activeObj.originX === 'left') activeObj.set({ left: cw - wObj }); else if (activeObj.originX === 'center') activeObj.set({ left: cw - wObj/2 }); else if (activeObj.originX === 'right') activeObj.set({ left: cw }); } else if (alignType === 'top') { if (activeObj.originY === 'top') activeObj.set({ top: 0 }); else if (activeObj.originY === 'center') activeObj.set({ top: hObj/2 }); else if (activeObj.originY === 'bottom') activeObj.set({ top: hObj }); } else if (alignType === 'middle') { activeObj.centerV(); } else if (alignType === 'bottom') { if (activeObj.originY === 'top') activeObj.set({ top: ch - hObj }); else if (activeObj.originY === 'center') activeObj.set({ top: ch - hObj/2 }); else if (activeObj.originY === 'bottom') activeObj.set({ top: ch }); }
             activeObj.setCoords();
         }
-        w.canvas.requestRenderAll();
-        w.saveState();
+        w.canvas.requestRenderAll(); w.saveState();
     };
 
     w.isGridEnabled = false; w.GRID_SIZE = 50 * w.BASE_PREVIEW_SCALE; w.gridLines = [];
@@ -899,6 +1095,8 @@ export default function AlbumPosterBuilder() {
             if(obj.type === 'i-text' || obj.type === 'textbox') text = obj.text.substring(0, 15) + '...'; 
             if(obj.id === 'main-cover') text = "Album Cover"; 
             if(obj.id === 'spotify-code') text = "Spotify Barcode";
+            if(obj.id === 'branding-text') text = "Branding Text";
+            if(obj.id === 'branding-qr') text = "Branding QR";
             if(obj.id === 'vinyl-full') text = "Vinyl Disc";
             if(obj.id === 'vinyl-half') text = "Half Vinyl";
             if(obj.id === 'info-box') text = "Info Box";
@@ -912,7 +1110,7 @@ export default function AlbumPosterBuilder() {
             
             let toolsDiv = document.createElement('div'); toolsDiv.style.display = 'flex'; toolsDiv.style.gap = '12px';
             
-            // Düzeltme: Taşıma tıklanınca hem Canvas hem de Panel güncellenecek
+            // Fix: Re-render and update layer panel immediately after movement
             let upBtn = document.createElement('i'); upBtn.className = 'fas fa-arrow-up'; upBtn.title = "Bring Forward";
             upBtn.onclick = () => { w.canvas.bringForward(obj); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); };
             
@@ -1116,6 +1314,7 @@ export default function AlbumPosterBuilder() {
                 <select id="layoutSelect" className="sidebar-control" onChange={(e) => (window as any).handleLayoutChange(e.target.value)}>
                     <option value="standart" id="opt_layout_minimalist">Minimalist</option>
                     <option value="minimal" id="opt_layout_bbox">bBoxes</option>
+                    {/* YENİ EKLENEN VINYL SEÇENEĞİ */}
                     <option value="vinyl" id="opt_layout_vinyl">Vinyl Record</option>
                 </select>
                 <select id="themeSelect" className="sidebar-control" onChange={(e) => (window as any).handleThemeChange(e.target.value)} style={{ marginTop: "5px" }}>
@@ -1331,6 +1530,16 @@ export default function AlbumPosterBuilder() {
                     </div>
                 </div>
 
+                {/* Bottom Export Buttons */}
+                <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", gap: "10px", paddingTop: "20px" }}>
+                    {/* MOCKUP EXPORT BUTONU */}
+                    <button className="sidebar-download-btn btn-accent" id="dlMockupBtn" onClick={() => (window as any).downloadMockup()} style={{ marginBottom: "5px" }}>
+                        <i className="far fa-images"></i> EXPORT MOCKUP
+                    </button>
+                    <button className="sidebar-download-btn btn-dark" id="dlBtn" onClick={() => (window as any).downloadPoster()}><i className="far fa-image"></i> EXPORT IMAGE</button>
+                    <button className="sidebar-download-btn btn-danger" id="dlPdfBtn" onClick={() => (window as any).downloadPDF()}><i className="far fa-file-pdf"></i> EXPORT HIGH-RES PDF</button>
+                </div>
+                
                 {/* Spotify Module - FIXED AT BOTTOM OF SCROLL */}
                 <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(29, 185, 84, 0.25)", marginTop: "auto" }}>
                     <span className="sidebar-title" style={{ color: "var(--spotify)", marginBottom: "5px", fontSize: "0.7rem" }} id="title_spotify_barcode"><i className="fab fa-spotify"></i> SPOTIFY BARCODE</span>
