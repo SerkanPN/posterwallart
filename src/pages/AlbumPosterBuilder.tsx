@@ -139,9 +139,7 @@ export default function AlbumPosterBuilder() {
 
     initScripts();
 
-    return () => {
-      // Cleanup
-    };
+    return () => {};
   }, []);
 
   const initApplicationLogic = () => {
@@ -236,6 +234,89 @@ export default function AlbumPosterBuilder() {
         };
     };
 
+    // ============================================================
+    // PROGRAMMATIC VECTOR DRAWING FOR VINYL AND CD (100% QUALITY, NO EXTERNAL FILES)
+    // ============================================================
+    w.createVectorVinyl = function(m: any) {
+        const R = 1800 * m.S;
+        
+        const base = new w.fabric.Circle({
+            radius: R, left: 0, top: 0, originX: 'center', originY: 'center',
+            fill: new w.fabric.Gradient({
+                type: 'linear',
+                coords: { x1: -R, y1: -R, x2: R, y2: R },
+                colorStops: [
+                    { offset: 0, color: '#f7d383' }, { offset: 0.15, color: '#c48f3b' },
+                    { offset: 0.3, color: '#fcf3c1' }, { offset: 0.5, color: '#7a5010' },
+                    { offset: 0.7, color: '#fcf3c1' }, { offset: 0.85, color: '#c48f3b' },
+                    { offset: 1, color: '#f7d383' }
+                ]
+            }),
+            stroke: '#4a3007', strokeWidth: 5 * m.S
+        });
+
+        const objs = [base];
+        
+        // Plak Çizgileri (Grooves)
+        for(let i = 1; i <= 24; i++) {
+            objs.push(new w.fabric.Circle({
+                radius: R * (1 - (i*0.028)), left: 0, top: 0, originX: 'center', originY: 'center',
+                fill: '', stroke: 'rgba(0,0,0,0.12)', strokeWidth: 3 * m.S
+            }));
+        }
+
+        // Orta Etiket
+        objs.push(new w.fabric.Circle({ radius: R * 0.33, left: 0, top: 0, originX: 'center', originY: 'center', fill: '#0a0d10' }));
+        objs.push(new w.fabric.Circle({ radius: R * 0.33, left: 0, top: 0, originX: 'center', originY: 'center', fill: '', stroke: '#cca652', strokeWidth: 6 * m.S }));
+        objs.push(new w.fabric.Circle({ radius: R * 0.08, left: 0, top: 0, originX: 'center', originY: 'center', fill: '', stroke: '#cca652', strokeWidth: 6 * m.S }));
+        objs.push(new w.fabric.Circle({ radius: R * 0.035, left: 0, top: 0, originX: 'center', originY: 'center', fill: '#ffffff' }));
+
+        return new w.fabric.Group(objs, { originX: 'center', originY: 'center', selectable: true, id: 'vinyl-full' });
+    };
+
+    w.createVectorHalfCD = function(m: any) {
+        const R = 800 * m.S; // CD Yarıçapı (Kapağın yarısı kadar)
+
+        const base = new w.fabric.Circle({
+            radius: R, left: 0, top: 0, originX: 'center', originY: 'center',
+            fill: new w.fabric.Gradient({
+                type: 'linear',
+                coords: { x1: -R, y1: 0, x2: R, y2: 0 },
+                colorStops: [
+                    { offset: 0, color: '#fcf3c1' }, { offset: 0.25, color: '#d4af37' },
+                    { offset: 0.5, color: '#ffffff' }, { offset: 0.75, color: '#aa7c11' },
+                    { offset: 1, color: '#fcf3c1' }
+                ]
+            }),
+            stroke: '#7a5010', strokeWidth: 2 * m.S
+        });
+
+        const objs = [base];
+
+        // CD Işık Yansımaları (Grooves)
+        for(let i = 1; i <= 15; i++) {
+            objs.push(new w.fabric.Circle({
+                radius: R * (1 - (i*0.05)), left: 0, top: 0, originX: 'center', originY: 'center',
+                fill: '', stroke: 'rgba(255,255,255,0.25)', strokeWidth: 4 * m.S
+            }));
+        }
+
+        // CD Göbeği
+        objs.push(new w.fabric.Circle({ radius: R * 0.25, left: 0, top: 0, originX: 'center', originY: 'center', fill: '#0a0d10' }));
+        objs.push(new w.fabric.Circle({ radius: R * 0.15, left: 0, top: 0, originX: 'center', originY: 'center', fill: '#1a1d20' }));
+        objs.push(new w.fabric.Circle({ radius: R * 0.05, left: 0, top: 0, originX: 'center', originY: 'center', fill: '#ffffff' }));
+
+        const group = new w.fabric.Group(objs, { originX: 'center', originY: 'center', selectable: true, id: 'vinyl-half' });
+        
+        // Sol tarafı kesip yarım CD yap
+        group.clipPath = new w.fabric.Rect({
+            left: 0, top: -R, width: R, height: R*2, originX: 'left', originY: 'top'
+        });
+
+        return group;
+    };
+
+
     w.updateFormat = function(newFormat: string) {
         w.currentFormat = newFormat;
         w.rescale((document.getElementById('zoom-slider') as HTMLInputElement).value);
@@ -292,34 +373,10 @@ export default function AlbumPosterBuilder() {
     };
 
     w.handleDeezerAlbumLoaded = function(d: any) {
-        w.activeAlbumData = d; w.currentSpotifyUri = null; (document.getElementById('spotifyLink') as HTMLInputElement).value = "";
-        const spotifySearchBtn = document.getElementById('spotifySearchBtn') as HTMLAnchorElement;
-        const query = encodeURIComponent(d.artist.name + " " + d.title);
-        spotifySearchBtn.href = `https://open.spotify.com/search/${query}/albums`;
+        w.activeAlbumData = d; w.currentSpotifyUri = null;
         w.hideLoading();
         w.generateAllVariants();
     };
-
-    w.addSpotifyCodePromise = function() {
-        return new Promise((resolve) => {
-            let uri = (document.getElementById('spotifyLink') as HTMLInputElement).value.trim();
-            if(!uri) uri = 'spotify:track:4uLU6hMCjMI75M1A2tKUQC';
-            let url = `https://scannables.scdn.co/uri/plain/png/000000/white/640/${uri}`;
-            w.fabric.Image.fromURL(url, function(img: any) {
-                if(!img) return resolve(true);
-                const m = w.getLayoutMetrics();
-                img.scaleToWidth(800 * m.S);
-                img.set({ left: m.OX + ((4961 * m.S) / 2) - (400 * m.S), top: m.OY + (7016 * m.S) - (1200 * m.S), id: 'spotify-code' });
-                let existing = w.canvas.getObjects().find((o: any) => o.id === 'spotify-code');
-                if (existing) w.canvas.remove(existing);
-                w.canvas.add(img); w.canvas.bringToFront(img);
-                if(!w.isBatchGenerating) { w.saveState(); w.updateLayersPanel(); }
-                resolve(true);
-            }, { crossOrigin: 'anonymous' });
-        });
-    };
-    
-    w.addSpotifyCode = async function() { await w.addSpotifyCodePromise(); if(!w.isBatchGenerating) { w.saveState(); w.updateLayersPanel(); w.saveCurrentStateToMemory(); } };
 
     w.extractPalettePromise = function(imgUrl: string) {
         return new Promise((resolve) => {
@@ -503,94 +560,77 @@ export default function AlbumPosterBuilder() {
         });
     };
 
+    // ============================================================
     // YENİ EKLENEN VİNYL (PLAK) TASARIMI
+    // ============================================================
     w.renderVinyl = async function(d: any) {
         return new Promise(async (resolve) => {
             w.currentImg = d.cover_xl; w.albumTitle = d.title;
             const m = w.getLayoutMetrics();
-            const dateArr = d.release_date.split('-'); const day = parseInt(dateArr[2]);
-            const getOrdinal = (n: number) => { let s = ["th", "st", "nd", "rd"], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); };
-            const dateStr = `${months[parseInt(dateArr[1])-1]} ${getOrdinal(day)} ${dateArr[0]}`.trim();
+            const dateArr = d.release_date.split('-'); const day = parseInt(dateArr[2]); const year = dateArr[0];
+            const monthStr = months[parseInt(dateArr[1])-1];
+            const dateStr = `${day.toString().padStart(2,'0')}.${dateArr[1]}.${year}`; // 13.04.2020 format
+            const releasedStr = `RELEASED ${monthStr.toUpperCase()} ${year}`;
             
             w.canvas.clear(); w.paletteRects = [];
-            
-            await document.fonts.load('100px Inter');
-            await document.fonts.load('700 140px Inter');
-            await document.fonts.load('700 60px Montserrat');
-            await document.fonts.load('400 250px Allura');
-
-            let goldColor = "#d4af37";
+            let goldColor = "#dfaa54";
 
             w.fabric.Image.fromURL(d.cover_xl, async function(coverImg: any) {
+                // Ana düzen koordinatları
                 const coverSize = 1600 * m.S;
-                const bottomY = m.OY + (7016 * m.S) - coverSize - (600 * m.S);
-                const coverX = m.OX + (500 * m.S);
-                
+                const bottomY = m.OY + (7016 * m.S) - coverSize - (400 * m.S);
+                const coverX = m.OX + (400 * m.S);
+
+                // 1. Plak Çizimi (Vektörel)
+                const vinylFull = w.createVectorVinyl(m);
+                vinylFull.set({ left: m.OX + (4961 * m.S / 2), top: m.OY + (2400 * m.S), id: 'vinyl-full' });
+                w.canvas.add(vinylFull);
+
+                // 1.1 Plak İçi Metinleri
+                let artistClean = d.artist.name.toUpperCase();
+                let vLabel = new w.fabric.IText(`Released by ${d.label || "Creative Market"}`, { left: vinylFull.left, top: vinylFull.top - (450 * m.S), fontSize: 60 * m.S, fontFamily: 'Inter', fontWeight: 600, fill: '#ccc', originX: 'center', id: 'vinyl-text' });
+                let vArtist = new w.fabric.IText("Custom Text", { left: vinylFull.left, top: vinylFull.top - (200 * m.S), fontSize: 260 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', id: 'vinyl-text' });
+                let vTitle = new w.fabric.IText("DIVE INTO CREATIVITY", { left: vinylFull.left, top: vinylFull.top + (250 * m.S), fontSize: 100 * m.S, fontFamily: 'Montserrat', fontWeight: 900, fill: '#fff', originX: 'center', id: 'vinyl-text' });
+                let vSub = new w.fabric.IText(d.artist.name, { left: vinylFull.left, top: vinylFull.top + (380 * m.S), fontSize: 90 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', id: 'vinyl-text' });
+                let vDate = new w.fabric.IText(dateStr, { left: vinylFull.left, top: vinylFull.top + (520 * m.S), fontSize: 60 * m.S, fontFamily: 'Inter', fontWeight: 600, fill: '#aaa', originX: 'center', id: 'vinyl-text' });
+                w.canvas.add(vLabel, vArtist, vTitle, vSub, vDate);
+
+                // 2. Kapak Arkasından Çıkan Yarım CD Çizimi
+                const halfCD = w.createVectorHalfCD(m);
+                halfCD.set({ left: coverX + coverSize - (100 * m.S), top: bottomY + (coverSize / 2), id: 'vinyl-half' });
+                w.canvas.add(halfCD);
+
+                // 3. Kapak Görseli
                 coverImg.scaleToWidth(coverSize);
                 coverImg.set({ left: coverX, top: bottomY, id: 'main-cover' });
-
-                let fullSVG: any = null, halfSVG: any = null;
-
-                try {
-                    await new Promise((r) => w.fabric.loadSVGFromURL('/goldfull.svg', (objs: any, opts: any) => {
-                        if(objs) { fullSVG = w.fabric.util.groupSVGElements(objs, opts); } r(true);
-                    }));
-                    await new Promise((r) => w.fabric.loadSVGFromURL('/goldhalf.svg', (objs: any, opts: any) => {
-                        if(objs) { halfSVG = w.fabric.util.groupSVGElements(objs, opts); } r(true);
-                    }));
-                } catch(e) { console.error("SVG Load Error", e); }
-
-                // Arka plandaki yarım plağı (CD'yi) kapağın soluna ekle
-                if (halfSVG) {
-                    halfSVG.scaleToHeight(coverSize * 0.95);
-                    halfSVG.set({ left: coverX + coverSize - (10 * m.S), top: bottomY + (coverSize * 0.025), id: 'vinyl-half' });
-                    w.canvas.add(halfSVG);
-                }
-                
-                // Kapak görselini yarım plağın üstüne (önüne) ekle
                 w.canvas.add(coverImg);
 
-                // Ana büyük plağı ve içindeki yazıları üst ortaya ekle
-                if (fullSVG) {
-                    const vinylSize = 3800 * m.S;
-                    fullSVG.scaleToWidth(vinylSize);
-                    fullSVG.set({ left: m.OX + (4961 * m.S / 2), top: m.OY + (600 * m.S) + (vinylSize / 2), originX: 'center', originY: 'center', id: 'vinyl-full' });
-                    w.canvas.add(fullSVG);
-
-                    let artistClean = d.artist.name.toUpperCase();
-                    let vLabel = new w.fabric.IText(`RELEASED BY ${d.label || 'RECORD LABEL'}`, { left: fullSVG.left, top: fullSVG.top - (350 * m.S), fontSize: 50 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: '#fff', originX: 'center', id: 'vinyl-text' });
-                    let vArtist = new w.fabric.IText(d.artist.name, { left: fullSVG.left, top: fullSVG.top - (80 * m.S), fontSize: 260 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', id: 'vinyl-text' });
-                    let vTitle = new w.fabric.IText(d.title.toUpperCase(), { left: fullSVG.left, top: fullSVG.top + (180 * m.S), fontSize: 90 * m.S, fontFamily: 'Montserrat', fontWeight: 900, fill: '#fff', originX: 'center', id: 'vinyl-text' });
-                    let vDate = new w.fabric.IText(dateStr, { left: fullSVG.left, top: fullSVG.top + (320 * m.S), fontSize: 50 * m.S, fontFamily: 'Inter', fill: '#ccc', originX: 'center', id: 'vinyl-text' });
-                    w.canvas.add(vLabel, vArtist, vTitle, vDate);
-                }
-
-                // Sağ Alt Altın Çerçeveli Bilgi Kutusu
-                const boxX = (halfSVG ? halfSVG.left + halfSVG.getScaledWidth() : coverX + coverSize) + (100 * m.S);
-                const boxW = m.OX + (4961 * m.S) - 500 * m.S - boxX;
-                const boxH = coverSize * 0.6;
-                const boxY = bottomY + (coverSize - boxH) / 2;
+                // 4. Sağ Alt Altın Çerçeveli Kutucuk
+                const boxX = halfCD.left + (750 * m.S) - (50 * m.S);
+                const boxW = (4961 * m.S) - (boxX - m.OX) - (400 * m.S);
+                const boxH = 800 * m.S;
+                const boxY = bottomY + (coverSize / 2) - (boxH / 2);
 
                 let infoBox = new w.fabric.Rect({
                     left: boxX, top: boxY, width: boxW, height: boxH,
-                    fill: 'rgba(0,0,0,0.7)', stroke: goldColor, strokeWidth: 12 * m.S,
+                    fill: 'rgba(20,10,5,0.85)', stroke: goldColor, strokeWidth: 15 * m.S,
                     id: 'info-box'
                 });
                 w.canvas.add(infoBox);
 
-                let bArtist = new w.fabric.IText(d.artist.name, { left: boxX + boxW/2, top: boxY + (boxH * 0.3), fontSize: 220 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', originY: 'center', id: 'box-text' });
-                let bCustom = new w.fabric.IText("ALBUM POSTER WALL ART", { left: boxX + boxW/2, top: boxY + (boxH * 0.6), fontSize: 60 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: '#ddd', originX: 'center', originY: 'center', id: 'box-text' });
-                let bDate = new w.fabric.IText(`RELEASED ${dateStr.toUpperCase()}`, { left: boxX + boxW/2, top: boxY + (boxH * 0.8), fontSize: 50 * m.S, fontFamily: 'Inter', fill: '#aaa', originX: 'center', originY: 'center', id: 'box-text' });
-                w.canvas.add(bArtist, bCustom, bDate);
+                let bArtist = new w.fabric.IText(d.artist.name, { left: boxX + boxW/2, top: boxY + (250 * m.S), fontSize: 240 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', originY: 'center', id: 'box-text' });
+                let bCustom = new w.fabric.IText("YOUR CUSTOM TEXT GOES HERE", { left: boxX + boxW/2, top: boxY + (500 * m.S), fontSize: 75 * m.S, fontFamily: 'Montserrat', fontWeight: 600, fill: '#eee', originX: 'center', originY: 'center', id: 'box-text' });
+                let bDateObj = new w.fabric.IText(releasedStr, { left: boxX + boxW/2, top: boxY + (650 * m.S), fontSize: 75 * m.S, fontFamily: 'Montserrat', fontWeight: 400, fill: '#ccc', originX: 'center', originY: 'center', id: 'box-text' });
+                w.canvas.add(bArtist, bCustom, bDateObj);
 
-                // Vinyl düzeni için arka plan bluru ve koyu temayı zorla
+                // Temayı Zorla
                 (document.getElementById('blurToggle') as HTMLInputElement).checked = true;
-                (document.getElementById('blurAmount') as HTMLInputElement).value = "100";
-                (document.getElementById('blurBrightness') as HTMLInputElement).value = "0.3";
-                (document.getElementById('themeSelect') as HTMLSelectElement).value = 'colorful'; // Blur uygular
-
+                (document.getElementById('blurAmount') as HTMLInputElement).value = "250";
+                (document.getElementById('blurBrightness') as HTMLInputElement).value = "0.2";
+                
                 await w.extractPalettePromise(d.cover_xl);
-                await w.applyTheme('colorful');
+                await w.applyTheme('dark'); // Vinil her zaman koyu temayla başlar
+                
                 w.canvas.requestRenderAll();
                 setTimeout(() => resolve(true), 100);
 
@@ -617,7 +657,6 @@ export default function AlbumPosterBuilder() {
             if (['artist-text', 'meta-val', 'meta-lbl', 'title-text', 'track-text', 'signature-text', 'layout2-meta'].includes(obj.id)) { if (obj.type !== 'rect') obj.set('fill', (obj.id === 'meta-val' || (obj.id === 'artist-text' && layout === 'standart')) ? subTextColor : textColor); }
             if (obj.id === 'desc-text') obj.set('fill', descColor);
         });
-        if(w.currentSpotifyUri || (document.getElementById('spotifyLink') as HTMLInputElement).value.trim()) { await w.addSpotifyCodePromise(); }
         
         w.canvas.requestRenderAll();
     };
@@ -645,7 +684,7 @@ export default function AlbumPosterBuilder() {
             w.isBatchGenerating = true;
             try {
                 if(newLayout === 'standart') await w.renderStandard(w.activeAlbumData); 
-                else if (newLayout === 'vinyl') await w.renderVinyl(w.activeAlbumData);
+                else if(newLayout === 'vinyl') await w.renderVinyl(w.activeAlbumData); 
                 else await w.renderMinimal(w.activeAlbumData);
             } catch(e) {} finally {
                 w.isBatchGenerating = false;
@@ -662,7 +701,41 @@ export default function AlbumPosterBuilder() {
 
     w.updateFrameColor = function(v: string) { if (!(document.getElementById('blurToggle') as HTMLInputElement).checked) { w.canvas.setBackgroundImage(null, () => w.canvas.renderAll()); w.canvas.setBackgroundColor(v, () => w.canvas.renderAll()); } w.saveCurrentStateToMemory(); };
     w.updateLineColor = function(v: string) { if(w.separatorLine) { w.separatorLine.set('fill', v); w.canvas.requestRenderAll(); if(!w.isBatchGenerating) w.saveState(); w.saveCurrentStateToMemory(); } };
-    w.setPalette = function(i: number, c: string) { const b = document.getElementById('box'+i); if(b) b.style.backgroundColor = c; if(w.paletteRects && w.paletteRects[i]) { w.paletteRects[i].set('fill', c); w.canvas.requestRenderAll(); w.saveCurrentStateToMemory(); } };
+    
+    // ============================================================
+    // DÜZELTME 1: Senkronizasyon (Auto-Sync) Fonksiyonu
+    // ============================================================
+    w.syncPropertyToAllVariants = function(activeObj: any, prop: string, val: any, exactIndex = -1) {
+        if (!activeObj || !activeObj.id || w.isBatchGenerating) return;
+        
+        let allWithId = w.canvas.getObjects().filter((o: any) => o.id === activeObj.id);
+        let targetIndex = exactIndex > -1 ? exactIndex : allWithId.indexOf(activeObj);
+        if (targetIndex === -1) return;
+
+        for (let key in w.variantStates) {
+            if (key === w.currentVariantKey) continue; 
+            try {
+                let stateObj = w.variantStates[key];
+                let objects = stateObj.objects;
+                let matches = objects.filter((o: any) => o.id === activeObj.id);
+                if (matches[targetIndex]) {
+                    matches[targetIndex][prop] = val;
+                    if (prop === 'fontSize') {
+                        matches[targetIndex].scaleX = 1;
+                        matches[targetIndex].scaleY = 1;
+                    }
+                }
+            } catch(e) {}
+        }
+    };
+
+    w.setPalette = function(i: number, c: string) { 
+        const b = document.getElementById('p'+(i+1)) as HTMLInputElement; if(b) b.value = c; 
+        if(w.paletteRects && w.paletteRects[i]) { 
+            w.paletteRects[i].set('fill', c); w.canvas.requestRenderAll(); w.saveCurrentStateToMemory(); 
+            w.syncPropertyToAllVariants(w.paletteRects[i], 'fill', c, i); // Senkronize et
+        } 
+    };
 
     w.confirmGenerateAll = function() {
         if(Object.keys(w.variantStates).length > 0) {
@@ -674,14 +747,11 @@ export default function AlbumPosterBuilder() {
     w.generateAllVariants = async function() {
         if(!w.activeAlbumData) { alert("Please search and select an album first!"); return; }
 
-        // Vinyl eklendiği için artık 12 tasarım oluşturuluyor.
         w.showLoading("Generating all variants...", "12 different designs are being created, please wait..."); 
         w.isBatchGenerating = true; w.variantStates = {}; 
         const wasGridOn = w.isGridEnabled; if (wasGridOn) w.toggleGrid(false);
 
-        const layouts = ['standart', 'minimal', 'vinyl']; 
-        const themes = ['light', 'dark', 'blurry', 'colorful']; 
-        const variantsData = [];
+        const layouts = ['standart', 'minimal', 'vinyl']; const themes = ['light', 'dark', 'blurry', 'colorful']; const variantsData = [];
         await w.extractPalettePromise(w.activeAlbumData.cover_xl);
 
         for (let l of layouts) {
@@ -690,6 +760,7 @@ export default function AlbumPosterBuilder() {
                 if (l === 'standart') await w.renderStandard(w.activeAlbumData); 
                 else if (l === 'vinyl') await w.renderVinyl(w.activeAlbumData);
                 else await w.renderMinimal(w.activeAlbumData);
+                
                 let key = `${l}_${t_theme}`;
                 w.variantStates[key] = w.canvas.toJSON(w.PROPS_TO_SAVE);
                 
@@ -755,30 +826,73 @@ export default function AlbumPosterBuilder() {
     w.undo = function() { if (w.historyStack.length > 1) { w.isHistoryAction = true; w.redoStack.push(w.historyStack.pop()); w.canvas.loadFromJSON(w.historyStack[w.historyStack.length - 1], () => { w.canvas.renderAll(); w.updateLayersPanel(); w.isHistoryAction = false; w.saveCurrentStateToMemory(); }); } };
     w.redo = function() { if (w.redoStack.length > 0) { w.isHistoryAction = true; const state = w.redoStack.pop(); w.historyStack.push(state); w.canvas.loadFromJSON(state, () => { w.canvas.renderAll(); w.updateLayersPanel(); w.isHistoryAction = false; w.saveCurrentStateToMemory(); }); } };
     
-    w.canvas.on('object:modified', () => { w.saveState(); w.updateLayersPanel(); }); w.canvas.on('object:added', () => { w.updateLayersPanel(); }); w.canvas.on('object:removed', () => { w.updateLayersPanel(); });
+    // Düzeltme 2: Modifiye olan objeyi (büyüme, küçülme) senkronize eder
+    w.canvas.on('object:modified', (e: any) => { 
+        w.saveState(); w.updateLayersPanel(); 
+        if(e.target) {
+            if (e.target.type === 'activeSelection') {
+                 e.target.getObjects().forEach((o: any) => {
+                     w.syncPropertyToAllVariants(o, 'scaleX', o.scaleX);
+                     w.syncPropertyToAllVariants(o, 'scaleY', o.scaleY);
+                     w.syncPropertyToAllVariants(o, 'angle', o.angle);
+                 });
+            } else {
+                 w.syncPropertyToAllVariants(e.target, 'scaleX', e.target.scaleX);
+                 w.syncPropertyToAllVariants(e.target, 'scaleY', e.target.scaleY);
+                 w.syncPropertyToAllVariants(e.target, 'angle', e.target.angle);
+            }
+        }
+    }); 
+    w.canvas.on('object:added', () => { w.updateLayersPanel(); }); w.canvas.on('object:removed', () => { w.updateLayersPanel(); });
 
-    // Düzeltme: Font ve renk değişimlerinden sonra ekranın anında güncellenmesi sağlandı.
     w.applyStyle = function(prop: string, val: any) { 
-        let obj = w.canvas.getActiveObject(); if(!obj) return; 
-        const m = w.getLayoutMetrics(); 
+        // Seçim kaybolmasını engellemek için direkt objeyi değişkene atar.
+        let obj = w.canvas.getActiveObject(); if(!obj) return; const m = w.getLayoutMetrics(); 
         if (obj.type === 'activeSelection') { 
             obj.getObjects().forEach((o: any) => { 
                 if (prop === 'fontSize' && o.set) { o.set('fontSize', parseFloat(val) * m.S); o.set('scaleX', 1); o.set('scaleY', 1); } 
                 else o.set(prop, val); 
+                w.syncPropertyToAllVariants(o, prop, o.get(prop)); // Auto-Sync
             }); 
         } else { 
             if (prop === 'fontSize' && obj.set) { obj.set('fontSize', parseFloat(val) * m.S); obj.set('scaleX', 1); obj.set('scaleY', 1); } 
             else obj.set(prop, val); 
+            w.syncPropertyToAllVariants(obj, prop, obj.get(prop)); // Auto-Sync
         } 
         w.canvas.requestRenderAll(); w.saveState(); w.updateEditorPanel();
     };
+    
     w.toggleStyle = function(prop: string, val1: string, val2: string) { let obj = w.canvas.getActiveObject(); if(!obj) return; w.applyStyle(prop, obj.get(prop) === val1 ? val2 : val1); };
-    w.updateElementText = function(val: string) { let obj = w.canvas.getActiveObject(); if(obj && (obj.type === 'i-text' || obj.type === 'textbox')) { obj.set('text', val); w.canvas.requestRenderAll(); w.saveState(); } };
+    
+    w.updateElementText = function(val: string) { 
+        let obj = w.canvas.getActiveObject(); 
+        if(obj && (obj.type === 'i-text' || obj.type === 'textbox')) { 
+            obj.set('text', val); w.canvas.requestRenderAll(); w.saveState(); 
+            w.syncPropertyToAllVariants(obj, 'text', val); // Auto-Sync
+        } 
+    };
+    
     w.deleteSelected = function() { let o = w.canvas.getActiveObjects(); if(o.length){ w.canvas.discardActiveObject(); o.forEach((x: any)=>w.canvas.remove(x)); w.saveState(); } };
     
-    // Düzeltme: Layer taşıma butonlarının tıklanmasının ardından canvas render edilip layer paneli güncelleniyor.
-    w.bringForward = function() { let o = w.canvas.getActiveObject(); if(o){ w.canvas.bringForward(o); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); } };
-    w.sendBackward = function() { let o = w.canvas.getActiveObject(); if(o){ w.canvas.sendBackwards(o); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); } };
+    // Düzeltme 3: Layer taşımanın düzeltilmesi
+    w.bringForward = function(manualObj: any = null) { 
+        let o = manualObj || w.canvas.getActiveObject(); 
+        if(o){ 
+            w.canvas.bringForward(o); 
+            w.canvas.requestRenderAll(); 
+            w.saveState(); 
+            w.updateLayersPanel(); 
+        } 
+    };
+    w.sendBackward = function(manualObj: any = null) { 
+        let o = manualObj || w.canvas.getActiveObject(); 
+        if(o){ 
+            w.canvas.sendBackwards(o); 
+            w.canvas.requestRenderAll(); 
+            w.saveState(); 
+            w.updateLayersPanel(); 
+        } 
+    };
     
     w.toggleLock = function() { let o = w.canvas.getActiveObject(); if(!o) return; let l = !o.lockMovementX; o.set({ lockMovementX: l, lockMovementY: l, lockScalingX: l, lockScalingY: l, lockRotation: l, hasControls: !l, selectable: true }); w.canvas.requestRenderAll(); w.updateEditorPanel(); };
 
@@ -898,7 +1012,6 @@ export default function AlbumPosterBuilder() {
             let text = obj.type; 
             if(obj.type === 'i-text' || obj.type === 'textbox') text = obj.text.substring(0, 15) + '...'; 
             if(obj.id === 'main-cover') text = "Album Cover"; 
-            if(obj.id === 'spotify-code') text = "Spotify Barcode";
             if(obj.id === 'vinyl-full') text = "Vinyl Disc";
             if(obj.id === 'vinyl-half') text = "Half Vinyl";
             if(obj.id === 'info-box') text = "Info Box";
@@ -912,12 +1025,12 @@ export default function AlbumPosterBuilder() {
             
             let toolsDiv = document.createElement('div'); toolsDiv.style.display = 'flex'; toolsDiv.style.gap = '12px';
             
-            // Düzeltme: Taşıma tıklanınca hem Canvas hem de Panel güncellenecek
+            // Düzeltme 4: Butonlara tıklanınca manuel objeyi gönderiyor
             let upBtn = document.createElement('i'); upBtn.className = 'fas fa-arrow-up'; upBtn.title = "Bring Forward";
-            upBtn.onclick = () => { w.canvas.bringForward(obj); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); };
+            upBtn.onclick = () => { w.bringForward(obj); };
             
             let downBtn = document.createElement('i'); downBtn.className = 'fas fa-arrow-down'; downBtn.title = "Send Backward";
-            downBtn.onclick = () => { w.canvas.sendBackwards(obj); w.canvas.requestRenderAll(); w.saveState(); w.updateLayersPanel(); };
+            downBtn.onclick = () => { w.sendBackward(obj); };
             
             toolsDiv.appendChild(upBtn); toolsDiv.appendChild(downBtn); div.appendChild(eyeBtn); div.appendChild(nameSpan); div.appendChild(toolsDiv); list.appendChild(div);
         }
@@ -960,7 +1073,7 @@ export default function AlbumPosterBuilder() {
                 if(textTools) textTools.style.display = 'flex';
                 if(imgFilters) imgFilters.style.display = 'none';
                 document.getElementById('size-col')!.style.display = 'flex';
-            } else if (obj.type === 'image') {
+            } else if (obj.type === 'image' || obj.type === 'group') {
                 if(basicTools) basicTools.style.display = 'none';
                 if(textTools) textTools.style.display = 'none';
                 if(imgFilters) imgFilters.style.display = 'flex';
@@ -1053,6 +1166,65 @@ export default function AlbumPosterBuilder() {
                 w.hideLoading();
             }
         }, 100);
+    };
+
+    // ============================================================
+    // MOCKUP GENERATOR (YENİ EKLENTİ)
+    // ============================================================
+    w.downloadMockup = async function() {
+        let wasGridOn = w.isGridEnabled; if(wasGridOn) w.toggleGrid(false); 
+        w.canvas.discardActiveObject(); w.canvas.requestRenderAll();
+        
+        w.showLoading("Generating Mockup...", "Preparing high quality presentation...");
+        
+        try {
+            await new Promise(r => setTimeout(r, 100));
+            
+            const exportMultiplier = (1/w.BASE_PREVIEW_SCALE) / w.canvas.getZoom();
+            const posterDataUrl = w.canvas.toDataURL({ format: 'jpeg', quality: 1, multiplier: exportMultiplier });
+            
+            const mockupImg = new Image();
+            mockupImg.crossOrigin = "anonymous";
+            mockupImg.onload = () => {
+                const mCanvas = document.createElement('canvas');
+                mCanvas.width = mockupImg.width;
+                mCanvas.height = mockupImg.height;
+                const mCtx = mCanvas.getContext('2d');
+                
+                if(mCtx) {
+                    const posterImg = new Image();
+                    posterImg.onload = () => {
+                        let pHeight = mockupImg.height * 0.65; // Posteri ortalama %65 yükseklikte çizer
+                        let pWidth = pHeight * (4961 / 7016); // A2 poster oranı
+                        let pX = (mockupImg.width - pWidth) / 2;
+                        let pY = (mockupImg.height - pHeight) / 2;
+                        
+                        mCtx.drawImage(posterImg, pX, pY, pWidth, pHeight); 
+                        mCtx.drawImage(mockupImg, 0, 0, mCanvas.width, mCanvas.height); 
+                        
+                        const link = document.createElement('a'); 
+                        link.download = `${w.albumTitle}_mockup.png`; 
+                        link.href = mCanvas.toDataURL('image/png'); 
+                        link.click();
+                        
+                        if(wasGridOn) w.toggleGrid(true); 
+                        w.hideLoading();
+                    };
+                    posterImg.src = posterDataUrl;
+                }
+            };
+            mockupImg.onerror = () => {
+                alert("HATA: 'mockup1.png' dosyası bulunamadı! Lütfen programın çalıştığı klasöre 'mockup1.png' dosyası ekleyin.");
+                if(wasGridOn) w.toggleGrid(true); 
+                w.hideLoading();
+            };
+            mockupImg.src = '/mockup1.png';
+            
+        } catch(e: any) { 
+            alert('Error: ' + e.message); 
+            if(wasGridOn) w.toggleGrid(true); 
+            w.hideLoading();
+        }
     };
 
     (document.getElementById('formatSelect') as HTMLSelectElement).value = 'a2';
@@ -1234,7 +1406,6 @@ export default function AlbumPosterBuilder() {
                             <textarea id="elemText" className="sidebar-control" style={{ resize: "vertical", minHeight: "45px", cursor: "text" }} onInput={(e: any) => (window as any).updateElementText(e.target.value)}></textarea>
                         </div>
                         
-                        {/* CUSTOM FONT PICKER WITH PREVIEWS */}
                         <div className="relative">
                             <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "4px", display: "block" }} id="lbl_font_family">Font Family</label>
                             <div 
@@ -1299,7 +1470,6 @@ export default function AlbumPosterBuilder() {
                         </div>
                     </div>
 
-                    {/* OBJECT ALIGNMENT TOOLS */}
                     <div id="object-align-tools" style={{ display: "none", flexDirection: "column", gap: "5px", marginTop: "10px" }}>
                         <label style={{ fontSize: "0.7rem", color: "var(--text-muted)", marginBottom: "2px" }} id="lbl_object_align">Align Objects</label>
                         <div style={{ display: "flex", gap: "5px" }}>
@@ -1331,13 +1501,6 @@ export default function AlbumPosterBuilder() {
                     </div>
                 </div>
 
-                {/* Spotify Module - FIXED AT BOTTOM OF SCROLL */}
-                <div className="sidebar-group" style={{ background: "var(--bg-input)", padding: "15px", borderRadius: "12px", border: "1px solid rgba(29, 185, 84, 0.25)", marginTop: "auto" }}>
-                    <span className="sidebar-title" style={{ color: "var(--spotify)", marginBottom: "5px", fontSize: "0.7rem" }} id="title_spotify_barcode"><i className="fab fa-spotify"></i> SPOTIFY BARCODE</span>
-                    <a id="spotifySearchBtn" href="https://open.spotify.com/search" target="_blank" rel="noreferrer" className="sidebar-download-btn" style={{ background: "var(--bg-main)", color: "var(--spotify)", padding: "12px", marginBottom: "10px", border: "1px solid transparent", boxShadow: "inset 0 0 0 1px rgba(29,185,84,0.1)" }}>1. FIND ON SPOTIFY</a>
-                    <input type="text" id="spotifyLink" className="sidebar-control" placeholder="2. Paste Copied Link" style={{ background: "var(--bg-main)", borderColor: "var(--border-color)", marginBottom: "10px" }} />
-                    <button className="sidebar-download-btn" onClick={() => (window as any).addSpotifyCode()} style={{ background: "var(--spotify)", color: "#fff", border: "none", padding: "12px" }} id="btn_add_barcode">ADD BARCODE</button>
-                </div>
             </div>
         </div>
 
@@ -1345,6 +1508,22 @@ export default function AlbumPosterBuilder() {
             <div style={{ textAlign: "right", cursor: "pointer", fontSize: "1.5rem", color: "var(--text-muted)", marginBottom: "20px" }} onClick={(e: any) => e.currentTarget.parentElement.style.display='none'}><i className="fas fa-times"></i></div>
             <div className="grid-pro" id="results-grid" style={{ gridTemplateColumns: "repeat(auto-fill, minmax(180px, 1fr))" }}></div>
         </div>
+
+        {/* BOTTOM EXPORT BUTTONS (FIXED AT THE VERY BOTTOM OF RIGHT SIDEBAR) */}
+        <div style={{ position: 'absolute', bottom: 0, right: 0, width: '340px', padding: '20px 25px', background: 'var(--bg-sidebar)', borderTop: '1px solid var(--border-color)', display: 'flex', flexDirection: 'column', gap: '10px', zIndex: 1001 }}>
+            <button className="sidebar-download-btn btn-accent" onClick={() => (window as any).downloadMockup()} style={{ marginBottom: "5px" }}>
+                <i className="far fa-images"></i> EXPORT MOCKUP
+            </button>
+            <div style={{ display: 'flex', gap: '10px' }}>
+                <button className="sidebar-download-btn btn-dark" onClick={() => (window as any).downloadPoster()} style={{ flex: 1, padding: "12px" }}>
+                    <i className="far fa-image"></i> PNG
+                </button>
+                <button className="sidebar-download-btn btn-danger" onClick={() => (window as any).downloadPDF()} style={{ flex: 1, padding: "12px" }}>
+                    <i className="far fa-file-pdf"></i> PDF
+                </button>
+            </div>
+        </div>
+
     </div>
   );
 }
