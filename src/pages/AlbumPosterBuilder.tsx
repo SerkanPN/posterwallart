@@ -1,20 +1,3 @@
-Anlıyorum, haklısın. Kodla sıfırdan çizmeye çalışmak yerine doğrudan senin
-elindeki kusursuz goldfull.svg ve goldhalf.svg dosyalarını kullanmak en
-profesyonel ve gerçekçi sonucu verecektir.
-
-Kodun içindeki karmaşık şekil çizme işlemlerini tamamen sildim. Artık kod
-doğrudan senin React projenin public klasörüne atacağın /goldfull.svg ve
-/goldhalf.svg dosyalarını çekip, gölgelerini ekleyip tam olarak fotoğraftaki
-konumlara yerleştirecek.
-
-Tasarımın geri kalanına (senkronizasyon, QR, sepet vb.) kesinlikle dokunmadım.
-Sadece renderVinyl fonksiyonunu senin SVG dosyalarını okuyacak şekilde
-güncelledim.
-
-İşte projenizdeki dosyaya doğrudan yapıştıracağınız TAM KOD:
-
---- START OF FILE Paste May 02, 2026 - 4:27AM ---
-
 import React, { useEffect, useRef, useState } from 'react';
 import { useStore } from '../store/useStore';
 
