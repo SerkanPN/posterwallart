@@ -154,15 +154,25 @@ export default function SpotifyPosterBuilder() {
       w.currentCoverSrc = '';
 
       w.updateBgBlur = function() {
-        if(w.POSTER_MODE === 'vinyl') return; // Vinyl mode doesn't use blur bg
-        const blur = (document.getElementById('blur-val') as HTMLInputElement).value;
-        const brightness = (document.getElementById('brightness-val') as HTMLInputElement).value;
-        document.getElementById('blur-display')!.textContent = blur + 'px';
-        document.getElementById('brightness-display')!.textContent = brightness + '%';
+        if(w.POSTER_MODE === 'vinyl') return;
+        
+        const blurEl = document.getElementById('blur-val') as HTMLInputElement;
+        if (!blurEl) return;
+        const blur = blurEl.value;
+        
+        // HTML'de brightness input'u bulunmadığı için kodun çökmesini önlemek adına güvenli hale getirildi (Varsayılan: 100%)
+        const brightEl = document.getElementById('brightness-val') as HTMLInputElement;
+        const brightness = brightEl ? brightEl.value : "100";
+        
+        const blurDisp = document.getElementById('blur-display');
+        if (blurDisp) blurDisp.textContent = blur + 'px';
+        
+        const brightDisp = document.getElementById('brightness-display');
+        if (brightDisp) brightDisp.textContent = brightness + '%';
         
         const bgImgDiv = document.getElementById('poster-bg-img') as HTMLElement;
         if (!w.currentCoverSrc) return;
-
+        
         const tempImg = new Image();
         tempImg.crossOrigin = "Anonymous";
         
@@ -172,14 +182,18 @@ export default function SpotifyPosterBuilder() {
           canvas.width = 800;
           canvas.height = 800;
 
-          ctx!.filter = `blur(${blur}px) brightness(${parseFloat(brightness)/100})`;
-          const margin = parseInt(blur) * 3;
-          ctx!.drawImage(tempImg, -margin, -margin, canvas.width + margin * 2, canvas.height + margin * 2);
+          if (ctx) {
+             ctx.filter = `blur(${blur}px) brightness(${parseFloat(brightness)/100})`;
+             const margin = parseInt(blur) * 3;
+             ctx.drawImage(tempImg, -margin, -margin, canvas.width + margin * 2, canvas.height + margin * 2);
+          }
 
           try {
             const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-            bgImgDiv.style.backgroundImage = `url(${dataUrl})`;
-          } catch (e) {}
+            if (bgImgDiv) bgImgDiv.style.backgroundImage = `url(${dataUrl})`;
+          } catch (e) {
+            console.error(e);
+          }
         };
         tempImg.src = w.currentCoverSrc;
       };
@@ -1323,7 +1337,7 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page #poster-content { position: relative; z-index: 10; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         
         /* SPOTIFY CARD STYLES */
-        .spotify-poster-page #spotify-card { width: 71.4%; display: flex; flex-direction: column; gap: 0; position: absolute; top: 50%; left: 0; right: 0; margin: 0 auto; translate: 0 -50%; }
+        .spotify-poster-page #spotify-card { width: 71.4%; display: flex; flex-direction: column; gap: 0; position: absolute; top: 50%; left: 0; right: 0; margin: 0 auto; transform: translateY(-50%); }
         .spotify-poster-page #label-top { font-family: 'DM Sans', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; color: #FFFFFF; margin-bottom: 20px; text-align: center; padding-bottom: 2px; }
         .spotify-poster-page #cover-wrapper { width: 100%; padding-bottom: 100%; position: relative; overflow: hidden; border-radius: 4px; background: #282828; box-shadow: 0 30px 60px rgba(0,0,0,0.8), 0 10px 20px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.05); }
         .spotify-poster-page #cover-img { position: absolute; width: 100%; height: 100%; object-fit: cover; transform-origin: center center; transition: transform 0.2s, left 0.2s, top 0.2s; }
@@ -1356,7 +1370,7 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page #v-title-group { position: absolute; top: 18%; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
         .spotify-poster-page #v-song-title { font-family: 'DM Sans', sans-serif; font-size: 38px; font-weight: 800; color: #dedede; letter-spacing: -0.02em; padding-bottom: 8px; margin-bottom: -8px; }
         .spotify-poster-page #v-song-artist { font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 500; color: #b3b3b3; margin-top: 4px; padding-bottom: 6px; margin-bottom: -6px; }
-        .spotify-poster-page #v-vinyl-center { position: absolute; top: 55%; left: 50%; translate: -50% -50%; width: 85%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
+        .spotify-poster-page #v-vinyl-center { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); width: 85%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
         .spotify-poster-page #v-bottom-text { position: absolute; bottom: 8%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 400; color: #b3b3b3; }
 
         /* ===== ACCORDION ===== */
@@ -1717,14 +1731,14 @@ export default function SpotifyPosterBuilder() {
                 <div className="form-row">
                     <label>Spiral Loops (Tightness)</label>
                     <div className="range-row">
-                        <input type="range" id="vinyl-loops" min="5" max="30" defaultValue="16" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value; (window as any).updateVinylSpiral() }} />
+                        <input type="range" id="vinyl-loops" min="5" max="30" defaultValue="16" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value; (window as any).updateVinylSpiral(); }} />
                         <span className="range-val">16</span>
                     </div>
                 </div>
                 <div className="form-row">
                     <label>Spiral Text Size</label>
                     <div className="range-row">
-                        <input type="range" id="vinyl-text-size" min="6" max="30" defaultValue="12" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value+'px'; document.getElementById('v-spiral-text')?.setAttribute('font-size', e.target.value); (window as any).updateVinylLyrics() }} />
+                        <input type="range" id="vinyl-text-size" min="6" max="30" defaultValue="12" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value+'px'; document.getElementById('v-spiral-text')?.setAttribute('font-size', e.target.value); (window as any).updateVinylLyrics(); }} />
                         <span className="range-val">12px</span>
                     </div>
                 </div>
