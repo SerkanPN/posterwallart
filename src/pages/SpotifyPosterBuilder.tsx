@@ -1205,24 +1205,76 @@ export default function SpotifyPosterBuilder() {
 
   if (posterMode === 'select') {
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', background: '#09090b', color: '#fff', alignItems: 'center', justifycontent: 'center', fontFamily: "'Inter', sans-serif" }}>
-        <h1 style={{ fontSize: '28px', marginBottom: '40px', fontWeight: 700 }}>Choose Poster Template</h1>
-        <div style={{ display: 'flex', gap: '30px' }}>
-          <div onClick={() => setPosterMode('spotify')} style={{ width: '300px', padding: '40px 20px', background: '#18181b', border: '1px solid #27272a', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s, borderColor 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'} onMouseLeave={e => e.currentTarget.style.borderColor = '#27272a'}>
-            <div style={{ width: '80px', height: '80px', background: '#6366f1', borderRadius: '50%', margin: '0 auto 20px', display: 'flex', itemsAlign: 'center', justifycontent: 'center', alignItems: 'center' }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="white"><path d="M17.9 10.9C14.7 9 9.35 8.8 6.3 9.75c-.5.15-1-.15-1.15-.6-.15-.5.15-1 .6-1.15 3.55-1.05 9.4-.85 13.1 1.35.45.25.6.85.35 1.3-.25.35-.85.5-1.3.25zm-.1 2.8c-.25.35-.7.5-1.05.25-2.7-1.65-6.8-2.15-9.95-1.15-.4.1-.85-.1-.95-.5-.1-.4.1-.85.5-.95 3.65-1.1 8.15-.55 11.25 1.35.3.15.45.65.2 1zm-1.2 2.75c-.2.3-.55.4-.85.2-2.35-1.45-5.3-1.75-8.8-.95-.35.1-.65-.15-.75-.45-.1-.35.15-.65.45-.75 3.8-.85 7.1-.5 9.7 1.1.35.15.4.55.25.85z"/></svg>
+      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100vw', background: '#09090b', color: '#fff', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif", padding: '20px' }}>
+        <h1 style={{ fontSize: '36px', marginBottom: '50px', fontWeight: 700, letterSpacing: '-0.02em' }}>Choose Poster Template</h1>
+        
+        <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap', justifyContent: 'center' }}>
+          
+          {/* SPOTIFY CARD */}
+          <div 
+            onClick={() => setPosterMode('spotify')} 
+            style={{ width: '360px', padding: '40px 30px', background: '#18181b', border: '2px solid #27272a', borderRadius: '16px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' }} 
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = '#1DB954';
+              e.currentTarget.style.transform = 'translateY(-8px)';
+              e.currentTarget.style.boxShadow = '0 12px 40px rgba(29, 185, 84, 0.15)';
+            }} 
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = '#27272a';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            {/* Spotify Preview SVG */}
+            <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
+              <svg width="160" height="200" viewBox="0 0 200 250" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 20px 30px rgba(0,0,0,0.5))' }}>
+                <rect width="200" height="250" rx="8" fill="#121212" stroke="#333" strokeWidth="2"/>
+                <rect x="20" y="20" width="160" height="160" rx="4" fill="#282828"/>
+                <rect x="20" y="195" width="100" height="12" rx="6" fill="#FFFFFF"/>
+                <rect x="20" y="215" width="60" height="8" rx="4" fill="#B3B3B3"/>
+                <circle cx="160" cy="210" r="16" fill="#1DB954"/>
+                <path d="M156 205L166 210L156 215V205Z" fill="#121212"/>
+              </svg>
             </div>
-            <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>Spotify Poster</h2>
-            <p style={{ fontSize: '13px', color: '#a1a1aa', lineHeight: 1.5 }}>Modern music player interface with cover art, progress bar, and play controls.</p>
+            <h2 style={{ fontSize: '22px', marginBottom: '12px', fontWeight: 600 }}>Spotify Poster</h2>
+            <p style={{ fontSize: '14px', color: '#a1a1aa', lineHeight: 1.6, margin: 0 }}>Modern music player interface with cover art, progress bar, and play controls.</p>
           </div>
           
-          <div onClick={() => setPosterMode('vinyl')} style={{ width: '300px', padding: '40px 20px', background: '#18181b', border: '1px solid #27272a', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', transition: 'transform 0.2s, borderColor 0.2s' }} onMouseEnter={e => e.currentTarget.style.borderColor = '#6366f1'} onMouseLeave={e => e.currentTarget.style.borderColor = '#27272a'}>
-            <div style={{ width: '80px', height: '80px', background: '#6366f1', borderRadius: '50%', margin: '0 auto 20px', display: 'flex', itemsAlign: 'center', justifycontent: 'center', alignItems: 'center' }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="1" fill="white"/></svg>
+          {/* VINYL CARD */}
+          <div 
+            onClick={() => setPosterMode('vinyl')} 
+            style={{ width: '360px', padding: '40px 30px', background: '#18181b', border: '2px solid #27272a', borderRadius: '16px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' }} 
+            onMouseEnter={e => {
+              e.currentTarget.style.borderColor = '#6366f1';
+              e.currentTarget.style.transform = 'translateY(-8px)';
+              e.currentTarget.style.boxShadow = '0 12px 40px rgba(99, 102, 241, 0.15)';
+            }} 
+            onMouseLeave={e => {
+              e.currentTarget.style.borderColor = '#27272a';
+              e.currentTarget.style.transform = 'translateY(0)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            {/* Vinyl Preview SVG */}
+            <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
+              <svg width="160" height="200" viewBox="0 0 200 250" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 20px 30px rgba(0,0,0,0.5))' }}>
+                <rect width="200" height="250" rx="8" fill="#1f1f1f" stroke="#333" strokeWidth="2"/>
+                <rect x="20" y="20" width="40" height="6" rx="3" fill="#dedede"/>
+                <rect x="150" y="20" width="30" height="6" rx="3" fill="#dedede"/>
+                <rect x="40" y="45" width="120" height="12" rx="6" fill="#dedede"/>
+                <rect x="60" y="65" width="80" height="6" rx="3" fill="#b3b3b3"/>
+                <circle cx="100" cy="155" r="60" fill="none" stroke="#111" strokeWidth="24"/>
+                <circle cx="100" cy="155" r="54" fill="none" stroke="#222" strokeWidth="1"/>
+                <circle cx="100" cy="155" r="48" fill="none" stroke="#222" strokeWidth="1"/>
+                <circle cx="100" cy="155" r="66" fill="none" stroke="#222" strokeWidth="1"/>
+                <circle cx="100" cy="155" r="22" fill="#dedede"/>
+                <circle cx="100" cy="155" r="4" fill="#1f1f1f"/>
+              </svg>
             </div>
-            <h2 style={{ fontSize: '18px', marginBottom: '10px' }}>Vinyl Song Poster</h2>
-            <p style={{ fontSize: '13px', color: '#a1a1aa', lineHeight: 1.5 }}>Retro record design with spiral lyrics forming the vinyl grooves in the center.</p>
+            <h2 style={{ fontSize: '22px', marginBottom: '12px', fontWeight: 600 }}>Vinyl Song Poster</h2>
+            <p style={{ fontSize: '14px', color: '#a1a1aa', lineHeight: 1.6, margin: 0 }}>Retro record design with spiral lyrics forming the vinyl grooves in the center.</p>
           </div>
+
         </div>
       </div>
     );
