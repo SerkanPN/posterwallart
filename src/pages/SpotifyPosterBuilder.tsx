@@ -155,23 +155,34 @@ export default function SpotifyPosterBuilder() {
 
       w.updateBgBlur = function() {
         if(w.POSTER_MODE === 'vinyl') return; // Vinyl mode doesn't use blur bg
-        
-        const blurEl = document.getElementById('blur-val') as HTMLInputElement;
-        if (!blurEl) return;
-        const blur = blurEl.value;
-        
-        // HTML'de brightness input'u bulunmadığı için kodun çökmesini önlemek adına güvenli hale getirildi (Varsayılan: 100%)
-        const brightEl = document.getElementById('brightness-val') as HTMLInputElement;
-        const brightness = brightEl ? brightEl.value : "100";
-        
-        const blurDisp = document.getElementById('blur-display');
-        if (blurDisp) blurDisp.textContent = blur + 'px';
-        
-        const brightDisp = document.getElementById('brightness-display');
-        if (brightDisp) brightDisp.textContent = brightness + '%';
+        const blur = (document.getElementById('blur-val') as HTMLInputElement).value;
+        const brightness = (document.getElementById('brightness-val') as HTMLInputElement).value;
+        document.getElementById('blur-display')!.textContent = blur + 'px';
+        document.getElementById('brightness-display')!.textContent = brightness + '%';
         
         const bgImgDiv = document.getElementById('poster-bg-img') as HTMLElement;
         if (!w.currentCoverSrc) return;
+
+        const tempImg = new Image();
+        tempImg.crossOrigin = "Anonymous";
+        
+        tempImg.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = 800;
+          canvas.height = 800;
+
+          ctx!.filter = `blur(${blur}px) brightness(${parseFloat(brightness)/100})`;
+          const margin = parseInt(blur) * 3;
+          ctx!.drawImage(tempImg, -margin, -margin, canvas.width + margin * 2, canvas.height + margin * 2);
+
+          try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            bgImgDiv.style.backgroundImage = `url(${dataUrl})`;
+          } catch (e) {}
+        };
+        tempImg.src = w.currentCoverSrc;
+      };
 
       w.updateBgColor = function() {
         const colorId = w.POSTER_MODE === 'vinyl' ? 'v-bg-color' : 'bg-color';
