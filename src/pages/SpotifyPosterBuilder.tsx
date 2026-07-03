@@ -1,3 +1,6 @@
+İşte dosyanın hataların giderilmiş ve güncellenmiş tam hali. Tüm kodu kopyalayıp
+dosyanıza yapıştırabilirsiniz:
+
 import React, { useEffect, useRef, useState } from 'react';
 
 export default function SpotifyPosterBuilder() {
@@ -993,9 +996,15 @@ export default function SpotifyPosterBuilder() {
           const lcol = l1 ? w.edRgbHex(l1.getAttribute('fill') || '#dedede') : '#dedede';
           const lsz = l1 ? parseInt(l1.getAttribute('r') || "80") : 80;
           
-          const hw = parseInt(el.style.width)||600;
+          const hwRaw = el.style.width || '85%';
+          let hw = 85;
+          if (hwRaw.includes('%')) hw = parseFloat(hwRaw);
+          else if (hwRaw.includes('px')) {
+              const pc = document.getElementById('poster-container');
+              hw = pc ? Math.round((parseFloat(hwRaw) / pc.offsetWidth) * 100) : 85;
+          }
 
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Overall Size</label>${rrow(200,1200,10,hw, `document.getElementById('v-vinyl-center').style.width=this.value+'px'; document.getElementById('v-vinyl-center').style.height=this.value+'px'`)}</div><div class="pf-row"><label>Spiral Text Color</label>${cpair(tcol, `document.getElementById('v-spiral-text').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,tsz, `document.getElementById('v-spiral-text').setAttribute('font-size', this.value); document.getElementById('vinyl-text-size').value=this.value; window.updateVinylLyrics();`)}</div><div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,ls, `document.getElementById('v-spiral-text').setAttribute('letter-spacing', this.value)`)}</div><div class="pf-row"><label>Center Label Color</label>${cpair(lcol, `document.getElementById('v-vinyl-label').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,lsz, `document.getElementById('v-vinyl-label').setAttribute('r', this.value); document.getElementById('v-vinyl-hole').setAttribute('r', this.value/10); document.getElementById('v-vinyl-groove1').setAttribute('r', this.value*1.1); document.getElementById('v-vinyl-groove2').setAttribute('r', this.value*1.15)`)}</div></div>`;
+          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,hw, `document.getElementById('v-vinyl-center').style.width=this.value+'%'; document.getElementById('v-vinyl-center').style.height='auto'`, '%')}</div><div class="pf-row"><label>Spiral Text Color</label>${cpair(tcol, `document.getElementById('v-spiral-text').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,tsz, `document.getElementById('v-spiral-text').setAttribute('font-size', this.value); document.getElementById('vinyl-text-size').value=this.value; window.updateVinylLyrics();`)}</div><div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,ls, `document.getElementById('v-spiral-text').setAttribute('letter-spacing', this.value)`)}</div><div class="pf-row"><label>Center Label Color</label>${cpair(lcol, `document.getElementById('v-vinyl-label').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,lsz, `document.getElementById('v-vinyl-label').setAttribute('r', this.value); document.getElementById('v-vinyl-hole').setAttribute('r', this.value/10); document.getElementById('v-vinyl-groove1').setAttribute('r', this.value*1.1); document.getElementById('v-vinyl-groove2').setAttribute('r', this.value*1.15)`)}</div></div>`;
         }
 
         return html;
@@ -1326,7 +1335,7 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page #v-title-group { position: absolute; top: 18%; left: 0; right: 0; display: flex; flex-direction: column; align-items: center; text-align: center; }
         .spotify-poster-page #v-song-title { font-family: 'DM Sans', sans-serif; font-size: 38px; font-weight: 800; color: #dedede; letter-spacing: -0.02em; padding-bottom: 8px; margin-bottom: -8px; }
         .spotify-poster-page #v-song-artist { font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 500; color: #b3b3b3; margin-top: 4px; padding-bottom: 6px; margin-bottom: -6px; }
-        .spotify-poster-page #v-vinyl-center { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); width: 600px; height: 600px; display: flex; align-items: center; justify-content: center; }
+        .spotify-poster-page #v-vinyl-center { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); width: 85%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
         .spotify-poster-page #v-bottom-text { position: absolute; bottom: 8%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 400; color: #b3b3b3; }
 
         /* ===== ACCORDION ===== */
