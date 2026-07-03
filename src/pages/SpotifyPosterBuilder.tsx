@@ -184,9 +184,14 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.updateBgColor = function() {
-        const color = (document.getElementById('bg-color') as HTMLInputElement).value;
+        const colorId = w.POSTER_MODE === 'vinyl' ? 'v-bg-color' : 'bg-color';
+        const txtId = w.POSTER_MODE === 'vinyl' ? 'v-bg-color-txt' : 'bg-color-txt';
+        const colorEl = document.getElementById(colorId) as HTMLInputElement;
+        const txtEl = document.getElementById(txtId) as HTMLInputElement;
+        if(!colorEl) return;
+        const color = colorEl.value;
         document.getElementById('poster-bg')!.style.background = color;
-        (document.getElementById('bg-color-txt') as HTMLInputElement).value = color;
+        if(txtEl) txtEl.value = color;
       };
 
       w.updateBg = function() {
@@ -456,7 +461,7 @@ export default function SpotifyPosterBuilder() {
           let steps = loops * 100;
           
           for(let i=0; i<=steps; i++) {
-              let t = -(i/steps) * loops * Math.PI * 2;
+              let t = -Math.PI/2 - (i/steps) * loops * Math.PI * 2;
               let r = maxR - ((maxR - minR) * (i/steps));
               let x = cx + r * Math.cos(t);
               let y = cy + r * Math.sin(t);
@@ -986,7 +991,7 @@ export default function SpotifyPosterBuilder() {
           
           const l1 = document.getElementById('v-vinyl-label');
           const lcol = l1 ? w.edRgbHex(l1.getAttribute('fill') || '#dedede') : '#dedede';
-          const lsz = l1 ? parseInt(l1.getAttribute('r') || "100") : 100;
+          const lsz = l1 ? parseInt(l1.getAttribute('r') || "80") : 80;
           
           const hw = parseInt(el.style.width)||600;
 
@@ -1645,8 +1650,8 @@ export default function SpotifyPosterBuilder() {
                 <div className="form-row">
                   <label>Background Color</label>
                   <div className="color-row">
-                    <input type="color" id="bg-color" defaultValue="#1f1f1f" onInput={() => (window as any).updateBgColor()} />
-                    <input type="text" id="bg-color-txt" defaultValue="#1f1f1f" onInput={() => { (window as any).syncColor('bg-color', 'bg-color-txt'); (window as any).updateBgColor(); }} />
+                    <input type="color" id="v-bg-color" defaultValue="#1f1f1f" onInput={() => (window as any).updateBgColor()} />
+                    <input type="text" id="v-bg-color-txt" defaultValue="#1f1f1f" onInput={() => { (window as any).syncColor('v-bg-color', 'v-bg-color-txt'); (window as any).updateBgColor(); }} />
                   </div>
                 </div>
             </div>
@@ -1776,17 +1781,17 @@ export default function SpotifyPosterBuilder() {
                             </defs>
                             {/* Outer Vinyl BG just for visual depth if needed, currently transparent to use main bg */}
                             <circle id="v-vinyl-bg" cx="400" cy="400" r="395" fill="none" />
-                            <circle id="v-vinyl-groove1" cx="400" cy="400" r="110" fill="none" stroke="#2a2a2a" strokeWidth="1" />
-                            <circle id="v-vinyl-groove2" cx="400" cy="400" r="115" fill="none" stroke="#2a2a2a" strokeWidth="1" />
+                            <circle id="v-vinyl-groove1" cx="400" cy="400" r="88" fill="none" stroke="#2a2a2a" strokeWidth="1" />
+                            <circle id="v-vinyl-groove2" cx="400" cy="400" r="92" fill="none" stroke="#2a2a2a" strokeWidth="1" />
                             
-                            <text fill="#b3b3b3" fontSize="12" letterSpacing="2" fontFamily="'DM Sans', sans-serif" fontWeight="700">
-                                <textPath href="#v-spiral-path" id="v-spiral-text">
+                            <text fill="#b3b3b3" fontSize="12" letterSpacing="2" fontFamily="'DM Sans', sans-serif" fontWeight="700" textAnchor="middle">
+                                <textPath href="#v-spiral-path" id="v-spiral-text" startOffset="50%">
                                     LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA
                                 </textPath>
                             </text>
                             
-                            <circle id="v-vinyl-label" cx="400" cy="400" r="100" fill="#dedede" />
-                            <circle id="v-vinyl-hole" cx="400" cy="400" r="10" fill="#1f1f1f" />
+                            <circle id="v-vinyl-label" cx="400" cy="400" r="80" fill="#dedede" />
+                            <circle id="v-vinyl-hole" cx="400" cy="400" r="8" fill="#1f1f1f" />
                         </svg>
                     </div>
 
