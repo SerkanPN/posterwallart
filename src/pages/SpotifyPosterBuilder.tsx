@@ -1,6 +1,3 @@
-İşte dosyanın hataların giderilmiş ve güncellenmiş tam hali. Tüm kodu kopyalayıp
-dosyanıza yapıştırabilirsiniz:
-
 import React, { useEffect, useRef, useState } from 'react';
 
 export default function SpotifyPosterBuilder() {
