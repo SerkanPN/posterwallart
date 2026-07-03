@@ -225,6 +225,7 @@ export default function AlbumPosterBuilder() {
         document.getElementById('global-loader')!.style.display = 'none';
     };
 
+    // AKILLI RENK KONTRASTI ALGORİTMASI (YIQ Luminance)
     w.getContrastYIQ = function(hexcolor: string) {
         hexcolor = hexcolor.replace("#", "");
         if(hexcolor.length === 3) hexcolor = hexcolor[0]+hexcolor[0]+hexcolor[1]+hexcolor[1]+hexcolor[2]+hexcolor[2];
@@ -1286,8 +1287,8 @@ export default function AlbumPosterBuilder() {
                         if(bImg) {
                             bImg.scaleToWidth(150 * m.S); 
                             bImg.set({ 
-                                left: m.OX + ((4961 * m.S) / 2), 
-                                top: m.OY + ((7016 * m.S) - (100 * m.S)), 
+                                left: m.OX + ((4961 * m.S) / 2), // Tam yatay merkez
+                                top: m.OY + ((7016 * m.S) - (100 * m.S)), // En alttan 100 birim yukarıda
                                 originX: 'center', 
                                 originY: 'bottom',
                                 id: 'custom-site-barcode'
@@ -1407,11 +1408,19 @@ export default function AlbumPosterBuilder() {
     w.updateFrameColor = function(v: string) { if (!(document.getElementById('blurToggle') as HTMLInputElement).checked) { w.canvas.setBackgroundImage(null, () => w.canvas.renderAll()); w.canvas.setBackgroundColor(v, () => w.canvas.renderAll()); } w.saveCurrentStateToMemory(); };
     w.updateLineColor = function(v: string) { if(w.separatorLine) { w.separatorLine.set('fill', v); w.canvas.requestRenderAll(); if(!w.isBatchGenerating) w.saveState(); w.saveCurrentStateToMemory(); } };
     
+    // YENİ: SENKRONİZASYON ARTIK SADECE O ANKİ LAYOUT'UN 4 TEMASINI ETKİLER
+    // YENİ: METİN RENKLERİ TEMAYI BOZMAMAK İÇİN SENKRONİZE EDİLMEZ (PALET HARİÇ)
     w.syncPropertyToAllVariants = function(activeObj: any, prop: string, val: any, exactIndex = -1) {
-        if (!activeObj || !activeObj.id || w.isBatchGenerating) return;
+        if (!activeObj || !activeObj.id || w.isBatchGenerating || !w.currentVariantKey) return;
         
-        const protectedProps = ['left', 'top', 'scaleX', 'scaleY', 'width', 'height', 'angle'];
-        if (protectedProps.includes(prop)) return; 
+        // Hangi layout'ta olduğumuzu bul (Örn: standart, modern, vs.)
+        const currentLayout = w.currentVariantKey.split('_')[0];
+
+        // Rengi koruma kontrolü (Sadece 'palette-rect' ise renk bulaştırılabilir)
+        const isColorProp = ['fill', 'stroke', 'textBackgroundColor', 'backgroundColor'].includes(prop);
+        if (isColorProp && activeObj.id !== 'palette-rect') {
+            return; 
+        }
 
         let allWithId = w.canvas.getObjects().filter((o: any) => o.id === activeObj.id);
         let targetIndex = exactIndex > -1 ? exactIndex : allWithId.indexOf(activeObj);
@@ -1419,6 +1428,8 @@ export default function AlbumPosterBuilder() {
         
         for (let key in w.variantStates) {
             if (key === w.currentVariantKey) continue; 
+            if (!key.startsWith(currentLayout + '_')) continue; // SADECE AYNI LAYOUT!
+            
             try {
                 let stateObj = w.variantStates[key];
                 let objects = stateObj.objects;
@@ -1437,7 +1448,7 @@ export default function AlbumPosterBuilder() {
         if(t) t.value = c;
         if(w.paletteRects && w.paletteRects[i]) { 
             w.paletteRects[i].set('fill', c); w.canvas.requestRenderAll(); w.saveCurrentStateToMemory(); 
-            w.syncPropertyToAllVariants(w.paletteRects[i], 'fill', c, i);
+            w.syncPropertyToAllVariants(w.paletteRects[i], 'fill', c, i); // Palet rengi istisna olduğu için senkronize edilecek
         } 
         const currentTheme = (document.getElementById('themeSelect') as HTMLSelectElement).value;
         if(currentTheme === 'colorful' && i === 0) w.applyTheme('colorful');
@@ -1741,6 +1752,24 @@ export default function AlbumPosterBuilder() {
             w.syncPropertyToAllVariants(e.target, 'scaleX', e.target.scaleX);
             w.syncPropertyToAllVariants(e.target, 'scaleY', e.target.scaleY);
             w.syncPropertyToAllVariants(e.target, 'angle', e.target.angle);
+            w.syncPropertyToAllVariants(e.target, 'left', e.target.left);
+            w.syncPropertyToAllVariants(e.target, 'top', e.target.top);
+        } else if (e.target && e.target.type === 'activeSelection') {
+            // Gruplu seçimlerde doğru pozisyon senkronizasyonu için nesneleri çöz, kaydet, geri topla
+            let sel = w.canvas.getActiveObject();
+            if (sel) {
+                let objs = sel.getObjects();
+                w.canvas.discardActiveObject();
+                objs.forEach((o: any) => {
+                    w.syncPropertyToAllVariants(o, 'scaleX', o.scaleX);
+                    w.syncPropertyToAllVariants(o, 'scaleY', o.scaleY);
+                    w.syncPropertyToAllVariants(o, 'angle', o.angle);
+                    w.syncPropertyToAllVariants(o, 'left', o.left);
+                    w.syncPropertyToAllVariants(o, 'top', o.top);
+                });
+                let newSel = new w.fabric.ActiveSelection(objs, { canvas: w.canvas });
+                w.canvas.setActiveObject(newSel);
+            }
         }
     }); 
     w.canvas.on('object:added', () => { w.updateLayersPanel(); }); w.canvas.on('object:removed', () => { w.updateLayersPanel(); });
@@ -1810,17 +1839,36 @@ export default function AlbumPosterBuilder() {
     
     w.toggleLock = function() { let o = w.canvas.getActiveObject(); if(!o) return; let l = !o.lockMovementX; o.set({ lockMovementX: l, lockMovementY: l, lockScalingX: l, lockScalingY: l, lockRotation: l, hasControls: !l, selectable: true }); w.canvas.requestRenderAll(); w.updateEditorPanel(); };
 
+    // YENİ: GÖRSEL DEĞİŞTİRME DE KENDİ İÇİNDEKİ DİĞER TEMALARLA SENKRONİZE OLACAK
     w.replaceSelectedImage = function(file: any) {
         if (!file) return;
         let obj = w.canvas.getActiveObject();
         if (!obj || obj.type !== 'image') return w.showToast("⚠ Please select an image to replace.");
+        
+        let allWithId = w.canvas.getObjects().filter((o: any) => o.id === obj.id);
+        let targetIndex = allWithId.indexOf(obj);
+        const currentLayout = w.currentVariantKey.split('_')[0];
+
         const reader = new FileReader();
         reader.onload = function(f: any) {
-            obj.setSrc(f.target.result, function() {
+            const newSrc = f.target.result;
+            obj.setSrc(newSrc, function() {
                 obj.set('dirty', true);
                 w.canvas.renderAll();
                 w.saveState();
                 w.saveCurrentStateToMemory();
+
+                if (targetIndex !== -1) {
+                    for (let key in w.variantStates) {
+                        if (key === w.currentVariantKey || !key.startsWith(currentLayout + '_')) continue;
+                        try {
+                            let matches = w.variantStates[key].objects.filter((o: any) => o.id === obj.id);
+                            if (matches[targetIndex]) {
+                                matches[targetIndex].src = newSrc;
+                            }
+                        } catch(e) {}
+                    }
+                }
             }, { crossOrigin: 'anonymous' });
         };
         reader.readAsDataURL(file);
@@ -1874,6 +1922,8 @@ export default function AlbumPosterBuilder() {
                     else if (obj.originY === 'bottom') obj.set('top', bottomY);
                 }
                 obj.setCoords();
+                w.syncPropertyToAllVariants(obj, 'left', obj.left);
+                w.syncPropertyToAllVariants(obj, 'top', obj.top);
             });
             let sel = new w.fabric.ActiveSelection(objs, { canvas: w.canvas });
             w.canvas.setActiveObject(sel);
@@ -1904,6 +1954,8 @@ export default function AlbumPosterBuilder() {
                 else if (activeObj.originY === 'bottom') activeObj.set('top', ch);
             }
             activeObj.setCoords();
+            w.syncPropertyToAllVariants(activeObj, 'left', activeObj.left);
+            w.syncPropertyToAllVariants(activeObj, 'top', activeObj.top);
             w.canvas.fire('object:modified', {target: activeObj});
         }
         
@@ -1946,6 +1998,8 @@ export default function AlbumPosterBuilder() {
                 it.obj.set('top', it.obj.top + (cursor - it.pos));
             }
             it.obj.setCoords();
+            w.syncPropertyToAllVariants(it.obj, 'left', it.obj.left);
+            w.syncPropertyToAllVariants(it.obj, 'top', it.obj.top);
             cursor += it.size + gap;
         }
 
@@ -2180,6 +2234,21 @@ export default function AlbumPosterBuilder() {
             w.canvas.requestRenderAll(); 
             w.saveState(); 
             w.updateEditorPanel(); 
+            
+            if (obj.type !== 'activeSelection') {
+                w.syncPropertyToAllVariants(obj, 'left', obj.left);
+                w.syncPropertyToAllVariants(obj, 'top', obj.top);
+            } else {
+                let sel = w.canvas.getActiveObject();
+                let objs = sel.getObjects();
+                w.canvas.discardActiveObject();
+                objs.forEach((o: any) => {
+                    w.syncPropertyToAllVariants(o, 'left', o.left);
+                    w.syncPropertyToAllVariants(o, 'top', o.top);
+                });
+                let newSel = new w.fabric.ActiveSelection(objs, { canvas: w.canvas });
+                w.canvas.setActiveObject(newSel);
+            }
         }
     });
 
