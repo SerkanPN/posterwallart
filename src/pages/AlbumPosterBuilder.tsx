@@ -357,27 +357,6 @@ export default function AlbumPosterBuilder() {
         };
     };
 
-    // --- YENİ: SMART TEXT ALGORİTMASI ---
-    // Textbox kullanarak metni sınırlandırır, sığmıyorsa fontu küçültür (Hiçbir zaman "..." ile kesmez, alt satıra atar).
-    w.createSmartText = function(text: string, config: any, maxWidth: number, maxHeight: number) {
-        let size = config.fontSize;
-        let tb = new w.fabric.Textbox(text, Object.assign({}, config, { 
-            width: maxWidth, 
-            fontSize: size,
-            splitByGrapheme: false 
-        }));
-        
-        while (tb.height > maxHeight && size > 15) {
-            size -= (size > 80 ? 6 : 2);
-            tb = new w.fabric.Textbox(text, Object.assign({}, config, { 
-                width: maxWidth, 
-                fontSize: size,
-                splitByGrapheme: false
-            }));
-        }
-        return tb;
-    };
-
     w.updateFormat = function(newFormat: string) {
         w.currentFormat = newFormat;
         w.rescale((document.getElementById('zoom-slider') as HTMLInputElement).value);
@@ -692,6 +671,7 @@ export default function AlbumPosterBuilder() {
             const length = hr > 0 ? `${hr}:${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}` : `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
 
             w.canvas.clear(); w.paletteRects =[];
+            await document.fonts.load('100px Inter'); await document.fonts.load('700 140px Inter'); await document.fonts.load('500 55px Inter'); await document.fonts.load('700 60px Montserrat');
 
             await w.updateBlurSettingsPromise();
 
@@ -706,23 +686,23 @@ export default function AlbumPosterBuilder() {
                 let maxTextW = contentW - pWidth - (100 * m.S); 
 
                 let artistClean = d.artist.name.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim().toUpperCase();
-                let artistText = w.createSmartText(artistClean, { left: px, top: currentY, fontSize: 90 * m.S, fontFamily: 'Inter', fontWeight: 300, fill: '#111', id: 'artist-text', lineHeight: 1.1 }, maxTextW, 200 * m.S);
+                let artistText = new w.fabric.IText(artistClean, { left: px, top: currentY, fontSize: 90 * m.S, fontFamily: 'Inter', fontWeight: 300, fill: '#111', id: 'artist-text' });
+                if (artistText.width > maxTextW) artistText.set('fontSize', (90 * m.S) * (maxTextW / artistText.width));
                 w.canvas.add(artistText); currentY += artistText.height + (15 * m.S);
 
                 let titleClean = d.title.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim().toUpperCase();
-                let titleText = w.createSmartText(titleClean, { left: px, top: currentY, fontSize: 140 * m.S, fontWeight: 700, fill: '#111', fontFamily: 'Inter', id: 'title-text', lineHeight: 1.1 }, maxTextW, 400 * m.S);
+                let titleText = new w.fabric.IText(titleClean, { left: px, top: currentY, fontSize: 140 * m.S, fontWeight: 700, fill: '#111', fontFamily: 'Inter', id: 'title-text' });
+                if (titleText.width > maxTextW) titleText.set('fontSize', (140 * m.S) * (maxTextW / titleText.width));
                 w.canvas.add(titleText);
                 
                 let paletteY = currentY + titleText.height - (90 * m.S) - (13 * m.S); 
-                if (paletteY < currentY) paletteY = currentY; 
-
                 let startX = px + contentW - pWidth;
                 for(let i=0; i<5; i++) {
                     let rect = new w.fabric.Rect({ left: startX + i*(boxW+gap), top: paletteY, width: boxW, height: boxH, fill: '#000', id: 'palette-rect' });
                     w.canvas.add(rect); w.paletteRects.push(rect);
                 }
                 
-                currentY = Math.max(currentY + titleText.height, paletteY + boxH) + (40 * m.S);
+                currentY = Math.max(currentY + titleText.height, paletteY + boxH) + (20 * m.S);
                 let lineCol = (document.getElementById('lineColorPicker') as HTMLInputElement).value;
                 w.separatorLine = new w.fabric.Rect({ left: px, top: currentY, width: contentW, height: 8 * m.S, fill: lineCol, id: 'separator' });
                 w.canvas.add(w.separatorLine); currentY += (8 * m.S) + (70 * m.S);
@@ -730,19 +710,13 @@ export default function AlbumPosterBuilder() {
                 let tCount = d.tracks.data.length;
                 let trackFontSize = (tCount <= 10) ? 90 * m.S : (tCount <= 16) ? 75 * m.S : (tCount <= 22) ? 60 * m.S : 48 * m.S;
 
-                let trackYLeft = currentY; let trackYRight = currentY; 
-                let colW = contentW * 0.45;
-                let col2X = px + contentW - colW; 
-                const MAX_ALLOWED_Y = m.OY + ((7016 - 250) * m.S); 
-                
+                let trackY1 = currentY; let trackY2 = currentY; let col2X = px + (contentW * 0.376); const MAX_ALLOWED_Y = m.OY + ((7016 - 250) * m.S); 
                 d.tracks.data.forEach((tObj: any, i: number) => {
                     let trackName = tObj.title.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim().toUpperCase();
-                    let txt = new w.fabric.Textbox(trackName, { width: colW, fontSize: trackFontSize, fontFamily: 'Montserrat', fontWeight: 700, fill: '#333', id: 'track-text', lineHeight: 1.2 });
-                    
-                    let isCol2 = (trackYLeft + txt.height + (trackFontSize * 0.5)) > MAX_ALLOWED_Y;
-                    txt.set({ left: isCol2 ? col2X : px, top: isCol2 ? trackYRight : trackYLeft }); w.canvas.add(txt);
-                    
-                    if(isCol2) trackYRight += txt.height + (trackFontSize * 0.5); else trackYLeft += txt.height + (trackFontSize * 0.5);
+                    let txt = new w.fabric.IText(trackName, { fontSize: trackFontSize, fontFamily: 'Montserrat', fontWeight: 700, fill: '#333', id: 'track-text' });
+                    let isCol2 = (trackY1 + txt.height + (trackFontSize * 0.5)) > MAX_ALLOWED_Y;
+                    txt.set({ left: isCol2 ? col2X : px, top: isCol2 ? trackY2 : trackY1 }); w.canvas.add(txt);
+                    if(isCol2) trackY2 += txt.height + (trackFontSize * 0.5); else trackY1 += txt.height + (trackFontSize * 0.5);
                 });
 
                 let finalGenre = w.translateGenre(d.genres?.data[0]?.name || 'Hip Hop'); let metaY = currentY;
@@ -807,12 +781,11 @@ export default function AlbumPosterBuilder() {
                 
                 let tCount = d.tracks.data.length;
                 let trackFontSize = (tCount <= 10) ? 90 * m.S : (tCount <= 16) ? 75 * m.S : (tCount <= 22) ? 60 * m.S : 48 * m.S;
-                let colW = 1000 * m.S;
 
                 d.tracks.data.forEach((tObj: any) => {
                     let trackName = tObj.title.replace(/^\d+\.\s*/, '').replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim().toUpperCase();
-                    let txt = new w.fabric.Textbox(trackName, { width: colW, fontSize: trackFontSize, fontFamily: 'Montserrat', fontWeight: 700, fill: textColor, id: 'track-text', lineHeight: 1.2 });
-                    if (trackY + txt.height + (trackFontSize * 0.5) > MAX_ALLOWED_Y) { currentTrackColX += colW + (200 * m.S); trackY = contentY; }
+                    let txt = new w.fabric.IText(trackName, { fontSize: trackFontSize, fontFamily: 'Montserrat', fontWeight: 700, fill: textColor, id: 'track-text' });
+                    if (trackY + txt.height + (trackFontSize * 0.5) > MAX_ALLOWED_Y) { currentTrackColX += (1200 * m.S); trackY = contentY; }
                     txt.set({ left: currentTrackColX, top: trackY }); w.canvas.add(txt); trackY += txt.height + (trackFontSize * 0.5);
                 });
 
@@ -820,17 +793,31 @@ export default function AlbumPosterBuilder() {
                 for(let i=0; i<5; i++) { let rect = new w.fabric.Rect({ left: startX + i*(boxW+gap), top: paletteY, width: boxW, height: boxH, fill: '#000', id: 'palette-rect' }); w.canvas.add(rect); w.paletteRects.push(rect); }
 
                 let maxRightTextW = coverW * 0.45;
-                let textStartY = paletteY + boxH + (100 * m.S);
 
-                let artistClean = d.artist.name.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim().toUpperCase();
-                let artistText = w.createSmartText(artistClean, { left: rightColX, top: textStartY, fontSize: 130 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: textColor, originX: 'right', id: 'artist-text', textAlign: 'right', lineHeight: 1.1 }, maxRightTextW, 350 * m.S); 
+                let textStartY = paletteY + boxH + (100 * m.S);
+                let artistClean = d.artist.name.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim();
+                let artistText = new w.fabric.IText(artistClean.toUpperCase(), { left: rightColX, top: textStartY, fontSize: 130 * m.S, fontFamily: 'Montserrat', fontWeight: 700, fill: textColor, originX: 'right', id: 'artist-text' }); 
+                if (artistText.width > maxRightTextW) artistText.set('fontSize', (130 * m.S) * (maxRightTextW / artistText.width));
                 w.canvas.add(artistText);
 
                 let titleClean = d.title.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim().toUpperCase();
-                let titleText = w.createSmartText(titleClean, { left: rightColX, top: artistText.top + artistText.height + (50 * m.S), fontSize: 180 * m.S, fontFamily: 'Montserrat', fontWeight: 900, fill: textColor, originX: 'right', textAlign: 'right', id: 'title-text', lineHeight: 1 }, maxRightTextW, 1000 * m.S); 
+                let titleText = new w.fabric.Textbox(titleClean, { 
+                    left: rightColX, top: artistText.top + artistText.height + (50 * m.S), 
+                    width: maxRightTextW, 
+                    fontSize: 180 * m.S, fontFamily: 'Montserrat', fontWeight: 900, fill: textColor, originX: 'right', textAlign: 'right', id: 'title-text', lineHeight: 1 
+                }); 
+                
+                let dummyText = new w.fabric.IText(titleClean, { fontSize: 180 * m.S, fontFamily: 'Montserrat', fontWeight: 900 });
+                if (dummyText.width > maxRightTextW * 1.5) { 
+                    let scaleRatio = (maxRightTextW * 1.5) / dummyText.width;
+                    titleText.set('fontSize', (180 * m.S) * scaleRatio);
+                }
                 w.canvas.add(titleText);
 
-                let signatureText = w.createSmartText(artistClean, { left: rightColX, top: titleText.top + titleText.height + (80 * m.S), fontSize: 250 * m.S, fontFamily: 'Sacramento', fill: textColor, originX: 'right', angle: -15, id: 'signature-text', textAlign: 'right' }, maxRightTextW * 1.2, 500 * m.S); 
+                let signatureText = new w.fabric.IText(artistClean, { left: rightColX, top: titleText.top + titleText.height + (80 * m.S), fontSize: 250 * m.S, fontFamily: 'Sacramento', fill: textColor, originX: 'right', angle: -15, id: 'signature-text' }); 
+                if (signatureText.width > maxRightTextW * 1.2) {
+                    signatureText.set('fontSize', (250 * m.S) * ((maxRightTextW * 1.2) / signatureText.width));
+                }
                 w.canvas.add(signatureText);
 
                 let footerY = m.OY + (7016 - 250) * m.S;
@@ -888,10 +875,18 @@ export default function AlbumPosterBuilder() {
                 let titleClean = d.title.toUpperCase();
                 let artistClean = d.artist.name.toUpperCase();
                 
-                let titleText = w.createSmartText(titleClean, { left: m.OX + margin, top: m.OY + margin + (50 * m.S), fontSize: 240 * m.S, fontFamily: 'Montserrat', fontWeight: 900, fill: textColor, id: 'title-text', lineHeight: 1.1 }, maxTextW, 500 * m.S);
+                let titleText = new w.fabric.IText(titleClean, { 
+                    left: m.OX + margin, top: m.OY + margin + (50 * m.S), 
+                    fontSize: 240 * m.S, fontFamily: 'Montserrat', fontWeight: 900, fill: textColor, id: 'title-text' 
+                });
+                if (titleText.width > maxTextW) titleText.set('fontSize', (240 * m.S) * (maxTextW / titleText.width));
                 w.canvas.add(titleText);
                 
-                let artistText = w.createSmartText(artistClean, { left: m.OX + margin, top: titleText.top + titleText.height + (30 * m.S), fontSize: 100 * m.S, fontFamily: 'Inter', fontWeight: 600, fill: textColor, id: 'artist-text', lineHeight: 1.1 }, maxTextW, 250 * m.S);
+                let artistText = new w.fabric.IText(artistClean, { 
+                    left: m.OX + margin, top: m.OY + margin + (320 * m.S), 
+                    fontSize: 100 * m.S, fontFamily: 'Inter', fontWeight: 600, fill: textColor, id: 'artist-text' 
+                });
+                if (artistText.width > maxTextW) artistText.set('fontSize', (100 * m.S) * (maxTextW / artistText.width));
                 w.canvas.add(artistText);
                 
                 const pHeight = boxH + (gap * 2);
@@ -923,7 +918,6 @@ export default function AlbumPosterBuilder() {
                 let trackYRight = bottomY;
                 let leftColX = m.OX + margin + (50 * m.S);
                 let rightColX = m.OX + margin + (1100 * m.S);
-                let colW = 900 * m.S;
                 
                 let tCount = d.tracks.data.length;
                 let trackFontSize = (tCount <= 10) ? 90 * m.S : (tCount <= 16) ? 75 * m.S : (tCount <= 22) ? 60 * m.S : 48 * m.S;
@@ -933,7 +927,7 @@ export default function AlbumPosterBuilder() {
                     let tNum = i + 1;
                     let trackName = tObj.title.replace(/^\d+\.\s*/, '').replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim();
                     let tText = `${tNum}. ${trackName}`;
-                    let txt = new w.fabric.Textbox(tText, { width: colW, fontSize: trackFontSize, fontFamily: 'Inter', fontWeight: 500, fill: textColor, id: 'track-text', lineHeight: 1.2 });
+                    let txt = new w.fabric.IText(tText, { fontSize: trackFontSize, fontFamily: 'Inter', fontWeight: 500, fill: textColor, id: 'track-text' });
                     
                     if (i < halfTracks) {
                         txt.set({ left: leftColX, top: trackYLeft });
@@ -965,6 +959,7 @@ export default function AlbumPosterBuilder() {
                 });
 
                 await w.extractPalettePromise(d.cover_xl); 
+                
                 const currentTheme = (document.getElementById('themeSelect') as HTMLSelectElement).value;
                 await w.applyTheme(currentTheme);
                 
@@ -972,7 +967,13 @@ export default function AlbumPosterBuilder() {
                     w.fabric.Image.fromURL('/musicpostershop.png', function(bImg: any) {
                         if(bImg) {
                             bImg.scaleToWidth(150 * m.S); 
-                            bImg.set({ left: m.OX + ((4961 * m.S) / 2), top: m.OY + ((7016 * m.S) - (100 * m.S)), originX: 'center', originY: 'bottom', id: 'custom-site-barcode' });
+                            bImg.set({ 
+                                left: m.OX + ((4961 * m.S) / 2), 
+                                top: m.OY + ((7016 * m.S) - (100 * m.S)), 
+                                originX: 'center', 
+                                originY: 'bottom',
+                                id: 'custom-site-barcode'
+                            });
                             w.canvas.add(bImg);
                         }
                         res(true);
@@ -1005,10 +1006,12 @@ export default function AlbumPosterBuilder() {
 
                 try {
                     await new Promise((r) => w.fabric.loadSVGFromURL('/goldfull1.svg', (objs: any, opts: any) => {
-                        if(objs && objs.length > 0) fullSVG = w.fabric.util.groupSVGElements(objs, opts); r(true);
+                        if(objs && objs.length > 0) fullSVG = w.fabric.util.groupSVGElements(objs, opts); 
+                        r(true);
                     }));
                     await new Promise((r) => w.fabric.loadSVGFromURL('/goldhalf1.svg', (objs: any, opts: any) => {
-                        if(objs && objs.length > 0) halfSVG = w.fabric.util.groupSVGElements(objs, opts); r(true);
+                        if(objs && objs.length > 0) halfSVG = w.fabric.util.groupSVGElements(objs, opts); 
+                        r(true);
                     }));
                 } catch(e) { console.error("SVG Load Error", e); }
 
@@ -1056,9 +1059,11 @@ export default function AlbumPosterBuilder() {
                 const textCenterX = visibleBoxX + (visibleBoxW / 2);
                 let maxTextW = visibleBoxW * 0.85;
 
-                let bArtist = w.createSmartText(d.artist.name, { left: textCenterX, top: boxY + (boxH * 0.3), fontSize: 240 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', originY: 'center', id: 'box-text', textAlign: 'center', lineHeight: 1 }, maxTextW, boxH * 0.3);
-                
-                let bAlbum = w.createSmartText(d.title.toUpperCase(), { left: textCenterX, top: boxY + (boxH * 0.6), fontSize: 70 * m.S, fontFamily: 'Montserrat', fontWeight: 600, fill: '#eee', originX: 'center', originY: 'center', id: 'box-text', textAlign: 'center', lineHeight: 1.1 }, maxTextW, boxH * 0.2);
+                let bArtist = new w.fabric.IText(d.artist.name, { left: textCenterX, top: boxY + (boxH * 0.3), fontSize: 240 * m.S, fontFamily: 'Allura', fill: '#fff', originX: 'center', originY: 'center', id: 'box-text' });
+                if (bArtist.width > maxTextW) bArtist.set('fontSize', (240 * m.S) * (maxTextW / bArtist.width));
+
+                let bAlbum = new w.fabric.IText(d.title.toUpperCase(), { left: textCenterX, top: boxY + (boxH * 0.6), fontSize: 70 * m.S, fontFamily: 'Montserrat', fontWeight: 600, fill: '#eee', originX: 'center', originY: 'center', id: 'box-text' });
+                if (bAlbum.width > maxTextW) bAlbum.set('fontSize', (70 * m.S) * (maxTextW / bAlbum.width));
 
                 let bDateObj = new w.fabric.IText(releasedStr, { left: textCenterX, top: boxY + (boxH * 0.8), fontSize: 50 * m.S, fontFamily: 'Montserrat', fontWeight: 400, fill: '#ccc', originX: 'center', originY: 'center', id: 'box-text' });
                 
@@ -1066,7 +1071,13 @@ export default function AlbumPosterBuilder() {
 
                 if (halfSVG) {
                     halfSVG.scaleToHeight(cdHeight);
-                    halfSVG.set({ left: coverRightEdge - overlap, top: bottomY + (coverSize / 2), originX: 'center', originY: 'center', id: 'vinyl-half' });
+                    halfSVG.set({ 
+                        left: coverRightEdge - overlap, 
+                        top: bottomY + (coverSize / 2), 
+                        originX: 'center', 
+                        originY: 'center', 
+                        id: 'vinyl-half' 
+                    });
                     objectsToAdd.push(halfSVG);
                 }
 
@@ -1083,6 +1094,7 @@ export default function AlbumPosterBuilder() {
                 objectsToAdd.forEach(obj => w.canvas.add(obj));
 
                 await w.extractPalettePromise(d.cover_xl); 
+                
                 const currentTheme = (document.getElementById('themeSelect') as HTMLSelectElement).value;
                 await w.applyTheme(currentTheme); 
                 
@@ -1090,7 +1102,10 @@ export default function AlbumPosterBuilder() {
                     w.fabric.Image.fromURL('/musicpostershop.png', function(bImg: any) {
                         if(bImg) {
                             bImg.scaleToWidth(150 * m.S); 
-                            bImg.set({ left: m.OX + ((4961 * m.S) / 2), top: m.OY + ((7016 * m.S) - (100 * m.S)), originX: 'center', originY: 'bottom', id: 'custom-site-barcode' });
+                            bImg.set({ 
+                                left: m.OX + ((4961 * m.S) / 2), top: m.OY + ((7016 * m.S) - (100 * m.S)), 
+                                originX: 'center', originY: 'bottom', id: 'custom-site-barcode' 
+                            });
                             w.canvas.add(bImg);
                         }
                         res(true);
@@ -1143,19 +1158,38 @@ export default function AlbumPosterBuilder() {
                 const maxTitleW = coverSize - pWidth - (100 * m.S);
                 
                 let titleClean = d.title.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim().toUpperCase();
-                let titleText = w.createSmartText(titleClean, { left: m.OX + margin, top: currentY, fontSize: 180 * m.S, fontFamily: 'Inter', fontWeight: 800, fill: textColor, id: 'title-text', lineHeight: 1.1 }, maxTitleW, 400 * m.S);
+                let titleText = new w.fabric.IText(titleClean, { 
+                    left: m.OX + margin, 
+                    top: currentY, 
+                    fontSize: 180 * m.S, 
+                    fontFamily: 'Inter', 
+                    fontWeight: 800, 
+                    fill: textColor, 
+                    id: 'title-text',
+                    lineHeight: 1
+                });
+                if (titleText.width > maxTitleW) titleText.set('fontSize', (180 * m.S) * (maxTitleW / titleText.width));
                 w.canvas.add(titleText);
                 
                 let artistClean = d.artist.name.replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim();
-                let artistText = w.createSmartText(artistClean, { left: m.OX + margin, top: currentY + titleText.height + (20 * m.S), fontSize: 80 * m.S, fontFamily: 'Inter', fontStyle: 'italic', fontWeight: 400, fill: textColor, id: 'artist-text', lineHeight: 1.1 }, maxTitleW, 200 * m.S);
+                let artistText = new w.fabric.IText(artistClean, { left: m.OX + margin, top: currentY + titleText.height + (20 * m.S), fontSize: 80 * m.S, fontFamily: 'Inter', fontStyle: 'italic', fontWeight: 400, fill: textColor, id: 'artist-text' });
+                if (artistText.width > maxTitleW) artistText.set('fontSize', (80 * m.S) * (maxTitleW / artistText.width));
                 w.canvas.add(artistText);
 
                 const pStartX = m.OX + canvasW - margin - pWidth;
+                
                 const textCenterY = titleText.top + (titleText.height / 2);
                 const pStartY = textCenterY - (boxSize / 2);
 
                 for(let i=0; i<4; i++) { 
-                    let rect = new w.fabric.Rect({ left: pStartX + i*(boxSize+gap), top: pStartY, width: boxSize, height: boxSize, fill: '#000', id: 'palette-rect' }); 
+                    let rect = new w.fabric.Rect({ 
+                        left: pStartX + i*(boxSize+gap), 
+                        top: pStartY, 
+                        width: boxSize, 
+                        height: boxSize, 
+                        fill: '#000', 
+                        id: 'palette-rect' 
+                    }); 
                     w.canvas.add(rect); w.paletteRects.push(rect); 
                 }
 
@@ -1164,31 +1198,55 @@ export default function AlbumPosterBuilder() {
                 let baseCount = Math.floor(totalTracks / 4);
                 let remainder = totalTracks % 4;
                 
-                let colSizes =[ baseCount + (remainder > 0 ? 1 : 0), baseCount + (remainder > 1 ? 1 : 0), baseCount + (remainder > 2 ? 1 : 0), baseCount ];
+                let colSizes =[
+                    baseCount + (remainder > 0 ? 1 : 0),
+                    baseCount + (remainder > 1 ? 1 : 0),
+                    baseCount + (remainder > 2 ? 1 : 0),
+                    baseCount
+                ];
 
                 let tCount = d.tracks.data.length;
                 let trackFontSize = (tCount <= 12) ? 75 * m.S : (tCount <= 20) ? 60 * m.S : 50 * m.S;
 
-                let colW = (coverSize * 0.22); 
-                let gridGap = (coverSize - (colW * 4)) / 3;
-                
                 let trackTexts: any[] = [];
-                let currentYPerCol = [trackStartY, trackStartY, trackStartY, trackStartY];
-
+                let colWidths =[0, 0, 0, 0];
+                
                 d.tracks.data.forEach((tObj: any, i: number) => {
-                    let colIndex = 0; let passed = 0;
-                    for (let c = 0; c < 4; c++) { if (i < passed + colSizes[c]) { colIndex = c; break; } passed += colSizes[c]; }
+                    let colIndex = 0;
+                    let rowIndex = 0;
+                    let passed = 0;
+                    
+                    for (let c = 0; c < 4; c++) {
+                        if (i < passed + colSizes[c]) {
+                            colIndex = c;
+                            rowIndex = i - passed;
+                            break;
+                        }
+                        passed += colSizes[c];
+                    }
                     
                     let tNum = i + 1;
                     let trackName = tObj.title.replace(/^\d+\.\s*/, '').replace(/\s*\(.*?\)\s*/g, '').replace(/\s*\[.*?\]\s*/g, '').trim();
                     let tText = `${tNum}. ${trackName}`;
                     
-                    let txt = new w.fabric.Textbox(tText, { width: colW, fontSize: trackFontSize, fontFamily: 'Inter', fontWeight: 500, fill: textColor, id: 'track-text', lineHeight: 1.2 });
+                    let txt = new w.fabric.IText(tText, { 
+                        fontSize: trackFontSize, fontFamily: 'Inter', fontWeight: 500, fill: textColor, id: 'track-text' 
+                    });
                     
-                    txt.set({ left: m.OX + margin + (colIndex * (colW + gridGap)), top: currentYPerCol[colIndex] });
-                    w.canvas.add(txt);
-                    
-                    currentYPerCol[colIndex] += txt.height + (trackFontSize * 0.5);
+                    if (txt.width > colWidths[colIndex]) {
+                        colWidths[colIndex] = txt.width;
+                    }
+                    trackTexts.push({ txt, colIndex, rowIndex });
+                });
+
+                let gridGap = (coverSize - colWidths[3]) / 3;
+                
+                trackTexts.forEach((item) => {
+                    item.txt.set({
+                        left: m.OX + margin + (item.colIndex * gridGap),
+                        top: trackStartY + (item.rowIndex * (trackFontSize * 1.3))
+                    });
+                    w.canvas.add(item.txt);
                 });
                 
                 let footerY = m.OY + (7016 * m.S) - margin - (150 * m.S);
@@ -1205,8 +1263,17 @@ export default function AlbumPosterBuilder() {
                     else if (item.align === 'center') fX = m.OX + (canvasW / 2);
                     else if (item.align === 'right') fX = m.OX + canvasW - margin;
 
-                    let lbl = new w.fabric.IText(item.lbl, { left: fX, top: footerY, fontSize: 70 * m.S, fontFamily: 'Inter', fontWeight: 800, fill: textColor, originX: item.align, textAlign: item.align, id: 'meta-lbl' });
-                    let val = new w.fabric.IText(item.val, { left: fX, top: footerY + lbl.height + (20 * m.S), fontSize: 50 * m.S, fontFamily: 'Inter', fontWeight: 500, fill: textColor, originX: item.align, textAlign: item.align, id: 'meta-val' });
+                    let lbl = new w.fabric.IText(item.lbl, { 
+                        left: fX, top: footerY, 
+                        fontSize: 70 * m.S, fontFamily: 'Inter', fontWeight: 800, fill: textColor, 
+                        originX: item.align, textAlign: item.align, id: 'meta-lbl' 
+                    });
+                    
+                    let val = new w.fabric.IText(item.val, { 
+                        left: fX, top: footerY + lbl.height + (20 * m.S), 
+                        fontSize: 50 * m.S, fontFamily: 'Inter', fontWeight: 500, fill: textColor, 
+                        originX: item.align, textAlign: item.align, id: 'meta-val' 
+                    });
                     w.canvas.add(lbl, val);
                 });
 
@@ -1218,7 +1285,13 @@ export default function AlbumPosterBuilder() {
                     w.fabric.Image.fromURL('/musicpostershop.png', function(bImg: any) {
                         if(bImg) {
                             bImg.scaleToWidth(150 * m.S); 
-                            bImg.set({ left: m.OX + ((4961 * m.S) / 2), top: m.OY + ((7016 * m.S) - (100 * m.S)), originX: 'center', originY: 'bottom', id: 'custom-site-barcode' });
+                            bImg.set({ 
+                                left: m.OX + ((4961 * m.S) / 2), 
+                                top: m.OY + ((7016 * m.S) - (100 * m.S)), 
+                                originX: 'center', 
+                                originY: 'bottom',
+                                id: 'custom-site-barcode'
+                            });
                             w.canvas.add(bImg);
                         }
                         res(true);
