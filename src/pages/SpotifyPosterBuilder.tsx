@@ -892,6 +892,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.exportVinylLoop = async function(format: string) {
+          w.edDeselect(); // Çıktı almadan önce seçili öğeyi bırakır
           const items = document.querySelectorAll('.multi-export-item');
           const colorsToExport: string[] = [];
           items.forEach((item: any) => {
@@ -991,6 +992,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.downloadPNG = async function() {
+        w.edDeselect(); // Çıktı almadan önce seçili öğeyi bırakır
         if (w.POSTER_MODE === 'vinyl') { await w.exportVinylLoop('png'); return; }
 
         w.showToast('PNG hazırlanıyor...');
@@ -1019,6 +1021,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.downloadPDF = async function() {
+        w.edDeselect(); // Çıktı almadan önce seçili öğeyi bırakır
         if (w.POSTER_MODE === 'vinyl') { await w.exportVinylLoop('pdf'); return; }
 
         w.showToast('PDF hazırlanıyor...');
@@ -1048,6 +1051,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.downloadSVG = async function() {
+        w.edDeselect(); // Çıktı almadan önce seçili öğeyi bırakır
         if (w.POSTER_MODE === 'vinyl') { await w.exportVinylLoop('svg'); return; }
 
         w.showToast('SVG hazırlanıyor...');
@@ -1714,7 +1718,7 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page #vinyl-card { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; }
         .spotify-poster-page #v-top-left { position: absolute; top: 8%; left: 8%; font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 700; color: #212121; letter-spacing: 0.1em; text-transform: uppercase !important; white-space: nowrap; }
         .spotify-poster-page #v-top-right { position: absolute; top: 8%; right: 8%; font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 700; color: #212121; letter-spacing: 0.1em; text-transform: uppercase !important; white-space: nowrap; }
-        .spotify-poster-page #v-song-title { position: absolute; top: 16%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 42px; font-weight: 800; color: #212121; letter-spacing: -0.02em; text-transform: uppercase !important; }
+        .spotify-poster-page #v-song-title { position: absolute; top: 12%; left: 0; right: 0; text-align: center; font-family: 'Josefin Sans', sans-serif; font-size: 42px; font-weight: 800; color: #212121; letter-spacing: 4px; text-transform: uppercase !important; }
         .spotify-poster-page #v-vinyl-center { position: absolute; top: 55%; left: 50%; translate: -50% -50%; width: 85%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
         .spotify-poster-page #v-bottom-text { position: absolute; bottom: 8%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; color: #555555; text-transform: uppercase !important; letter-spacing: 0.05em; }
         
