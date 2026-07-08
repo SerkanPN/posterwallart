@@ -9,7 +9,7 @@ export default function SpotifyPosterBuilder() {
     if (isInitialized.current) return;
     isInitialized.current = true;
 
-    // Load External Scripts (html2canvas, jsPDF)
+    // Load External Scripts (html2canvas, jsPDF, JSZip)
     const loadScript = (src: string) => {
       return new Promise((resolve, reject) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve(true);
@@ -24,6 +24,7 @@ export default function SpotifyPosterBuilder() {
     const initApp = async () => {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+      await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
 
       const w = window as any;
       w.POSTER_MODE = posterMode;
@@ -151,8 +152,13 @@ export default function SpotifyPosterBuilder() {
         }
       };
 
+      // ──────────────────────────────────────────────────────────
+      // BACKGROUND LOGIC (SPOTIFY VS VINYL SEPARATED)
+      // ──────────────────────────────────────────────────────────
       w.currentCoverSrc = '';
+      w.vCurrentCoverSrc = ''; // Separated for vinyl
 
+      // Spotify blur function
       w.updateBgBlur = function() {
         if(w.POSTER_MODE === 'vinyl') return;
         
@@ -195,6 +201,46 @@ export default function SpotifyPosterBuilder() {
           }
         };
         tempImg.src = w.currentCoverSrc;
+      };
+
+      // Vinyl blur function
+      w.updateVinylBgBlur = function() {
+        if(w.POSTER_MODE !== 'vinyl') return;
+        
+        const blurEl = document.getElementById('v-blur-val') as HTMLInputElement;
+        if (!blurEl) return;
+        const blur = blurEl.value;
+        const brightness = "100"; // default brightness
+        
+        const blurDisp = document.getElementById('v-blur-display');
+        if (blurDisp) blurDisp.textContent = blur + 'px';
+        
+        const bgImgDiv = document.getElementById('poster-bg-img') as HTMLElement;
+        if (!w.vCurrentCoverSrc) return;
+        
+        const tempImg = new Image();
+        tempImg.crossOrigin = "Anonymous";
+        
+        tempImg.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          canvas.width = 800;
+          canvas.height = 800;
+
+          if (ctx) {
+             ctx.filter = `blur(${blur}px) brightness(${parseFloat(brightness)/100})`;
+             const margin = parseInt(blur) * 3;
+             ctx.drawImage(tempImg, -margin, -margin, canvas.width + margin * 2, canvas.height + margin * 2);
+          }
+
+          try {
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+            if (bgImgDiv) bgImgDiv.style.backgroundImage = `url(${dataUrl})`;
+          } catch (e) {
+            console.error(e);
+          }
+        };
+        tempImg.src = w.vCurrentCoverSrc;
       };
 
       w.applyAutoContrast = function(bgHex: string) {
@@ -248,11 +294,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.updateBg = function() {
-        if(w.POSTER_MODE === 'vinyl') {
-           w.updateBgColor(); // Vinyl always uses color
-           return;
-        }
-
+        if(w.POSTER_MODE === 'vinyl') return; // Handled separately
         const type = (document.getElementById('bg-type') as HTMLSelectElement).value;
         const bgColorSection = document.getElementById('bg-color-section');
         const bgBlurSection = document.getElementById('bg-blur-section');
@@ -260,16 +302,39 @@ export default function SpotifyPosterBuilder() {
         const posterBg = document.getElementById('poster-bg');
 
         if (type === 'color') {
-          bgColorSection!.style.display = 'block';
-          bgBlurSection!.style.display = 'none';
-          bgImg!.style.display = 'none';
+          if(bgColorSection) bgColorSection.style.display = 'block';
+          if(bgBlurSection) bgBlurSection.style.display = 'none';
+          if(bgImg) bgImg.style.display = 'none';
           w.updateBgColor();
         } else {
-          bgColorSection!.style.display = 'none';
-          bgBlurSection!.style.display = 'block';
-          posterBg!.style.background = 'none';
-          bgImg!.style.display = w.currentCoverSrc ? 'block' : 'none';
+          if(bgColorSection) bgColorSection.style.display = 'none';
+          if(bgBlurSection) bgBlurSection.style.display = 'block';
+          if(posterBg) posterBg.style.background = 'none';
+          if(bgImg) bgImg.style.display = w.currentCoverSrc ? 'block' : 'none';
           w.updateBgBlur();
+        }
+      };
+
+      w.updateVinylBg = function() {
+        if(w.POSTER_MODE !== 'vinyl') return;
+        const type = (document.getElementById('v-bg-type') as HTMLSelectElement).value;
+        const bgColorSection = document.getElementById('v-bg-color-section');
+        const bgBlurSection = document.getElementById('v-bg-blur-section');
+        const bgImg = document.getElementById('poster-bg-img');
+        const posterBg = document.getElementById('poster-bg');
+
+        if (type === 'color') {
+          if(bgColorSection) bgColorSection.style.display = 'block';
+          if(bgBlurSection) bgBlurSection.style.display = 'none';
+          if(bgImg) bgImg.style.display = 'none';
+          w.updateBgColor();
+        } else {
+          if(bgColorSection) bgColorSection.style.display = 'none';
+          if(bgBlurSection) bgBlurSection.style.display = 'block';
+          if(posterBg) posterBg.style.background = 'none';
+          if(bgImg) bgImg.style.display = w.vCurrentCoverSrc ? 'block' : 'none';
+          w.applyAutoContrast('#121212'); // Force light text for blur background to ensure readability
+          w.updateVinylBgBlur();
         }
       };
 
@@ -324,6 +389,25 @@ export default function SpotifyPosterBuilder() {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (e: any) => w.setCoverImage(e.target.result);
+        reader.readAsDataURL(file);
+      };
+
+      w.handleVinylCoverUpload = function(event: any) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e: any) => {
+            w.vCurrentCoverSrc = e.target.result;
+            const bgImgDiv = document.getElementById('poster-bg-img') as HTMLElement;
+            if (bgImgDiv) {
+                bgImgDiv.style.backgroundImage = `url(${e.target.result})`;
+                const btype = document.getElementById('v-bg-type') as HTMLSelectElement;
+                if (btype && btype.value === 'blur') {
+                    bgImgDiv.style.display = 'block';
+                    w.updateVinylBgBlur();
+                }
+            }
+        };
         reader.readAsDataURL(file);
       };
 
@@ -521,24 +605,28 @@ export default function SpotifyPosterBuilder() {
           const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
           const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
           
-          // Metnin kaplayacağı yaklaşık piksel uzunluğu
           const textLen = input.length * (fs * 0.6); 
-          const minR = 100; // İç boşluk (Göbek)
-          const spacing = fs * 1.2; // Satır arası boşluk
+          const minR = 100;
+          const spacing = fs * 1.2;
           
-          // Tüm metni sığdırmak için plağın ne kadar büyümesi gerektiğini hesaplıyoruz
-          let maxR = Math.sqrt((textLen * spacing / Math.PI) + (minR * minR));
+          const standardLoops = (380 - minR) / spacing;
+          const standardLen = Math.PI * spacing * standardLoops * standardLoops + 2 * Math.PI * minR * standardLoops;
           
-          // Plak boş durmasın diye en az 380px boyutunda kalmasını sağlıyoruz
-          if (maxR < 380) maxR = 380;
+          let loops = standardLoops;
+          let maxR = 380;
           
-          let loops = (maxR - minR) / spacing;
+          if (textLen > standardLen) {
+              const a = Math.PI * spacing;
+              const b = 2 * Math.PI * minR;
+              const c = -textLen;
+              loops = (-b + Math.sqrt(b*b - 4*a*c)) / (2*a);
+              maxR = minR + loops * spacing;
+          }
           
           let svgSize = 800;
           let cx = 400;
           let cy = 400;
           
-          // Metin devasa boyuttaysa SVG çerçevesini (tuvali) de genişletiyoruz ki dışı kesilmesin
           if (maxR > 380) {
               svgSize = (maxR + 30) * 2;
               cx = svgSize / 2;
@@ -566,7 +654,6 @@ export default function SpotifyPosterBuilder() {
           let points = [];
           let steps = Math.ceil(loops * 100);
           
-          // BURASI ÖNEMLİ: Spirali İÇERİDEN (minR) DIŞARIYA (maxR) doğru ve SAAT YÖNÜNDE çiziyoruz.
           for(let i=0; i<=steps; i++) {
               let t = -Math.PI/2 + (i/steps) * loops * Math.PI * 2;
               let r = minR + ((maxR - minR) * (i/steps));
@@ -594,8 +681,6 @@ export default function SpotifyPosterBuilder() {
           
           let finalStr = input.trim();
           
-          // Şarkı sözü kısaysa ve varsayılan plağı (380) boş bırakacaksa, estetik için tekrar ederek doldur. 
-          // Ama çok uzunsa zaten üstteki fonksiyon plağı genişletecek ve sözler KESİLMEDEN 1 kere tam yazılacak.
           if (textLen < standardLen) {
              let repeats = Math.ceil(standardLen / (textLen + 20));
              let arr = [];
@@ -710,7 +795,6 @@ export default function SpotifyPosterBuilder() {
             const bottomInp = document.getElementById('v-bottom-input') as HTMLInputElement;
             if (bottomInp) bottomInp.value = album;
 
-            // Plak şirketi yerine SANATÇI ADI
             let artistLabel = item.artistName || 'ARTIST NAME';
             const labelEl = document.getElementById('v-top-left');
             if (labelEl) labelEl.textContent = artistLabel.toUpperCase();
@@ -740,7 +824,7 @@ export default function SpotifyPosterBuilder() {
             artist = ((document.getElementById('song-artist-input') as HTMLInputElement)?.value || 'artist').replace(/[^a-z0-9]/gi, '-').toLowerCase();
             song = ((document.getElementById('song-title-input') as HTMLInputElement)?.value || 'song').replace(/[^a-z0-9]/gi, '-').toLowerCase();
         } else {
-            artist = ((document.getElementById('v-song-artist-input') as HTMLInputElement)?.value || 'artist').replace(/[^a-z0-9]/gi, '-').toLowerCase();
+            artist = ((document.getElementById('v-label-input') as HTMLInputElement)?.value || 'artist').replace(/[^a-z0-9]/gi, '-').toLowerCase();
             song = ((document.getElementById('v-song-title-input') as HTMLInputElement)?.value || 'song').replace(/[^a-z0-9]/gi, '-').toLowerCase();
         }
         
@@ -827,7 +911,7 @@ export default function SpotifyPosterBuilder() {
           if(!posterBg) return;
           const originalBg = posterBg.style.background;
 
-          w.showToast(`${colorsToExport.length} renk için ${format.toUpperCase()} hazırlanıyor... Lütfen bekleyin.`);
+          w.showToast(`${colorsToExport.length} renk için ZIP hazırlanıyor... Lütfen bekleyin.`);
 
           const container = document.getElementById('poster-container');
           const key = (document.getElementById('canvas-size') as HTMLSelectElement).value;
@@ -845,12 +929,19 @@ export default function SpotifyPosterBuilder() {
               targetHeightPx = Math.round(targetHeightPx * limitScale);
           }
 
+          const zip = new (window as any).JSZip();
+          const folder = zip.folder(`vinyl-posters-${format}`);
+
           for (let i = 0; i < colorsToExport.length; i++) {
               const color = colorsToExport[i];
               posterBg.style.background = color;
+              
+              const bgImgDiv = document.getElementById('poster-bg-img') as HTMLElement;
+              const originalBgImgDisplay = bgImgDiv ? bgImgDiv.style.display : 'none';
+              if(bgImgDiv) bgImgDiv.style.display = 'none'; // Toplu çıktı düz renkler içindir
+              
               w.applyAutoContrast(color);
               
-              // Allow DOM to update
               await new Promise(r => setTimeout(r, 150));
 
               try {
@@ -861,35 +952,42 @@ export default function SpotifyPosterBuilder() {
                   if (format === 'png') {
                       const base64Data = canvas.toDataURL('image/png', 1.0);
                       const dpiFixedData = w.changeDpiDataUrl(base64Data, 300);
-                      const link = document.createElement('a');
-                      link.download = filename; link.href = dpiFixedData; link.click();
+                      const base64Content = dpiFixedData.split(',')[1];
+                      folder.file(filename, base64Content, {base64: true});
                   } else if (format === 'pdf') {
                       const { jsPDF } = w.jspdf;
                       const pdf = new jsPDF({ orientation: wIn > hIn ? 'landscape' : 'portrait', unit: 'in', format: [wIn, hIn] });
                       const imgData = canvas.toDataURL('image/jpeg', 0.95);
                       pdf.addImage(imgData, 'JPEG', 0, 0, wIn, hIn);
-                      pdf.save(filename);
+                      const pdfArrayBuffer = pdf.output('arraybuffer');
+                      folder.file(filename, pdfArrayBuffer);
                   } else if (format === 'svg') {
                       const imgData = canvas.toDataURL('image/png', 1.0);
                       const svgContent = `<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${targetWidthPx}" height="${targetHeightPx}" viewBox="0 0 ${targetWidthPx} ${targetHeightPx}">\n  <image href="${imgData}" x="0" y="0" width="${targetWidthPx}" height="${targetHeightPx}"/>\n</svg>`;
-                      const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-                      const url = URL.createObjectURL(blob);
-                      const link = document.createElement('a');
-                      link.download = filename; link.href = url; link.click();
-                      URL.revokeObjectURL(url);
+                      folder.file(filename, svgContent);
                   }
-                  
-                  // short pause between downloads
-                  await new Promise(r => setTimeout(r, 400));
               } catch(e) {
                   console.error(e);
               }
+
+              if(bgImgDiv) bgImgDiv.style.display = originalBgImgDisplay;
           }
 
-          // Restore original
+          zip.generateAsync({type:"blob"}).then(function(content: Blob) {
+              const url = URL.createObjectURL(content);
+              const link = document.createElement('a');
+              link.download = `Vinyl-Posters-${new Date().getTime()}.zip`;
+              link.href = url;
+              link.click();
+              URL.revokeObjectURL(url);
+              w.showToast(`✓ ZIP dosyası indirildi!`);
+          });
+
+          // Restore original view
           posterBg.style.background = originalBg;
-          w.applyAutoContrast(originalBg);
-          w.showToast(`✓ Tüm ${format.toUpperCase()} dosyaları indirildi!`);
+          const currentType = (document.getElementById('v-bg-type') as HTMLSelectElement)?.value || 'color';
+          if (currentType === 'color') w.applyAutoContrast(originalBg);
+          else w.applyAutoContrast('#121212');
       };
 
       w.downloadPNG = async function() {
@@ -1981,18 +2079,43 @@ export default function SpotifyPosterBuilder() {
             <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🖼️ Main Background (Current View)<span className="arrow">▼</span></button>
             <div className="accordion-content">
                 <div className="form-row">
-                  <label>Background Color</label>
-                  <div className="color-row">
-                    <input type="color" id="v-bg-color" defaultValue="#f5f5f5" onInput={() => (window as any).updateBgColor()} />
-                    <input type="text" id="v-bg-color-txt" defaultValue="#f5f5f5" onInput={() => { (window as any).syncColor('v-bg-color', 'v-bg-color-txt'); (window as any).updateBgColor(); }} />
-                  </div>
+                  <label>Background Type</label>
+                  <select id="v-bg-type" defaultValue="color" onChange={() => (window as any).updateVinylBg()}>
+                    <option value="color">Solid Color</option>
+                    <option value="blur">Blurred Image</option>
+                  </select>
+                </div>
+                
+                <div id="v-bg-color-section">
+                    <div className="form-row">
+                      <label>Background Color</label>
+                      <div className="color-row">
+                        <input type="color" id="v-bg-color" defaultValue="#f5f5f5" onInput={() => (window as any).updateBgColor()} />
+                        <input type="text" id="v-bg-color-txt" defaultValue="#f5f5f5" onInput={() => { (window as any).syncColor('v-bg-color', 'v-bg-color-txt'); (window as any).updateBgColor(); }} />
+                      </div>
+                    </div>
+                </div>
+                
+                <div id="v-bg-blur-section" style={{ display: 'none' }}>
+                    <div className="form-row">
+                      <label>Blur</label>
+                      <div className="range-row">
+                        <input type="range" min="0" max="40" defaultValue="10" id="v-blur-val" onInput={() => (window as any).updateVinylBgBlur()} />
+                        <span className="range-val" id="v-blur-display">10px</span>
+                      </div>
+                    </div>
+                    <div className="upload-area" onClick={() => document.getElementById('v-cover-upload')?.click()} style={{marginTop:'12px'}}>
+                      <input type="file" id="v-cover-upload" accept="image/*" onChange={(e: any) => (window as any).handleVinylCoverUpload(e)} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer' }} />
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                      <p>Click to upload image</p>
+                    </div>
                 </div>
             </div>
 
             {/* MULTI-COLOR EXPORT SECTION */}
             <button className="accordion-btn open" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🎨 Multi-Color Export (Toplu Çıktı)<span className="arrow">▼</span></button>
             <div className="accordion-content open">
-                <p style={{fontSize:'10px', color:'#777', marginBottom:'10px'}}>Seçili renkler indirme butonuna bastığınızda otomatik olarak sırayla arka plan yapılıp kaydedilir.</p>
+                <p style={{fontSize:'10px', color:'#777', marginBottom:'10px'}}>Seçili renkler indirme butonuna bastığınızda otomatik olarak sırayla arka plan yapılıp ZIP olarak kaydedilir.</p>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                     {vinylColors.map((col, i) => (
                     <div className="pf-color-row multi-export-item" key={i}>
