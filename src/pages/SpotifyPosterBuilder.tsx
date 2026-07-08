@@ -197,6 +197,43 @@ export default function SpotifyPosterBuilder() {
         tempImg.src = w.currentCoverSrc;
       };
 
+      w.applyAutoContrast = function(bgHex: string) {
+        if (w.POSTER_MODE !== 'vinyl') return;
+        let hex = bgHex.replace('#', '');
+        if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+        const r = parseInt(hex.substr(0,2), 16) || 255;
+        const g = parseInt(hex.substr(2,2), 16) || 255;
+        const b = parseInt(hex.substr(4,2), 16) || 255;
+        const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+        const isDark = yiq < 128; // Arka plan koyu mu?
+
+        const mainTextCol = isDark ? '#ffffff' : '#212121';
+        const subTextCol  = isDark ? '#cccccc' : '#555555';
+        const labelCol    = isDark ? '#eeeeee' : '#e0e0e0';
+
+        const setCol = (id: string, col: string) => { const el = document.getElementById(id); if(el) el.style.color = col; };
+        setCol('v-top-left', mainTextCol);
+        setCol('v-top-right', mainTextCol);
+        setCol('v-song-title', mainTextCol);
+        setCol('v-bottom-text', subTextCol);
+
+        const spText = document.getElementById('v-spiral-text');
+        if(spText) spText.setAttribute('fill', mainTextCol);
+        
+        const vLabel = document.getElementById('v-vinyl-label');
+        if(vLabel) vLabel.setAttribute('fill', labelCol);
+
+        // Menüdeki renk kutucuklarını da senkronize et
+        const setInp = (id: string, col: string) => { 
+          const el = document.getElementById(id) as HTMLInputElement; if(el) el.value = col; 
+          const txt = document.getElementById(id+'-t') as HTMLInputElement; if(txt) txt.value = col;
+        };
+        setInp('c-v-tl', mainTextCol);
+        setInp('c-v-tr', mainTextCol);
+        setInp('c-v-st', mainTextCol);
+        setInp('c-v-bot', subTextCol);
+      };
+
       w.updateBgColor = function() {
         const colorId = w.POSTER_MODE === 'vinyl' ? 'v-bg-color' : 'bg-color';
         const txtId = w.POSTER_MODE === 'vinyl' ? 'v-bg-color-txt' : 'bg-color-txt';
@@ -206,6 +243,8 @@ export default function SpotifyPosterBuilder() {
         const color = colorEl.value;
         document.getElementById('poster-bg')!.style.background = color;
         if(txtEl) txtEl.value = color;
+        
+        if (w.POSTER_MODE === 'vinyl') w.applyAutoContrast(color);
       };
 
       w.updateBg = function() {
@@ -811,6 +850,7 @@ export default function SpotifyPosterBuilder() {
           for (let i = 0; i < colorsToExport.length; i++) {
               const color = colorsToExport[i];
               posterBg.style.background = color;
+              w.applyAutoContrast(color);
               
               // Allow DOM to update
               await new Promise(r => setTimeout(r, 150));
@@ -850,6 +890,7 @@ export default function SpotifyPosterBuilder() {
 
           // Restore original
           posterBg.style.background = originalBg;
+          w.applyAutoContrast(originalBg);
           w.showToast(`✓ Tüm ${format.toUpperCase()} dosyaları indirildi!`);
       };
 
