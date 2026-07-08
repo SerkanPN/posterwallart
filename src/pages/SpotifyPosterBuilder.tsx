@@ -356,15 +356,15 @@ export default function SpotifyPosterBuilder() {
         const txtEl = document.getElementById(textId) as HTMLInputElement;
         const colEl = document.getElementById(colorId) as HTMLInputElement;
         if(!txtEl || !colEl) return;
-        const txt = txtEl.value;
-        if (/^#[0-9A-Fa-f]{6}$/i.test(txt) || /^#[0-9A-Fa-f]{3}$/i.test(txt)) {
-          // Native Input Setter trick for React to properly trigger state
-          const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")?.set;
-          if (nativeInputValueSetter) {
-             nativeInputValueSetter.call(colEl, txt);
-          } else {
-             colEl.value = txt;
-          }
+        let txt = txtEl.value.trim();
+        
+        // 3 haneli HEX değerini 6 haneliye tamamla ki <input type="color"> hata vermesin
+        if (/^#[0-9A-Fa-f]{3}$/.test(txt)) {
+          txt = '#' + txt[1]+txt[1] + txt[2]+txt[2] + txt[3]+txt[3];
+        }
+        
+        if (/^#[0-9A-Fa-f]{6}$/.test(txt)) {
+          colEl.value = txt;
           colEl.dispatchEvent(new Event('input', { bubbles: true }));
           colEl.dispatchEvent(new Event('change', { bubbles: true }));
         }
@@ -479,12 +479,65 @@ export default function SpotifyPosterBuilder() {
       w.updateVinylSpiral = function() {
           const pathEl = document.getElementById('v-spiral-path');
           if(!pathEl) return;
-          const loops = parseInt((document.getElementById('vinyl-loops') as HTMLInputElement)?.value || "16");
-          let cx = 400, cy = 400;
-          let minR = 100, maxR = 380;
-          let points = [];
-          let steps = loops * 100;
           
+          const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
+          const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
+          
+          // Metin uzunluğunu karakter sayısına göre yaklaşık hesapla
+          const textLen = input.length * (fs * 0.55); 
+          
+          const minR = 100;
+          const spacing = fs * 1.2;
+          
+          // Standart (boşluk bırakılmış) bir 380 yarıçaplı plağın kapasitesi
+          const standardLoops = (380 - minR) / spacing;
+          const standardLen = Math.PI * spacing * standardLoops * standardLoops + 2 * Math.PI * minR * standardLoops;
+          
+          let loops = standardLoops;
+          let maxR = 380;
+          
+          // Eğer metin standart plaktan daha uzunsa otomatik olarak döngü (loops) sayısını artır ve plağı büyüt
+          if (textLen > standardLen) {
+              const a = Math.PI * spacing;
+              const b = 2 * Math.PI * minR;
+              const c = -textLen;
+              loops = (-b + Math.sqrt(b*b - 4*a*c)) / (2*a);
+              maxR = minR + loops * spacing;
+          }
+          
+          let svgSize = 800;
+          let cx = 400;
+          let cy = 400;
+          
+          // Eğer plak standart 380r'den daha fazla büyüdüyse SVG viewBox'ını da genişletiyoruz
+          if (maxR > 380) {
+              svgSize = (maxR + 30) * 2;
+              cx = svgSize / 2;
+              cy = svgSize / 2;
+          }
+
+          const svgEl = document.getElementById('vinyl-svg');
+          if(svgEl) {
+              svgEl.setAttribute('viewBox', `0 0 ${svgSize} ${svgSize}`);
+              document.getElementById('v-vinyl-bg')?.setAttribute('cx', cx.toString());
+              document.getElementById('v-vinyl-bg')?.setAttribute('cy', cy.toString());
+              document.getElementById('v-vinyl-bg')?.setAttribute('r', (maxR + 15).toString());
+              
+              document.getElementById('v-vinyl-groove1')?.setAttribute('cx', cx.toString());
+              document.getElementById('v-vinyl-groove1')?.setAttribute('cy', cy.toString());
+              document.getElementById('v-vinyl-groove2')?.setAttribute('cx', cx.toString());
+              document.getElementById('v-vinyl-groove2')?.setAttribute('cy', cy.toString());
+              
+              document.getElementById('v-vinyl-label')?.setAttribute('cx', cx.toString());
+              document.getElementById('v-vinyl-label')?.setAttribute('cy', cy.toString());
+              document.getElementById('v-vinyl-hole')?.setAttribute('cx', cx.toString());
+              document.getElementById('v-vinyl-hole')?.setAttribute('cy', cy.toString());
+          }
+
+          let points = [];
+          let steps = Math.ceil(loops * 100);
+          
+          // Spirali dışarıdan içeriye doğru çiziyoruz
           for(let i=0; i<=steps; i++) {
               let t = -Math.PI/2 - (i/steps) * loops * Math.PI * 2;
               let r = maxR - ((maxR - minR) * (i/steps));
@@ -495,25 +548,33 @@ export default function SpotifyPosterBuilder() {
           }
           pathEl.setAttribute('d', points.join(' '));
           
-          // Tekrar sayısını da tetikle ki metin tam dolsun
           w.updateVinylLyrics();
       };
 
       w.updateVinylLyrics = function() {
-          const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM DOLOR SIT AMET ";
+          const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
           const textEl = document.getElementById('v-spiral-text');
           if(!textEl) return;
           
-          // Metnin uzunluğuna ve spiral boyutuna göre tekrarla
-          const loops = parseInt((document.getElementById('vinyl-loops') as HTMLInputElement)?.value || "16");
           const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
-          const neededLength = (loops * 2500) / fs; 
-          let result = input.trim() + " • ";
+          const textLen = input.length * (fs * 0.55);
           
-          while(result.length < neededLength) {
-              result += input.trim() + " • ";
+          const minR = 100;
+          const spacing = fs * 1.2;
+          const standardLoops = (380 - minR) / spacing;
+          const standardLen = Math.PI * spacing * standardLoops * standardLoops + 2 * Math.PI * minR * standardLoops;
+          
+          let finalStr = input.trim();
+          
+          // Eğer girilen şarkı sözü kısa kaldıysa, estetik olarak plağı tam doldurması için sözü tekrarla
+          if (textLen < standardLen) {
+             let repeats = Math.ceil(standardLen / (textLen + 20)); // +20 boşluk payı
+             let arr = [];
+             for(let k=0; k<repeats; k++) arr.push(finalStr);
+             finalStr = arr.join(' • ');
           }
-          textEl.textContent = result.toUpperCase();
+          
+          textEl.textContent = finalStr.toUpperCase();
       };
 
       w.fetchLyrics = async function(artist: string, title: string) {
@@ -619,19 +680,21 @@ export default function SpotifyPosterBuilder() {
             if(yearInp) yearInp.value = year.toString();
 
             // Extract Album and Record Label
-            const album = (item.collectionName || "Unknown Album").toUpperCase();
+            const album = item.collectionName ? item.collectionName.toUpperCase() : "UNKNOWN ALBUM";
             const bottomEl = document.getElementById('v-bottom-text');
             if (bottomEl) bottomEl.textContent = album;
             const bottomInp = document.getElementById('v-bottom-input') as HTMLInputElement;
             if (bottomInp) bottomInp.value = album;
 
-            // Better Record Label Extraction
+            // Plak Şirketi Çıkarma Mantığı (Geliştirildi)
             let label = 'RECORD LABEL';
             if (item.copyright) {
-                label = item.copyright.replace(/^[℗©]\s*\d+\s*/, '');
+                // "℗ 2014 Boyina Records" -> Baştaki sembol ve yılı atıp saf ismi alırız
+                label = item.copyright.replace(/^[℗©]\s*\d{4}\s*/, '');
             } else if (item.primaryGenreName) {
-                label = item.primaryGenreName.toUpperCase() + ' RECORDS';
+                label = item.primaryGenreName + ' RECORDS';
             }
+            
             const labelEl = document.getElementById('v-top-left');
             if (labelEl) labelEl.textContent = label.toUpperCase();
             const labelInp = document.getElementById('v-label-input') as HTMLInputElement;
@@ -648,7 +711,7 @@ export default function SpotifyPosterBuilder() {
                 if(linp) linp.value = "LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA";
                 w.showToast('Sözler bulunamadı, varsayılan metin eklendi');
             }
-            w.updateVinylLyrics();
+            w.updateVinylSpiral();
         }
       };
 
@@ -996,19 +1059,13 @@ export default function SpotifyPosterBuilder() {
         const vis = el.style.display !== 'none';
 
         function cpair(initColor: string, oninput: string) {
-          return `<div class="pf-color-row"><input type="color" value="${initColor}" oninput="${oninput.replace(/"/g,"'")}; this.nextElementSibling.value=this.value"><input type="text" value="${initColor}" oninput="if(/^#[0-9a-fA-F]{6}$/i.test(this.value)||/^#[0-9a-fA-F]{3}$/i.test(this.value)){${oninput.replace(/"/g,"'")}; this.previousElementSibling.value=this.value}"></div>`;
+          return `<div class="pf-color-row"><input type="color" value="${initColor}" oninput="const v=this.value; ${oninput.replace(/"/g,"'")}; this.nextElementSibling.value=v;"><input type="text" value="${initColor}" oninput="let v=this.value; if(/^#[0-9a-fA-F]{3}$/i.test(v)){v='#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3];} if(/^#[0-9a-fA-F]{6}$/i.test(v)){${oninput.replace(/this\.value/g,"v").replace(/"/g,"'")}; this.previousElementSibling.value=v;}"></div>`;
         }
         function rrow(min:number,max:number,step:number,val:number,oninput:string,unit='px') {
           return `<div class="pf-range-row"><input type="range" min="${min}" max="${max}" step="${step}" value="${val}" oninput="${oninput.replace(/"/g,"'")}; this.nextElementSibling.textContent=this.value+'${unit}'"><span class="pf-range-val">${val}${unit}</span></div>`;
         }
 
-        const fonts = [
-            {name: 'Inter', v: "'Inter', sans-serif"}, {name: 'DM Sans', v: "'DM Sans', sans-serif"},
-            {name: 'Montserrat', v: "'Montserrat', sans-serif"}, {name: 'Poppins', v: "'Poppins', sans-serif"},
-            {name: 'Roboto', v: "'Roboto', sans-serif"}, {name: 'Playfair Display', v: "'Playfair Display', serif"},
-            {name: 'Bebas Neue', v: "'Bebas Neue', sans-serif"}, {name: 'Arial', v: "Arial, sans-serif"},
-            {name: 'Times New Roman', v: "'Times New Roman', serif"}, {name: 'Courier New', v: "'Courier New', monospace"}
-        ];
+        const fontOpts = `<option value="'DM Sans', sans-serif">DM Sans</option><option value="'Inter', sans-serif">Inter</option><option value="'Montserrat', sans-serif">Montserrat</option><option value="'Oswald', sans-serif">Oswald</option><option value="'Poppins', sans-serif">Poppins</option><option value="'Playfair Display', serif">Playfair Display</option><option value="'Anton', sans-serif">Anton</option><option value="'Bebas Neue', sans-serif">Bebas Neue</option><option value="'Lora', serif">Lora</option><option value="'Merriweather', serif">Merriweather</option>`;
 
         let html = `<div class="pf-section"><div class="pf-section-title">Position &amp; Size</div><div class="pf-2col"><div class="pf-row"><label>X offset</label><input type="number" id="epx" value="${Math.round(o.tx)}" oninput="window.edSetXY('${id}','x',this.value)"></div><div class="pf-row"><label>Y offset</label><input type="number" id="epy" value="${Math.round(o.ty)}" oninput="window.edSetXY('${id}','y',this.value)"></div></div><div class="pf-2col"><div class="pf-row"><label>Width (px)</label><input type="number" value="${cw}" oninput="window.edSetW('${id}',this.value)"></div><div class="pf-row"><label>Height (px)</label><input type="number" value="${ch}" oninput="window.edSetH('${id}',this.value)"></div></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Visibility</div><div class="pf-toggle-row"><span>Visible</span><label class="toggle"><input type="checkbox" ${vis?'checked':''} onchange="window.edEl('${id}').style.display=this.checked?'':'none'"><span class="slider"></span></label></div><div class="pf-row"><label>Opacity</label>${rrow(0,100,1,op, `window.edEl('${id}').style.opacity=this.value/100`, '%')}</div></div>`;
 
@@ -1022,13 +1079,9 @@ export default function SpotifyPosterBuilder() {
           const lhRaw = parseFloat(cs.lineHeight);
           const lh  = isNaN(lhRaw) ? "1.2" : (lhRaw / (parseFloat(cs.fontSize)||14)).toFixed(2);
           const isUC = cs.textTransform === 'uppercase';
-          
-          let fontOpts = '';
-          fonts.forEach(f => {
-              fontOpts += `<option value="${f.v}" ${cs.fontFamily.includes(f.name.split(' ')[0]) ? 'selected' : ''}>${f.name}</option>`;
-          });
+          const ff = cs.fontFamily.replace(/"/g, "'");
 
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text</div><div class="pf-row"><label>Content</label><input type="text" value="${txt}" oninput="window.edSetText('${id}',this.value)"></div><div class="pf-row"><label>Font Family</label><select onchange="window.edEl('${id}').style.fontFamily=this.value">${fontOpts}</select></div><div class="pf-2col"><div class="pf-row"><label>Font Size</label><input type="number" value="${fs}" min="6" max="200" oninput="window.edEl('${id}').style.fontSize=this.value+'px'"></div><div class="pf-row"><label>Weight</label><select onchange="window.edEl('${id}').style.fontWeight=this.value"><option value="300" ${fw==='300'?'selected':''}>Light</option><option value="400" ${fw==='400'||fw==='normal'?'selected':''}>Regular</option><option value="500" ${fw==='500'?'selected':''}>Medium</option><option value="600" ${fw==='600'?'selected':''}>SemiBold</option><option value="700" ${fw==='700'||fw==='bold'?'selected':''}>Bold</option><option value="900" ${fw==='900'?'selected':''}>Black</option></select></div></div><div class="pf-row"><label>Letter Spacing</label>${rrow(-5,30,0.5,ls, `window.edEl('${id}').style.letterSpacing=this.value+'px'`)}</div><div class="pf-row"><label>Line Height</label>${rrow(0.8,4,0.05,parseFloat(lh), `window.edEl('${id}').style.lineHeight=this.value`, '')}</div><div class="pf-row"><label>Alignment</label><div class="pf-3col"><button class="pf-btn" onclick="window.edEl('${id}').style.textAlign='left'">Left</button><button class="pf-btn" onclick="window.edEl('${id}').style.textAlign='center'">Center</button><button class="pf-btn" onclick="window.edEl('${id}').style.textAlign='right'">Right</button></div></div><div class="pf-toggle-row"><span>Uppercase</span><label class="toggle"><input type="checkbox" ${isUC?'checked':''} onchange="window.edEl('${id}').style.textTransform=this.checked?'uppercase':'none'"><span class="slider"></span></label></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text Color</div><div class="pf-row">${cpair(col, `window.edEl('${id}').style.color=this.value`)}</div></div>`;
+          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text properties</div><div class="pf-row"><label>Content</label><input type="text" value="${txt}" oninput="window.edSetText('${id}',this.value)"></div><div class="pf-row"><label>Font Family</label><select onchange="window.edEl('${id}').style.fontFamily=this.value"><option value="${ff}" selected>Current Font</option>${fontOpts}</select></div><div class="pf-2col"><div class="pf-row"><label>Font Size</label><input type="number" value="${fs}" min="6" max="200" oninput="window.edEl('${id}').style.fontSize=this.value+'px'"></div><div class="pf-row"><label>Weight</label><select onchange="window.edEl('${id}').style.fontWeight=this.value"><option value="300" ${fw==='300'?'selected':''}>Light</option><option value="400" ${fw==='400'||fw==='normal'?'selected':''}>Regular</option><option value="500" ${fw==='500'?'selected':''}>Medium</option><option value="600" ${fw==='600'?'selected':''}>SemiBold</option><option value="700" ${fw==='700'||fw==='bold'?'selected':''}>Bold</option><option value="900" ${fw==='900'?'selected':''}>Black</option></select></div></div><div class="pf-row"><label>Letter Spacing</label>${rrow(-5,30,0.5,ls, `window.edEl('${id}').style.letterSpacing=this.value+'px'`)}</div><div class="pf-row"><label>Line Height</label>${rrow(0.8,4,0.05,parseFloat(lh), `window.edEl('${id}').style.lineHeight=this.value`, '')}</div><div class="pf-row"><label>Alignment</label><div class="pf-3col"><button class="pf-btn" onclick="window.edEl('${id}').style.textAlign='left'">Left</button><button class="pf-btn" onclick="window.edEl('${id}').style.textAlign='center'">Center</button><button class="pf-btn" onclick="window.edEl('${id}').style.textAlign='right'">Right</button></div></div><div class="pf-toggle-row"><span>Uppercase</span><label class="toggle"><input type="checkbox" ${isUC?'checked':''} onchange="window.edEl('${id}').style.textTransform=this.checked?'uppercase':'none'"><span class="slider"></span></label></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text Color</div><div class="pf-row">${cpair(col, `window.edEl('${id}').style.color=this.value`)}</div></div>`;
         }
 
         if (id === 'cover') {
@@ -1057,28 +1110,19 @@ export default function SpotifyPosterBuilder() {
               hw = pc ? Math.round((parseFloat(hwRaw) / pc.offsetWidth) * 100) : 85;
           }
 
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,hw, `document.getElementById('v-vinyl-center').style.width=this.value+'%'; document.getElementById('v-vinyl-center').style.height='auto'`, '%')}</div><div class="pf-row"><label>Spiral Text Color</label>${cpair(tcol, `document.getElementById('v-spiral-text').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,tsz, `document.getElementById('v-spiral-text').setAttribute('font-size', this.value); document.getElementById('vinyl-text-size').value=this.value; window.updateVinylLyrics();`)}</div><div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,ls, `document.getElementById('v-spiral-text').setAttribute('letter-spacing', this.value)`)}</div><div class="pf-row"><label>Center Label Color</label>${cpair(lcol, `document.getElementById('v-vinyl-label').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,lsz, `document.getElementById('v-vinyl-label').setAttribute('r', this.value); document.getElementById('v-vinyl-hole').setAttribute('r', this.value/10); document.getElementById('v-vinyl-groove1').setAttribute('r', this.value*1.1); document.getElementById('v-vinyl-groove2').setAttribute('r', this.value*1.15)`)}</div></div>`;
+          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,hw, `document.getElementById('v-vinyl-center').style.width=this.value+'%'; document.getElementById('v-vinyl-center').style.height='auto'`, '%')}</div><div class="pf-row"><label>Spiral Text Color</label>${cpair(tcol, `document.getElementById('v-spiral-text').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,tsz, `document.getElementById('v-spiral-text').setAttribute('font-size', this.value); document.getElementById('vinyl-text-size').value=this.value; window.updateVinylSpiral();`)}</div><div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,ls, `document.getElementById('v-spiral-text').setAttribute('letter-spacing', this.value)`)}</div><div class="pf-row"><label>Center Label Color</label>${cpair(lcol, `document.getElementById('v-vinyl-label').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,lsz, `document.getElementById('v-vinyl-label').setAttribute('r', this.value); document.getElementById('v-vinyl-hole').setAttribute('r', this.value/10); document.getElementById('v-vinyl-groove1').setAttribute('r', this.value*1.1); document.getElementById('v-vinyl-groove2').setAttribute('r', this.value*1.15)`)}</div></div>`;
         }
 
         return html;
       };
 
       w.edBuildMulti = function() {
-        const fonts = [
-            {name: 'Inter', v: "'Inter', sans-serif"}, {name: 'DM Sans', v: "'DM Sans', sans-serif"},
-            {name: 'Montserrat', v: "'Montserrat', sans-serif"}, {name: 'Poppins', v: "'Poppins', sans-serif"},
-            {name: 'Roboto', v: "'Roboto', sans-serif"}, {name: 'Playfair Display', v: "'Playfair Display', serif"},
-            {name: 'Bebas Neue', v: "'Bebas Neue', sans-serif"}, {name: 'Arial', v: "Arial, sans-serif"},
-            {name: 'Times New Roman', v: "'Times New Roman', serif"}, {name: 'Courier New', v: "'Courier New', monospace"}
-        ];
-        let fontOpts = '<option value="">-- Select Font --</option>';
-        fonts.forEach(f => { fontOpts += `<option value="${f.v}">${f.name}</option>`; });
-
-        function cpairMulti(initColor: string, oninput: string) {
-          return `<div class="pf-color-row"><input type="color" value="${initColor}" oninput="${oninput.replace(/"/g,"'")}; this.nextElementSibling.value=this.value"><input type="text" value="${initColor}" oninput="if(/^#[0-9a-fA-F]{6}$/i.test(this.value)||/^#[0-9a-fA-F]{3}$/i.test(this.value)){${oninput.replace(/"/g,"'")}; this.previousElementSibling.value=this.value}"></div>`;
-        }
-
-        return `<div class="pf-section"><div class="pf-section-title">Align to Canvas</div><div class="pf-2col" style="margin-bottom:6px;"><button class="pf-btn" onclick="window.edAlign('left')">← Left</button><button class="pf-btn" onclick="window.edAlign('right')">Right →</button><button class="pf-btn" onclick="window.edAlign('cx')">↔ Center H</button><button class="pf-btn" onclick="window.edAlign('cy')">↕ Center V</button><button class="pf-btn" onclick="window.edAlign('top')">↑ Top</button><button class="pf-btn" onclick="window.edAlign('bottom')">↓ Bottom</button></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Distribute</div><div class="pf-2col"><button class="pf-btn" onclick="window.edDistribute('h')">↔ Horizontal</button><button class="pf-btn" onclick="window.edDistribute('v')">↕ Vertical</button></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Batch Text Styling</div><div class="pf-row"><label>Font Family</label><select onchange="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.fontFamily=this.value})">${fontOpts}</select></div><div class="pf-row"><label>Text Color</label>${cpairMulti('#ffffff', `window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.color=this.value})`)}</div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Batch Visibility</div><div class="pf-row"><label>Opacity</label><div class="pf-range-row"><input type="range" min="0" max="100" value="100" oninput="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.opacity=this.value/100});this.nextElementSibling.textContent=this.value+'%'"><span class="pf-range-val">100%</span></div></div><div class="pf-row"><div class="pf-2col"><button class="pf-btn" onclick="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.display=''})">Show All</button><button class="pf-btn" onclick="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.display='none'})">Hide All</button></div></div></div>`;
+        const fontOpts = `<option value="'DM Sans', sans-serif">DM Sans</option><option value="'Inter', sans-serif">Inter</option><option value="'Montserrat', sans-serif">Montserrat</option><option value="'Oswald', sans-serif">Oswald</option><option value="'Poppins', sans-serif">Poppins</option><option value="'Playfair Display', serif">Playfair Display</option><option value="'Anton', sans-serif">Anton</option><option value="'Bebas Neue', sans-serif">Bebas Neue</option><option value="'Lora', serif">Lora</option><option value="'Merriweather', serif">Merriweather</option>`;
+        
+        return `<div class="pf-section"><div class="pf-section-title">Align to Canvas</div><div class="pf-2col" style="margin-bottom:6px;"><button class="pf-btn" onclick="window.edAlign('left')">← Left</button><button class="pf-btn" onclick="window.edAlign('right')">Right →</button><button class="pf-btn" onclick="window.edAlign('cx')">↔ Center H</button><button class="pf-btn" onclick="window.edAlign('cy')">↕ Center V</button><button class="pf-btn" onclick="window.edAlign('top')">↑ Top</button><button class="pf-btn" onclick="window.edAlign('bottom')">↓ Bottom</button></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Distribute</div><div class="pf-2col"><button class="pf-btn" onclick="window.edDistribute('h')">↔ Horizontal</button><button class="pf-btn" onclick="window.edDistribute('v')">↕ Vertical</button></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Batch Formatting</div>
+        <div class="pf-row"><label>Font Family (selected texts)</label><select onchange="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.fontFamily=this.value;})"><option value="" disabled selected>Change Font...</option>${fontOpts}</select></div>
+        <div class="pf-row"><label>Color (all selected)</label><div class="pf-color-row"><input type="color" value="#ffffff" oninput="const v=this.value; window.edSel.forEach(id=>{const el=window.edEl(id);if(el){el.style.color=v; el.querySelectorAll('path,circle,rect').forEach(p=>{if(p.getAttribute('fill')!=='none')p.setAttribute('fill',v);});}}); this.nextElementSibling.value=v;" /><input type="text" value="#ffffff" oninput="let v=this.value; if(/^#[0-9a-fA-F]{3}$/i.test(v)){v='#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3];} if(/^#[0-9a-fA-F]{6}$/i.test(v)){this.previousElementSibling.value=v; this.previousElementSibling.dispatchEvent(new Event('input'));}" /></div></div>
+        <div class="pf-row"><label>Opacity</label><div class="pf-range-row"><input type="range" min="0" max="100" value="100" oninput="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.opacity=this.value/100});this.nextElementSibling.textContent=this.value+'%'"><span class="pf-range-val">100%</span></div></div><div class="pf-row"><label>Visibility</label><div class="pf-2col"><button class="pf-btn" onclick="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.display=''})">Show All</button><button class="pf-btn" onclick="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.display='none'})">Hide All</button></div></div></div>`;
       };
 
       // INIT CALLS
@@ -1315,8 +1359,8 @@ export default function SpotifyPosterBuilder() {
   return (
     <div className="spotify-poster-page">
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Poppins:ital,wght@0,100..900;1,100..900&family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
-
+        @import url('https://fonts.googleapis.com/css2?family=Anton&family=Bebas+Neue&family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:wght@100..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Merriweather:ital,wght@0,300..900;1,300..900&family=Montserrat:ital,wght@0,100..900;1,100..900&family=Oswald:wght@200..700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Poppins:ital,wght@0,100..900;1,100..900&display=swap');
+        
         .spotify-poster-page {
           --spotify-green: #1DB954;
           --spotify-black: #121212;
@@ -1451,12 +1495,12 @@ export default function SpotifyPosterBuilder() {
 
         /* VINYL CARD STYLES */
         .spotify-poster-page #vinyl-card { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; }
-        .spotify-poster-page #v-top-left { position: absolute; top: 8%; left: 8%; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700; color: #dedede; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; }
-        .spotify-poster-page #v-top-right { position: absolute; top: 8%; right: 8%; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 800; color: #dedede; letter-spacing: 0.05em; text-transform: uppercase; white-space: nowrap; }
-        .spotify-poster-page #v-song-title { position: absolute; top: 18%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 38px; font-weight: 800; color: #dedede; letter-spacing: -0.02em; text-transform: uppercase; }
-        .spotify-poster-page #v-song-artist { position: absolute; top: 25%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 500; color: #b3b3b3; text-transform: uppercase; }
+        .spotify-poster-page #v-top-left { position: absolute; top: 8%; left: 8%; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700; color: #dedede; letter-spacing: 0.1em; text-transform: uppercase !important; white-space: nowrap; }
+        .spotify-poster-page #v-top-right { position: absolute; top: 8%; right: 8%; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 800; color: #dedede; letter-spacing: 0.05em; text-transform: uppercase !important; white-space: nowrap; }
+        .spotify-poster-page #v-song-title { position: absolute; top: 15%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 38px; font-weight: 800; color: #dedede; letter-spacing: -0.02em; text-transform: uppercase !important; }
+        .spotify-poster-page #v-song-artist { position: absolute; top: 22%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 500; color: #b3b3b3; text-transform: uppercase !important; }
         .spotify-poster-page #v-vinyl-center { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); width: 85%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
-        .spotify-poster-page #v-bottom-text { position: absolute; bottom: 8%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 400; color: #b3b3b3; text-transform: uppercase; }
+        .spotify-poster-page #v-bottom-text { position: absolute; bottom: 8%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 400; color: #b3b3b3; text-transform: uppercase !important; }
 
         /* ===== ACCORDION ===== */
         .spotify-poster-page .accordion-btn { width: 100%; background: none; border: none; color: var(--spotify-subtext); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; text-align: left; padding: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); font-family: 'DM Sans', sans-serif; transition: color 0.15s; }
@@ -1628,13 +1672,6 @@ export default function SpotifyPosterBuilder() {
                 <label>Text</label>
                 <input type="text" id="label-top-input" defaultValue="Now Playing" onInput={(e: any) => document.getElementById('label-top')!.textContent = e.target.value} />
               </div>
-              <div className="form-row">
-                <label>Text Color</label>
-                <div className="color-row">
-                  <input type="color" id="c-s-tl" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).updateTextColor('label-top', e.target.value); (window as any).syncColor('c-s-tl', 'c-s-tl-t'); }} />
-                  <input type="text" id="c-s-tl-t" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).syncColor('c-s-tl', 'c-s-tl-t'); (window as any).updateTextColor('label-top', document.getElementById('c-s-tl-t')!.value); }} />
-                </div>
-              </div>
             </div>
 
             <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🎵 Song Title & Artist<span className="arrow">▼</span></button>
@@ -1644,22 +1681,8 @@ export default function SpotifyPosterBuilder() {
                 <input type="text" id="song-title-input" defaultValue="Song Title" onInput={(e: any) => document.getElementById('song-title')!.textContent = e.target.value} />
               </div>
               <div className="form-row">
-                <label>Song Title Color</label>
-                <div className="color-row">
-                  <input type="color" id="c-s-st" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).updateTextColor('song-title', e.target.value); (window as any).syncColor('c-s-st', 'c-s-st-t'); }} />
-                  <input type="text" id="c-s-st-t" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).syncColor('c-s-st', 'c-s-st-t'); (window as any).updateTextColor('song-title', document.getElementById('c-s-st-t')!.value); }} />
-                </div>
-              </div>
-              <div className="form-row" style={{ marginTop: '12px' }}>
                 <label>Artist Name Text</label>
                 <input type="text" id="song-artist-input" defaultValue="Artist Name" onInput={(e: any) => document.getElementById('song-artist')!.textContent = e.target.value} />
-              </div>
-              <div className="form-row">
-                <label>Artist Name Color</label>
-                <div className="color-row">
-                  <input type="color" id="c-s-sa" defaultValue="#B3B3B3" onInput={(e:any) => { (window as any).updateTextColor('song-artist', e.target.value); (window as any).syncColor('c-s-sa', 'c-s-sa-t'); }} />
-                  <input type="text" id="c-s-sa-t" defaultValue="#B3B3B3" onInput={(e:any) => { (window as any).syncColor('c-s-sa', 'c-s-sa-t'); (window as any).updateTextColor('song-artist', document.getElementById('c-s-sa-t')!.value); }} />
-                </div>
               </div>
             </div>
 
@@ -1751,36 +1774,13 @@ export default function SpotifyPosterBuilder() {
                     <label>Record Label (Top Left) Text</label>
                     <input type="text" id="v-label-input" defaultValue="RECORD LABEL" onInput={(e: any) => document.getElementById('v-top-left')!.textContent = e.target.value} />
                 </div>
-                <div className="form-row">
-                    <label>Record Label Color</label>
-                    <div className="color-row">
-                        <input type="color" id="c-v-tl" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).updateTextColor('v-top-left', e.target.value); (window as any).syncColor('c-v-tl', 'c-v-tl-t'); }} />
-                        <input type="text" id="c-v-tl-t" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).syncColor('c-v-tl', 'c-v-tl-t'); (window as any).updateTextColor('v-top-left', document.getElementById('c-v-tl-t')!.value); }} />
-                    </div>
-                </div>
-
                 <div className="form-row" style={{ marginTop: '12px' }}>
                     <label>Year (Top Right) Text</label>
                     <input type="text" id="v-year-input" defaultValue="1992" onInput={(e: any) => document.getElementById('v-top-right')!.textContent = e.target.value} />
                 </div>
-                <div className="form-row">
-                    <label>Year Color</label>
-                    <div className="color-row">
-                        <input type="color" id="c-v-tr" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).updateTextColor('v-top-right', e.target.value); (window as any).syncColor('c-v-tr', 'c-v-tr-t'); }} />
-                        <input type="text" id="c-v-tr-t" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).syncColor('c-v-tr', 'c-v-tr-t'); (window as any).updateTextColor('v-top-right', document.getElementById('c-v-tr-t')!.value); }} />
-                    </div>
-                </div>
-
                 <div className="form-row" style={{ marginTop: '12px' }}>
                     <label>Bottom Text (Album Name / Optional)</label>
                     <input type="text" id="v-bottom-input" defaultValue="Your Text (Optional)" onInput={(e: any) => document.getElementById('v-bottom-text')!.textContent = e.target.value} />
-                </div>
-                <div className="form-row">
-                    <label>Bottom Text Color</label>
-                    <div className="color-row">
-                        <input type="color" id="c-v-bot" defaultValue="#b3b3b3" onInput={(e:any)=>{ (window as any).updateTextColor('v-bottom-text', e.target.value); (window as any).syncColor('c-v-bot', 'c-v-bot-t'); }} />
-                        <input type="text" id="c-v-bot-t" defaultValue="#b3b3b3" onInput={(e:any)=>{ (window as any).syncColor('c-v-bot', 'c-v-bot-t'); (window as any).updateTextColor('v-bottom-text', document.getElementById('c-v-bot-t')!.value); }} />
-                    </div>
                 </div>
             </div>
 
@@ -1790,46 +1790,24 @@ export default function SpotifyPosterBuilder() {
                     <label>Song Title Text</label>
                     <input type="text" id="v-song-title-input" defaultValue="Song Name" onInput={(e: any) => document.getElementById('v-song-title')!.textContent = e.target.value} />
                 </div>
-                <div className="form-row">
-                    <label>Song Title Color</label>
-                    <div className="color-row">
-                        <input type="color" id="c-v-st" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).updateTextColor('v-song-title', e.target.value); (window as any).syncColor('c-v-st', 'c-v-st-t'); }} />
-                        <input type="text" id="c-v-st-t" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).syncColor('c-v-st', 'c-v-st-t'); (window as any).updateTextColor('v-song-title', document.getElementById('c-v-st-t')!.value); }} />
-                    </div>
-                </div>
-
                 <div className="form-row" style={{ marginTop: '12px' }}>
                     <label>Artist Name Text</label>
                     <input type="text" id="v-song-artist-input" defaultValue="Artist Name" onInput={(e: any) => document.getElementById('v-song-artist')!.textContent = e.target.value} />
-                </div>
-                <div className="form-row">
-                    <label>Artist Name Color</label>
-                    <div className="color-row">
-                        <input type="color" id="c-v-sa" defaultValue="#b3b3b3" onInput={(e:any)=>{ (window as any).updateTextColor('v-song-artist', e.target.value); (window as any).syncColor('c-v-sa', 'c-v-sa-t'); }} />
-                        <input type="text" id="c-v-sa-t" defaultValue="#b3b3b3" onInput={(e:any)=>{ (window as any).syncColor('c-v-sa', 'c-v-sa-t'); (window as any).updateTextColor('v-song-artist', document.getElementById('c-v-sa-t')!.value); }} />
-                    </div>
                 </div>
             </div>
 
             <button className="accordion-btn open" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>💿 Vinyl Record & Lyrics<span className="arrow">▼</span></button>
             <div className="accordion-content open">
                 <div className="form-row">
-                    <label>Spiral Loops (Tightness)</label>
-                    <div className="range-row">
-                        <input type="range" id="vinyl-loops" min="5" max="30" defaultValue="16" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value; (window as any).updateVinylSpiral(); }} />
-                        <span className="range-val">16</span>
-                    </div>
-                </div>
-                <div className="form-row">
                     <label>Spiral Text Size</label>
                     <div className="range-row">
-                        <input type="range" id="vinyl-text-size" min="6" max="30" defaultValue="12" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value+'px'; document.getElementById('v-spiral-text')?.setAttribute('font-size', e.target.value); (window as any).updateVinylLyrics(); }} />
+                        <input type="range" id="vinyl-text-size" min="6" max="40" defaultValue="12" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value+'px'; document.getElementById('v-spiral-text')?.setAttribute('font-size', e.target.value); (window as any).updateVinylSpiral(); }} />
                         <span className="range-val">12px</span>
                     </div>
                 </div>
                 <div className="form-row">
                     <label>Lyrics / Text Content</label>
-                    <textarea id="vinyl-lyrics-input" defaultValue="LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA" onInput={() => (window as any).updateVinylLyrics()}></textarea>
+                    <textarea id="vinyl-lyrics-input" defaultValue="LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA" onInput={() => (window as any).updateVinylSpiral()}></textarea>
                     <p style={{fontSize:'10px', color:'#777', marginTop:'4px'}}>Arama yaptığınızda sözler otomatik olarak çekilmeye çalışılır. Çekilemezse buraya manuel yapıştırabilirsiniz.</p>
                 </div>
             </div>
@@ -1840,7 +1818,7 @@ export default function SpotifyPosterBuilder() {
                   <label>Background Color</label>
                   <div className="color-row">
                     <input type="color" id="v-bg-color" defaultValue="#1f1f1f" onInput={() => (window as any).updateBgColor()} />
-                    <input type="text" id="v-bg-color-txt" defaultValue="#1f1f1f" onInput={(e:any) => { (window as any).syncColor('v-bg-color', 'v-bg-color-txt'); (window as any).updateBgColor(); }} />
+                    <input type="text" id="v-bg-color-txt" defaultValue="#1f1f1f" onInput={() => { (window as any).syncColor('v-bg-color', 'v-bg-color-txt'); (window as any).updateBgColor(); }} />
                   </div>
                 </div>
             </div>
@@ -1970,8 +1948,8 @@ export default function SpotifyPosterBuilder() {
                             <circle id="v-vinyl-groove1" cx="400" cy="400" r="88" fill="none" stroke="#2a2a2a" strokeWidth="1" />
                             <circle id="v-vinyl-groove2" cx="400" cy="400" r="92" fill="none" stroke="#2a2a2a" strokeWidth="1" />
                             
-                            <text fill="#b3b3b3" fontSize="12" letterSpacing="2" fontFamily="'DM Sans', sans-serif" fontWeight="700">
-                                <textPath href="#v-spiral-path" id="v-spiral-text" startOffset="0%">
+                            <text fill="#b3b3b3" fontSize="12" letterSpacing="2" fontFamily="'DM Sans', sans-serif" fontWeight="700" textAnchor="middle">
+                                <textPath href="#v-spiral-path" id="v-spiral-text" startOffset="50%">
                                     LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA
                                 </textPath>
                             </text>
