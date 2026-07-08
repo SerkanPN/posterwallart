@@ -49,33 +49,19 @@ export default function SpotifyPosterBuilder() {
         '68x80': [68,80], '88x104': [88,104]
       };
 
-      w.ED_LABELS = {
-        'label-top':  'Top Label', 'cover': 'Cover Art', 'song-info': 'Song Info Group',
-        'song-title': 'Song Title', 'song-artist':'Artist Name', 'heart': 'Heart Icon',
-        'progress': 'Progress Bar', 'play': 'Play Button', 'btn-shuffle':'Shuffle Button',
-        'btn-prev': 'Previous Button', 'btn-next': 'Next Button', 'btn-repeat': 'Repeat Button',
-        'barcode': 'Spotify Barcode',
-        'v-top-left': 'Artist Name', 'v-top-right': 'Year',
-        'v-song-title': 'Vinyl Song Title', 'v-song-artist': 'Vinyl Artist Name',
-        'v-vinyl': 'Vinyl Record Graphic', 'v-bottom': 'Bottom Text'
-      };
-
       // ──────────────────────────────────────────────────────────
-      // FABRIC.JS INITIALIZATION
+      // FABRIC.JS ENGINE INITIALIZATION
       // ──────────────────────────────────────────────────────────
-      const canvasEl = document.getElementById('poster-canvas') as HTMLCanvasElement;
-      w.canvas = new w.fabric.Canvas(canvasEl, { preserveObjectStacking: true, selection: true });
-      w.fabric.Object.prototype.set({ transparentCorners: false, cornerColor: '#1DB954', borderColor: '#1DB954', cornerSize: 8 });
+      w.canvas = new w.fabric.Canvas('poster-canvas', { preserveObjectStacking: true, selection: true });
+      w.fabric.Object.prototype.set({ transparentCorners: false, cornerColor: '#1DB954', borderColor: '#1DB954', cornerSize: 10 });
 
-      // Scale to fit the visual area while keeping aspect ratio
       w.updateCanvasSize = function() {
         const selectEl = document.getElementById('canvas-size') as HTMLSelectElement;
         if(!selectEl) return;
         const key = selectEl.value;
         const[w_in, h_in] = w.CANVAS_SIZES[key];
         
-        // Base logical resolution
-        const targetW = Math.round(w_in * 100); 
+        const targetW = Math.round(w_in * 100);
         const targetH = Math.round(h_in * 100);
 
         const area = document.getElementById('canvas-area');
@@ -99,19 +85,19 @@ export default function SpotifyPosterBuilder() {
             container.style.height = visualH + 'px';
         }
 
-        w.canvas.setWidth(targetW);
-        w.canvas.setHeight(targetH);
-        w.canvas.setZoom(visualW / targetW);
-        
-        // Update the CSS to fit the container
-        const lowerCanvas = document.querySelector('.canvas-container') as HTMLElement;
-        if (lowerCanvas) {
-            lowerCanvas.style.width = visualW + 'px';
-            lowerCanvas.style.height = visualH + 'px';
+        if (w.canvas) {
+            w.canvas.setWidth(targetW);
+            w.canvas.setHeight(targetH);
+            w.canvas.setZoom(visualW / targetW);
+            const lowerCanvas = document.querySelector('.canvas-container') as HTMLElement;
+            if(lowerCanvas) {
+                lowerCanvas.style.width = visualW + 'px';
+                lowerCanvas.style.height = visualH + 'px';
+            }
+            
+            if (w.POSTER_MODE === 'vinyl' && w.canvas.getObjects().length === 0) w.renderVinylFabric();
+            else if (w.POSTER_MODE === 'spotify' && w.canvas.getObjects().length === 0) w.renderSpotifyFabric();
         }
-
-        if (w.POSTER_MODE === 'vinyl' && w.canvas.getObjects().length === 0) w.renderVinylFabric();
-        else if (w.POSTER_MODE === 'spotify' && w.canvas.getObjects().length === 0) w.renderSpotifyFabric();
       };
 
       window.addEventListener('resize', w.updateCanvasSize);
@@ -121,20 +107,352 @@ export default function SpotifyPosterBuilder() {
         if(!toast) return;
         toast.textContent = msg;
         toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3500);
+        setTimeout(() => toast.classList.remove('show'), 3000);
       };
 
       // ──────────────────────────────────────────────────────────
-      // PROPERTIES EDITOR PANEL (FABRIC INTEGRATION)
+      // CORE: UI INPUT -> FABRIC OBJECT SYNCHRONIZATION
+      // ──────────────────────────────────────────────────────────
+      w.updateFabObj = function(id: string, prop: string, val: any) {
+          let obj = w.canvas.getObjects().find((o: any) => o.id === id);
+          if (obj) { 
+              obj.set(prop, val); 
+              w.canvas.requestRenderAll(); 
+              w.edUpdatePanelPos();
+          }
+      };
+
+      w.syncColor = function(colorId: string, textId: string) {
+        const txtEl = document.getElementById(textId) as HTMLInputElement;
+        const colEl = document.getElementById(colorId) as HTMLInputElement;
+        if(!txtEl || !colEl) return;
+        let txt = txtEl.value.trim();
+        if (/^#[0-9A-Fa-f]{3}$/.test(txt)) { txt = '#' + txt[1]+txt[1] + txt[2]+txt[2] + txt[3]+txt[3]; }
+        if (/^#[0-9A-Fa-f]{6}$/.test(txt)) {
+          colEl.value = txt;
+          colEl.dispatchEvent(new Event('input', { bubbles: true }));
+        }
+      };
+
+      // ──────────────────────────────────────────────────────────
+      // DATA FETCHING & API (ITUNES & LYRICS)
+      // ──────────────────────────────────────────────────────────
+      w.currentCoverSrc = '';
+      w.currentTrackUri = 'spotify:track:4uLU6hMCjMI75M1A2tKUQC';
+
+      w.searchSong = async function() {
+        const q = (document.getElementById('search-input') as HTMLInputElement).value.trim();
+        if (!q) return;
+
+        const spinner = document.getElementById('search-spinner');
+        const results = document.getElementById('search-results');
+        if(spinner) spinner.style.display = 'block';
+        if(results) results.style.display = 'none';
+
+        try {
+          const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6`);
+          const data = await res.json();
+          if(spinner) spinner.style.display = 'none';
+
+          if (!data.results || data.results.length === 0) {
+            w.showToast('Sonuç bulunamadı');
+            return;
+          }
+
+          if(results) {
+              results.innerHTML = '';
+              data.results.forEach((item: any) => {
+                const div = document.createElement('div');
+                div.className = 'search-result-item';
+                div.innerHTML = `
+                  <img src="${item.artworkUrl100}" alt="">
+                  <div class="result-info">
+                    <p>${item.trackName}</p>
+                    <span>${item.artistName}</span>
+                  </div>`;
+                div.onclick = () => {
+                  w.applySearchResult(item);
+                  results.style.display = 'none';
+                };
+                results.appendChild(div);
+              });
+              results.style.display = 'block';
+          }
+        } catch(e: any) {
+          if(spinner) spinner.style.display = 'none';
+          w.showToast('Arama hatası: ' + e.message);
+        }
+      };
+
+      w.fetchLyrics = async function(artist: string, title: string) {
+          try {
+              let a = encodeURIComponent(artist.split(',')[0].trim());
+              let t = encodeURIComponent(title.replace(/\(.*\)/g, '').trim());
+              let res = await fetch(`https://api.lyrics.ovh/v1/${a}/${t}`);
+              if (res.ok) { let data = await res.json(); if (data.lyrics) return data.lyrics.replace(/\n/g, ' • ').replace(/\r/g, '').toUpperCase(); }
+          } catch(e) {}
+          return null;
+      };
+
+      w.applySearchResult = async function(item: any) {
+        w.currentCoverSrc = item.artworkUrl100.replace('100x100bb', '600x600bb');
+        
+        if(w.POSTER_MODE === 'spotify') {
+            const tinp = document.getElementById('song-title-input') as HTMLInputElement;
+            const ainp = document.getElementById('song-artist-input') as HTMLInputElement;
+            if(tinp) { tinp.value = item.trackName; w.updateFabObj('song-title', 'text', item.trackName); }
+            if(ainp) { ainp.value = item.artistName; w.updateFabObj('song-artist', 'text', item.artistName); }
+
+            if (item.trackTimeMillis) {
+              const totalSecs = item.trackTimeMillis / 1000;
+              const m = Math.floor(totalSecs / 60); const s = Math.floor(totalSecs % 60);
+              const endStr = `${m}:${s < 10 ? '0' : ''}${s}`;
+              const tend = document.getElementById('time-end') as HTMLInputElement;
+              if(tend) tend.value = endStr;
+              w.updateFabObj('time-end-el', 'text', endStr);
+            }
+            w.renderSpotifyFabric();
+            w.showToast('✓ ' + item.trackName + ' yüklendi');
+        } 
+        else if (w.POSTER_MODE === 'vinyl') {
+            const tinp = document.getElementById('v-song-title-input') as HTMLInputElement;
+            if(tinp) { tinp.value = item.trackName.toUpperCase(); }
+            
+            const year = new Date(item.releaseDate).getFullYear() || "1992";
+            const yearInp = document.getElementById('v-year-input') as HTMLInputElement;
+            if(yearInp) { yearInp.value = year.toString(); }
+
+            const album = item.collectionName ? item.collectionName.toUpperCase() : "UNKNOWN ALBUM";
+            const bottomInp = document.getElementById('v-bottom-input') as HTMLInputElement;
+            if (bottomInp) { bottomInp.value = album; }
+
+            let artistLabel = item.artistName || 'ARTIST NAME';
+            const labelInp = document.getElementById('v-label-input') as HTMLInputElement;
+            if (labelInp) { labelInp.value = artistLabel.toUpperCase(); }
+
+            w.showToast('Sözler aranıyor...');
+            let lyrics = await w.fetchLyrics(item.artistName, item.trackName);
+            const linp = document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement;
+            if(lyrics) {
+                if(linp) linp.value = lyrics;
+                w.showToast('✓ Sözler ve şarkı yüklendi');
+            } else {
+                if(linp) linp.value = "LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA";
+                w.showToast('Sözler bulunamadı, varsayılan metin eklendi');
+            }
+            w.renderVinylFabric(); 
+        }
+      };
+
+      // ──────────────────────────────────────────────────────────
+      // SPOTIFY FABRIC RENDER ENGINE
+      // ──────────────────────────────────────────────────────────
+      w.renderSpotifyFabric = function() {
+          w.canvas.clear();
+          const W = w.canvas.getWidth();
+          const H = w.canvas.getHeight();
+          const S = W / 2400; 
+          
+          w.canvas.setBackgroundColor((document.getElementById('bg-color') as HTMLInputElement).value || '#121212', w.canvas.renderAll.bind(w.canvas));
+
+          const cardW = W * 0.714;
+          const cardX = (W - cardW) / 2;
+          let currentY = H * (parseFloat((document.getElementById('content-y') as HTMLInputElement).value || "50") / 100);
+          
+          const itemSpacing = 30 * S;
+          let totalHeight = (40*S) + itemSpacing + cardW + itemSpacing + (75*S) + (45*S) + itemSpacing + (12*S) + itemSpacing + (35*S) + (60*S);
+          let startY = currentY - (totalHeight / 2);
+
+          let lblText = (document.getElementById('label-top-input') as HTMLInputElement).value || "NOW PLAYING";
+          let lblColor = (document.getElementById('c-s-tl') as HTMLInputElement).value || "#FFFFFF";
+          let lbl = new w.fabric.IText(lblText, { id: 'label-top', left: W/2, top: startY, fontSize: 36*S, fontFamily: 'DM Sans', fontWeight: 700, fill: lblColor, originX: 'center', charSpacing: 150, textTransform: 'uppercase' });
+          w.canvas.add(lbl);
+          startY += lbl.height + itemSpacing;
+
+          let coverBg = new w.fabric.Rect({ id: 'cover-bg', left: cardX, top: startY, width: cardW, height: cardW, fill: '#282828', rx: 12*S, ry: 12*S, shadow: new w.fabric.Shadow({ color: 'rgba(0,0,0,0.6)', blur: 40*S, offsetY: 20*S }) });
+          w.canvas.add(coverBg);
+          
+          if (w.currentCoverSrc) {
+              w.fabric.Image.fromURL(w.currentCoverSrc, function(img: any) {
+                  img.scaleToWidth(cardW);
+                  img.set({ id: 'cover-img', left: cardX, top: coverBg.top, clipPath: new w.fabric.Rect({ width: cardW, height: cardW, rx: 12*S, ry: 12*S, originX: 'center', originY: 'center' }) });
+                  w.canvas.add(img); w.canvas.requestRenderAll();
+              }, { crossOrigin: 'anonymous' });
+          }
+          startY += cardW + itemSpacing + (20*S);
+
+          let stText = (document.getElementById('song-title-input') as HTMLInputElement).value || "Song Title";
+          let stCol = (document.getElementById('c-s-st') as HTMLInputElement).value || "#FFFFFF";
+          let title = new w.fabric.IText(stText, { id: 'song-title', left: cardX, top: startY, fontSize: 75*S, fontFamily: 'DM Sans', fontWeight: 700, fill: stCol });
+          w.canvas.add(title);
+          
+          let saText = (document.getElementById('song-artist-input') as HTMLInputElement).value || "Artist Name";
+          let saCol = (document.getElementById('c-s-sa') as HTMLInputElement).value || "#B3B3B3";
+          let artist = new w.fabric.IText(saText, { id: 'song-artist', left: cardX, top: startY + 80*S, fontSize: 45*S, fontFamily: 'DM Sans', fontWeight: 400, fill: saCol });
+          w.canvas.add(artist);
+
+          startY += 180*S;
+
+          let track = new w.fabric.Rect({ id: 'progress-track', left: cardX, top: startY, width: cardW, height: 12*S, fill: '#535353', rx: 6*S, ry: 6*S });
+          let pct = parseFloat((document.getElementById('progress-val') as HTMLInputElement).value) || 35;
+          let fill = new w.fabric.Rect({ id: 'progress-fill', left: cardX, top: startY, width: cardW * (pct / 100), height: 12*S, fill: '#FFFFFF', rx: 6*S, ry: 6*S });
+          w.canvas.add(track, fill);
+          
+          let tsText = (document.getElementById('time-start') as HTMLInputElement).value || "1:12";
+          let timeStart = new w.fabric.IText(tsText, { id: 'time-start-el', left: cardX, top: startY + 30*S, fontSize: 32*S, fontFamily: 'DM Sans', fill: '#B3B3B3' });
+          let teText = (document.getElementById('time-end') as HTMLInputElement).value || "3:45";
+          let timeEnd = new w.fabric.IText(teText, { id: 'time-end-el', left: cardX + cardW, top: startY + 30*S, fontSize: 32*S, fontFamily: 'DM Sans', fill: '#B3B3B3', originX: 'right' });
+          w.canvas.add(timeStart, timeEnd);
+
+          startY += 100*S;
+
+          const ctrlSvg = `<svg viewBox="0 0 500 80" xmlns="http://www.w3.org/2000/svg"><path d="M10,30 L30,15 V45 Z" fill="#b3b3b3"/><path d="M30,30 L50,15 V45 Z" fill="#b3b3b3"/><path d="M120,40 L160,20 V60 Z" fill="#b3b3b3"/><rect x="110" y="20" width="8" height="40" fill="#b3b3b3"/><circle cx="250" cy="40" r="40" fill="#fff"/><polygon points="235,20 275,40 235,60" fill="#000"/><path d="M340,20 L380,40 L340,60 Z" fill="#b3b3b3"/><rect x="382" y="20" width="8" height="40" fill="#b3b3b3"/><path d="M450,15 L470,30 L450,45 Z" fill="#b3b3b3"/><path d="M470,15 L490,30 L470,45 Z" fill="#b3b3b3"/></svg>`;
+          w.fabric.loadSVGFromString(ctrlSvg, (objs:any, opts:any) => {
+              let ctrl = w.fabric.util.groupSVGElements(objs, opts);
+              ctrl.scaleToWidth(cardW * 0.9);
+              ctrl.set({ left: W/2, top: startY, originX: 'center', id: 'controls-row' });
+              w.canvas.add(ctrl);
+              w.canvas.requestRenderAll();
+          });
+      };
+
+      // ──────────────────────────────────────────────────────────
+      // VINYL FABRIC RENDER ENGINE
+      // ──────────────────────────────────────────────────────────
+      w.renderVinylFabric = function() {
+          w.canvas.clear();
+          const W = w.canvas.getWidth();
+          const H = w.canvas.getHeight();
+          const S = W / 2400; 
+
+          w.canvas.setBackgroundColor((document.getElementById('v-bg-color') as HTMLInputElement).value || '#f5f5f5', w.canvas.renderAll.bind(w.canvas));
+
+          const tlText = (document.getElementById('v-label-input') as HTMLInputElement).value || "ARTIST NAME";
+          const tl = new w.fabric.IText(tlText, { id: 'v-top-left', left: W * 0.08, top: H * 0.08, fontSize: 50 * S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-v-tl') as HTMLInputElement).value || '#212121', originX: 'left', originY: 'top', charSpacing: 100 });
+          
+          const trText = (document.getElementById('v-year-input') as HTMLInputElement).value || "1992";
+          const tr = new w.fabric.IText(trText, { id: 'v-top-right', left: W * 0.92, top: H * 0.08, fontSize: 50 * S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-v-tr') as HTMLInputElement).value || '#212121', originX: 'right', originY: 'top', charSpacing: 100 });
+
+          const stText = (document.getElementById('v-song-title-input') as HTMLInputElement).value || "SONG NAME";
+          const st = new w.fabric.IText(stText, { id: 'v-song-title', left: W / 2, top: H * 0.12, fontSize: 130 * S, fontFamily: 'Josefin Sans', fontWeight: 800, fill: (document.getElementById('c-v-st') as HTMLInputElement).value || '#212121', originX: 'center', originY: 'top', charSpacing: 40, textAlign: 'center' });
+
+          const botText = (document.getElementById('v-bottom-input') as HTMLInputElement).value || "UNKNOWN ALBUM";
+          const bot = new w.fabric.IText(botText, { id: 'v-bottom-text', left: W / 2, top: H * 0.92, fontSize: 46 * S, fontFamily: 'DM Sans', fontWeight: 600, fill: (document.getElementById('c-v-bot') as HTMLInputElement).value || '#555555', originX: 'center', originY: 'bottom', charSpacing: 50, textAlign: 'center' });
+
+          w.canvas.add(tl, tr, st, bot);
+          w.updateVinylSpiralFabric();
+      };
+
+      w.updateVinylSpiralFabric = function() {
+          if(w.POSTER_MODE !== 'vinyl') return;
+          let existing = w.canvas.getObjects().find((o:any) => o.id === 'v-vinyl-group');
+          if (existing) w.canvas.remove(existing);
+
+          const W = w.canvas.getWidth();
+          const H = w.canvas.getHeight();
+          
+          const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
+          const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
+          
+          const textLen = input.length * (fs * 0.6); 
+          const minR = 100;
+          const spacing = fs * 1.2;
+          
+          let maxR = Math.sqrt((textLen * spacing / Math.PI) + (minR * minR));
+          if (maxR < 380) maxR = 380;
+          let loops = (maxR - minR) / spacing;
+          
+          let svgSize = 800;
+          let cx = 400, cy = 400;
+          if (maxR > 380) { svgSize = (maxR + 30) * 2; cx = svgSize / 2; cy = svgSize / 2; }
+
+          let points = [];
+          let steps = Math.ceil(loops * 100);
+          for(let i=0; i<=steps; i++) {
+              let t = -Math.PI/2 + (i/steps) * loops * Math.PI * 2;
+              let r = minR + ((maxR - minR) * (i/steps));
+              let x = cx + r * Math.cos(t);
+              let y = cy + r * Math.sin(t);
+              if(i===0) points.push(`M ${x} ${y}`);
+              else points.push(`L ${x} ${y}`);
+          }
+          const pathData = points.join(' ');
+
+          let finalStr = input.trim();
+          const standardLen = Math.PI * (380 + minR) * (380 - minR) / spacing;
+          if (textLen < standardLen) {
+             let repeats = Math.ceil(standardLen / (textLen + 20));
+             let arr = []; for(let k=0; k<repeats; k++) arr.push(finalStr);
+             finalStr = arr.join(' • ');
+          }
+          finalStr = finalStr.toUpperCase();
+
+          const bgHex = (document.getElementById('v-bg-color') as HTMLInputElement).value || '#f5f5f5';
+          let isDark = false;
+          try {
+              let hex = bgHex.replace('#', '');
+              if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+              const rVal = parseInt(hex.substr(0,2), 16);
+              const gVal = parseInt(hex.substr(2,2), 16);
+              const bVal = parseInt(hex.substr(4,2), 16);
+              const yiq = ((rVal * 299) + (gVal * 587) + (bVal * 114)) / 1000;
+              isDark = yiq < 128;
+          } catch(e){}
+
+          const spiralColor = isDark ? '#ffffff' : '#212121';
+          const labelColor = isDark ? '#eeeeee' : '#e0e0e0';
+          const holeColor = isDark ? '#111111' : '#111111';
+
+          const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize}" height="${svgSize}">
+              <defs><path id="spiral" d="${pathData}" fill="none" /></defs>
+              <circle cx="${cx}" cy="${cy}" r="${maxR+15}" fill="none" />
+              <circle cx="${cx}" cy="${cy}" r="88" fill="none" stroke="#2a2a2a" stroke-width="1" />
+              <circle cx="${cx}" cy="${cy}" r="92" fill="none" stroke="#2a2a2a" stroke-width="1" />
+              <text fill="${spiralColor}" font-size="${fs}" letter-spacing="2" font-family="DM Sans" font-weight="700" text-anchor="start">
+                  <textPath href="#spiral" startOffset="0%">${finalStr}</textPath>
+              </text>
+              <circle cx="${cx}" cy="${cy}" r="80" fill="${labelColor}" />
+              <circle cx="${cx}" cy="${cy}" r="8" fill="${holeColor}" />
+          </svg>`;
+
+          w.fabric.loadSVGFromString(svgString, function(objects:any, options:any) {
+              const obj = w.fabric.util.groupSVGElements(objects, options);
+              obj.set({ id: 'v-vinyl-group', originX: 'center', originY: 'center', left: W / 2, top: H * 0.55 });
+              obj.scaleToWidth(W * 0.85);
+              w.canvas.add(obj); w.canvas.sendToBack(obj); w.canvas.requestRenderAll();
+          });
+      };
+
+      w.applyAutoContrast = function(bgHex: string) {
+          if (w.POSTER_MODE !== 'vinyl') return;
+          let hex = bgHex.replace('#', '');
+          if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+          const r = parseInt(hex.substr(0,2), 16) || 255;
+          const g = parseInt(hex.substr(2,2), 16) || 255;
+          const b = parseInt(hex.substr(4,2), 16) || 255;
+          const yiq = ((r * 299) + (g * 587) + (b * 114)) / 1000;
+          const isDark = yiq < 128; 
+
+          const mainTextCol = isDark ? '#ffffff' : '#212121';
+          const subTextCol  = isDark ? '#cccccc' : '#555555';
+          
+          w.updateFabObj('v-top-left', 'fill', mainTextCol);
+          w.updateFabObj('v-top-right', 'fill', mainTextCol);
+          w.updateFabObj('v-song-title', 'fill', mainTextCol);
+          w.updateFabObj('v-bottom-text', 'fill', subTextCol);
+          w.updateVinylSpiralFabric(); 
+      };
+
+      // ──────────────────────────────────────────────────────────
+      // RIGHT PANEL EDITOR (DIRECT FABRIC CONTROL)
       // ──────────────────────────────────────────────────────────
       w.edSel = [];
-
-      w.canvas.on('selection:created', function(e: any) { w.handleSelection(e); });
-      w.canvas.on('selection:updated', function(e: any) { w.handleSelection(e); });
+      w.canvas.on('selection:created', function() { w.handleSelection(); });
+      w.canvas.on('selection:updated', function() { w.handleSelection(); });
       w.canvas.on('selection:cleared', function() { w.edSel = []; w.edUpdatePanel(); w.edUpdateAlignBar(); });
       w.canvas.on('object:modified', function() { w.edUpdatePanelPos(); });
 
-      w.handleSelection = function(e: any) {
+      w.handleSelection = function() {
           const selected = w.canvas.getActiveObjects();
           w.edSel = selected.map((o: any) => o.id || 'unknown');
           w.edUpdatePanel();
@@ -166,7 +484,7 @@ export default function SpotifyPosterBuilder() {
           return;
         }
 
-        if(nameEl) nameEl.textContent = w.ED_LABELS[activeObj.id] || activeObj.id || 'Object';
+        if(nameEl) nameEl.textContent = activeObj.id ? activeObj.id.replace(/-/g, ' ').toUpperCase() : 'OBJECT';
         if(fields) fields.innerHTML = w.edBuildSingle(activeObj);
       };
 
@@ -177,17 +495,12 @@ export default function SpotifyPosterBuilder() {
         const yi = document.getElementById('epy') as HTMLInputElement; if (yi) yi.value = Math.round(obj.top).toString();
       };
 
-      // Bu fonksiyon paneldeki inputlardan gelen verileri seçili Fabric objesine uygular
       w.applyToActiveObject = function(prop: string, val: any) {
           const obj = w.canvas.getActiveObject();
           if (!obj) return;
 
           const applyChange = (o: any) => {
-              if (prop === 'shadow') {
-                  // Ignore for now or implement shadow
-              } else if (prop === 'rx') {
-                  o.set('rx', parseFloat(val)); o.set('ry', parseFloat(val));
-              } else if (['left', 'top', 'width', 'height', 'fontSize', 'charSpacing', 'lineHeight', 'opacity', 'strokeWidth'].includes(prop)) {
+              if (['left', 'top', 'width', 'height', 'fontSize', 'charSpacing', 'lineHeight', 'opacity', 'strokeWidth'].includes(prop)) {
                   o.set(prop, parseFloat(val));
               } else if (prop === 'text' && (o.type === 'i-text' || o.type === 'textbox')) {
                   o.set('text', val);
@@ -197,7 +510,6 @@ export default function SpotifyPosterBuilder() {
               
               if(prop === 'fontFamily' && (o.type === 'i-text' || o.type === 'textbox')) {
                   const cleanedFont = val.replace(/'/g, '').split(',')[0];
-                  // Yükleme kontrolü
                   (document as any).fonts.load(`1em ${cleanedFont}`).then(() => {
                       o.set('fontFamily', cleanedFont);
                       w.canvas.requestRenderAll();
@@ -205,25 +517,10 @@ export default function SpotifyPosterBuilder() {
               }
           };
 
-          if (obj.type === 'activeSelection') {
-              obj.getObjects().forEach(applyChange);
-          } else {
-              applyChange(obj);
-          }
+          if (obj.type === 'activeSelection') obj.getObjects().forEach(applyChange);
+          else applyChange(obj);
           
           w.canvas.requestRenderAll();
-      };
-
-      w.syncColor = function(colorId: string, textId: string) {
-        const txtEl = document.getElementById(textId) as HTMLInputElement;
-        const colEl = document.getElementById(colorId) as HTMLInputElement;
-        if(!txtEl || !colEl) return;
-        let txt = txtEl.value.trim();
-        if (/^#[0-9A-Fa-f]{3}$/.test(txt)) { txt = '#' + txt[1]+txt[1] + txt[2]+txt[2] + txt[3]+txt[3]; }
-        if (/^#[0-9A-Fa-f]{6}$/.test(txt)) {
-          colEl.value = txt;
-          colEl.dispatchEvent(new Event('input', { bubbles: true }));
-        }
       };
 
       w.edBuildSingle = function(obj: any) {
@@ -250,12 +547,12 @@ export default function SpotifyPosterBuilder() {
           const col = obj.fill || '#000000';
           const ls  = obj.charSpacing || 0;
           const lh  = obj.lineHeight || 1.2;
-          const isUC = obj.textTransform === 'uppercase';
+          const ff = obj.fontFamily ? `'${obj.fontFamily}'` : "'DM Sans', sans-serif";
 
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text properties</div><div class="pf-row"><label>Content</label><input type="text" value="${txt}" oninput="window.applyToActiveObject('text', this.value)"></div><div class="pf-row"><label>Font Family</label><select onchange="window.applyToActiveObject('fontFamily', this.value)"><option value="${obj.fontFamily}" selected>Current Font</option>${fontOpts}</select></div><div class="pf-2col"><div class="pf-row"><label>Font Size</label><input type="number" value="${fs}" oninput="window.applyToActiveObject('fontSize', this.value)"></div><div class="pf-row"><label>Weight</label><select onchange="window.applyToActiveObject('fontWeight', this.value)"><option value="300" ${fw==='300'?'selected':''}>Light</option><option value="400" ${fw==='400'||fw==='normal'?'selected':''}>Regular</option><option value="500" ${fw==='500'?'selected':''}>Medium</option><option value="600" ${fw==='600'?'selected':''}>SemiBold</option><option value="700" ${fw==='700'||fw==='bold'?'selected':''}>Bold</option><option value="900" ${fw==='900'?'selected':''}>Black</option></select></div></div><div class="pf-row"><label>Letter Spacing</label>${rrow(-5,500,1,ls, `window.applyToActiveObject('charSpacing', this.value)`)}</div><div class="pf-row"><label>Line Height</label>${rrow(0.8,4,0.05,parseFloat(lh), `window.applyToActiveObject('lineHeight', this.value)`, '')}</div><div class="pf-row"><label>Alignment</label><div class="pf-3col"><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'left')">Left</button><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'center')">Center</button><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'right')">Right</button></div></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text Color</div><div class="pf-row">${cpair(col, `window.applyToActiveObject('fill', this.value)`)}</div></div>`;
+          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text properties</div><div class="pf-row"><label>Content</label><input type="text" value="${txt}" oninput="window.applyToActiveObject('text', this.value)"></div><div class="pf-row"><label>Font Family</label><select onchange="window.applyToActiveObject('fontFamily', this.value)"><option value="${ff}" selected>Current Font</option>${fontOpts}</select></div><div class="pf-2col"><div class="pf-row"><label>Font Size</label><input type="number" value="${fs}" min="6" max="1000" oninput="window.applyToActiveObject('fontSize', this.value)"></div><div class="pf-row"><label>Weight</label><select onchange="window.applyToActiveObject('fontWeight', this.value)"><option value="300" ${fw==='300'?'selected':''}>Light</option><option value="400" ${fw==='400'||fw==='normal'?'selected':''}>Regular</option><option value="500" ${fw==='500'?'selected':''}>Medium</option><option value="600" ${fw==='600'?'selected':''}>SemiBold</option><option value="700" ${fw==='700'||fw==='bold'?'selected':''}>Bold</option><option value="900" ${fw==='900'?'selected':''}>Black</option></select></div></div><div class="pf-row"><label>Letter Spacing</label>${rrow(-50,500,1,ls, `window.applyToActiveObject('charSpacing', this.value)`)}</div><div class="pf-row"><label>Line Height</label>${rrow(0.8,4,0.05,parseFloat(lh), `window.applyToActiveObject('lineHeight', this.value)`, '')}</div><div class="pf-row"><label>Alignment</label><div class="pf-3col"><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'left')">Left</button><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'center')">Center</button><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'right')">Right</button></div></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text Color</div><div class="pf-row">${cpair(col, `window.applyToActiveObject('fill', this.value)`)}</div></div>`;
         }
 
-        if (obj.type === 'group' && obj.id === 'v-vinyl-group') {
+        if (obj.id === 'v-vinyl-group') {
             const scale = Math.round(obj.scaleX * 100);
             html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Scale (%)</label>${rrow(10,200,1,scale, `window.applyToActiveObject('scaleX', this.value/100); window.applyToActiveObject('scaleY', this.value/100)`, '%')}</div><p style="font-size:10px; color:#888; margin-top:10px;">To edit lyrics and colors, please use the main left sidebar accordion menus.</p></div>`;
         }
@@ -265,7 +562,6 @@ export default function SpotifyPosterBuilder() {
 
       w.edBuildMulti = function() {
         const fontOpts = `<option value="'Abril Fatface', serif">Abril Fatface</option><option value="'Alfa Slab One', serif">Alfa Slab One</option><option value="'Anton', sans-serif">Anton</option><option value="'Archivo Black', sans-serif">Archivo Black</option><option value="'Bangers', cursive">Bangers</option><option value="'Bebas Neue', sans-serif">Bebas Neue</option><option value="'Bodoni Moda', serif">Bodoni Moda</option><option value="'Caveat', cursive">Caveat</option><option value="'Cinzel', serif">Cinzel</option><option value="'Cormorant Garamond', serif">Cormorant Garamond</option><option value="'Courgette', cursive">Courgette</option><option value="'DM Sans', sans-serif">DM Sans</option><option value="'Dancing Script', cursive">Dancing Script</option><option value="'EB Garamond', serif">EB Garamond</option><option value="'Fjalla One', sans-serif">Fjalla One</option><option value="'Great Vibes', cursive">Great Vibes</option><option value="'Inter', sans-serif">Inter</option><option value="'Josefin Sans', sans-serif">Josefin Sans</option><option value="'Kanit', sans-serif">Kanit</option><option value="'Lato', sans-serif">Lato</option><option value="'Libre Baskerville', serif">Libre Baskerville</option><option value="'Lobster', cursive">Lobster</option><option value="'Lora', serif">Lora</option><option value="'Merriweather', serif">Merriweather</option><option value="'Montserrat', sans-serif">Montserrat</option><option value="'Open Sans', sans-serif">Open Sans</option><option value="'Oswald', sans-serif">Oswald</option><option value="'PT Serif', serif">PT Serif</option><option value="'Pacifico', cursive">Pacifico</option><option value="'Patua One', serif">Patua One</option><option value="'Permanent Marker', cursive">Permanent Marker</option><option value="'Playfair Display', serif">Playfair Display</option><option value="'Poppins', sans-serif">Poppins</option><option value="'Prata', serif">Prata</option><option value="'Raleway', sans-serif">Raleway</option><option value="'Righteous', cursive">Righteous</option><option value="'Roboto', sans-serif">Roboto</option><option value="'Sacramento', cursive">Sacramento</option><option value="'Satisfy', cursive">Satisfy</option><option value="'Teko', sans-serif">Teko</option><option value="'Ubuntu', sans-serif">Ubuntu</option><option value="'Yellowtail', cursive">Yellowtail</option>`;
-        
         return `<div class="pf-section"><div class="pf-section-title">Align to Canvas</div><div class="pf-2col" style="margin-bottom:6px;"><button class="pf-btn" onclick="window.edAlign('left')">← Left</button><button class="pf-btn" onclick="window.edAlign('right')">Right →</button><button class="pf-btn" onclick="window.edAlign('cx')">↔ Center H</button><button class="pf-btn" onclick="window.edAlign('cy')">↕ Center V</button><button class="pf-btn" onclick="window.edAlign('top')">↑ Top</button><button class="pf-btn" onclick="window.edAlign('bottom')">↓ Bottom</button></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Distribute</div><div class="pf-2col"><button class="pf-btn" onclick="window.edDistribute('h')">↔ Horizontal</button><button class="pf-btn" onclick="window.edDistribute('v')">↕ Vertical</button></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Batch Formatting</div>
         <div class="pf-row"><label>Font Family (selected texts)</label><select onchange="window.applyToActiveObject('fontFamily', this.value)"><option value="" disabled selected>Change Font...</option>${fontOpts}</select></div>
         <div class="pf-row"><label>Color (all selected)</label><div class="pf-color-row"><input type="color" value="#ffffff" oninput="const v=this.value; window.applyToActiveObject('fill', v); this.nextElementSibling.value=v;" /><input type="text" value="#ffffff" oninput="let v=this.value; if(/^#[0-9a-fA-F]{3}$/i.test(v)){v='#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3];} if(/^#[0-9a-fA-F]{6}$/i.test(v)){this.previousElementSibling.value=v; this.previousElementSibling.dispatchEvent(new Event('input'));}" /></div></div>
@@ -421,59 +717,7 @@ export default function SpotifyPosterBuilder() {
       });
 
       // ──────────────────────────────────────────────────────────
-      // DATA FETCHING & UI MAPPING
-      // ──────────────────────────────────────────────────────────
-      w.applySearchResult = async function(item: any) {
-        w.currentCoverSrc = item.artworkUrl100.replace('100x100bb', '600x600bb');
-        
-        if(w.POSTER_MODE === 'spotify') {
-            const tinp = document.getElementById('song-title-input') as HTMLInputElement;
-            const ainp = document.getElementById('song-artist-input') as HTMLInputElement;
-            if(tinp) { tinp.value = item.trackName; }
-            if(ainp) { ainp.value = item.artistName; }
-
-            if (item.trackTimeMillis) {
-              const totalSecs = item.trackTimeMillis / 1000;
-              const m = Math.floor(totalSecs / 60); const s = Math.floor(totalSecs % 60);
-              const endStr = `${m}:${s < 10 ? '0' : ''}${s}`;
-              const tend = document.getElementById('time-end') as HTMLInputElement;
-              if(tend) tend.value = endStr;
-            }
-            w.renderSpotifyFabric();
-            w.showToast('✓ ' + item.trackName + ' yüklendi');
-        } 
-        else if (w.POSTER_MODE === 'vinyl') {
-            const tinp = document.getElementById('v-song-title-input') as HTMLInputElement;
-            if(tinp) { tinp.value = item.trackName.toUpperCase(); }
-            
-            const year = new Date(item.releaseDate).getFullYear() || "1992";
-            const yearInp = document.getElementById('v-year-input') as HTMLInputElement;
-            if(yearInp) { yearInp.value = year.toString(); }
-
-            const album = item.collectionName ? item.collectionName.toUpperCase() : "UNKNOWN ALBUM";
-            const bottomInp = document.getElementById('v-bottom-input') as HTMLInputElement;
-            if (bottomInp) { bottomInp.value = album; }
-
-            let artistLabel = item.artistName || 'ARTIST NAME';
-            const labelInp = document.getElementById('v-label-input') as HTMLInputElement;
-            if (labelInp) { labelInp.value = artistLabel.toUpperCase(); }
-
-            w.showToast('Sözler aranıyor...');
-            let lyrics = await w.fetchLyrics(item.artistName, item.trackName);
-            const linp = document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement;
-            if(lyrics) {
-                if(linp) linp.value = lyrics;
-                w.showToast('✓ Sözler ve şarkı yüklendi');
-            } else {
-                if(linp) linp.value = "LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA";
-                w.showToast('Sözler bulunamadı, varsayılan metin eklendi');
-            }
-            w.renderVinylFabric(); // Full re-render
-        }
-      };
-
-      // ──────────────────────────────────────────────────────────
-      // EXPORT FUNCTIONS (ZIP, PNG, PDF, SVG)
+      // NEW HIGH-RES EXPORT ENGINE (FAST FABRIC RENDER)
       // ──────────────────────────────────────────────────────────
       w.getExportFilename = function(ext: string) {
         let artist = 'artist'; let song = 'song';
@@ -540,7 +784,7 @@ export default function SpotifyPosterBuilder() {
               w.canvas.setBackgroundColor(color, w.canvas.renderAll.bind(w.canvas));
               w.applyAutoContrast(color);
               
-              await new Promise(r => setTimeout(r, 100)); // allow render
+              await new Promise(r => setTimeout(r, 100));
 
               let baseFilename = w.getExportFilename(format);
               let filename = baseFilename.replace(`.${format}`, `-${color.replace('#', '')}.${format}`);
@@ -562,6 +806,7 @@ export default function SpotifyPosterBuilder() {
               }
           }
 
+          // STORE sıkıştırmasıyla saniyeler içinde ziple
           zip.generateAsync({type:"blob", compression: "STORE"}).then(function(content: Blob) {
               const url = URL.createObjectURL(content);
               const link = document.createElement('a');
@@ -806,30 +1051,38 @@ export default function SpotifyPosterBuilder() {
 
             <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🔤 Top Label<span className="arrow">▼</span></button>
             <div className="accordion-content">
-              <div className="form-row"><label>Text</label><input type="text" id="label-top-input" defaultValue="Now Playing" onInput={(e: any) => { (window as any).updateFabObj('label-top', 'text', e.target.value.toUpperCase()); }} /></div>
+              <div className="form-row"><label>Text</label><input type="text" id="label-top-input" defaultValue="Now Playing" onInput={(e: any) => { w.updateFabObj('label-top', 'text', e.target.value.toUpperCase()); }} /></div>
               <div className="form-row"><label>Text Color</label>
                 <div className="color-row">
-                  <input type="color" id="c-s-tl" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).updateFabObj('label-top', 'fill', e.target.value); (window as any).syncColor('c-s-tl', 'c-s-tl-t'); }} />
-                  <input type="text" id="c-s-tl-t" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).syncColor('c-s-tl', 'c-s-tl-t'); (window as any).updateFabObj('label-top', 'fill', e.target.value); }} />
+                  <input type="color" id="c-s-tl" defaultValue="#FFFFFF" onInput={(e:any) => { w.updateFabObj('label-top', 'fill', e.target.value); w.syncColor('c-s-tl', 'c-s-tl-t'); }} />
+                  <input type="text" id="c-s-tl-t" defaultValue="#FFFFFF" onInput={(e:any) => { w.syncColor('c-s-tl-t', 'c-s-tl'); w.updateFabObj('label-top', 'fill', e.target.value); }} />
                 </div>
               </div>
             </div>
 
             <button className="accordion-btn open" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🎵 Song Details<span className="arrow">▼</span></button>
             <div className="accordion-content open">
-              <div className="form-row"><label>Song Title Text</label><input type="text" id="song-title-input" defaultValue="Song Title" onInput={(e: any) => { (window as any).updateFabObj('song-title', 'text', e.target.value); }} /></div>
+              <div className="form-row"><label>Song Title Text</label><input type="text" id="song-title-input" defaultValue="Song Title" onInput={(e: any) => { w.updateFabObj('song-title', 'text', e.target.value); }} /></div>
               <div className="form-row"><label>Song Title Color</label>
                 <div className="color-row">
-                  <input type="color" id="c-s-st" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).updateFabObj('song-title', 'fill', e.target.value); (window as any).syncColor('c-s-st', 'c-s-st-t'); }} />
-                  <input type="text" id="c-s-st-t" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).syncColor('c-s-st', 'c-s-st-t'); (window as any).updateFabObj('song-title', 'fill', e.target.value); }} />
+                  <input type="color" id="c-s-st" defaultValue="#FFFFFF" onInput={(e:any) => { w.updateFabObj('song-title', 'fill', e.target.value); w.syncColor('c-s-st', 'c-s-st-t'); }} />
+                  <input type="text" id="c-s-st-t" defaultValue="#FFFFFF" onInput={(e:any) => { w.syncColor('c-s-st-t', 'c-s-st'); w.updateFabObj('song-title', 'fill', e.target.value); }} />
                 </div>
               </div>
-              <div className="form-row" style={{ marginTop: '12px' }}><label>Artist Name Text</label><input type="text" id="song-artist-input" defaultValue="Artist Name" onInput={(e: any) => { (window as any).updateFabObj('song-artist', 'text', e.target.value); }} /></div>
+              <div className="form-row" style={{ marginTop: '12px' }}><label>Artist Name Text</label><input type="text" id="song-artist-input" defaultValue="Artist Name" onInput={(e: any) => { w.updateFabObj('song-artist', 'text', e.target.value); }} /></div>
               <div className="form-row"><label>Artist Name Color</label>
                 <div className="color-row">
-                  <input type="color" id="c-s-sa" defaultValue="#B3B3B3" onInput={(e:any) => { (window as any).updateFabObj('song-artist', 'fill', e.target.value); (window as any).syncColor('c-s-sa', 'c-s-sa-t'); }} />
-                  <input type="text" id="c-s-sa-t" defaultValue="#B3B3B3" onInput={(e:any) => { (window as any).syncColor('c-s-sa', 'c-s-sa-t'); (window as any).updateFabObj('song-artist', 'fill', e.target.value); }} />
+                  <input type="color" id="c-s-sa" defaultValue="#B3B3B3" onInput={(e:any) => { w.updateFabObj('song-artist', 'fill', e.target.value); w.syncColor('c-s-sa', 'c-s-sa-t'); }} />
+                  <input type="text" id="c-s-sa-t" defaultValue="#B3B3B3" onInput={(e:any) => { w.syncColor('c-s-sa-t', 'c-s-sa'); w.updateFabObj('song-artist', 'fill', e.target.value); }} />
                 </div>
+              </div>
+            </div>
+
+            <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>⏱️ Progress & Time<span className="arrow">▼</span></button>
+            <div className="accordion-content">
+              <div className="two-col">
+                <div className="form-row"><label>Start Time</label><input type="text" id="time-start" defaultValue="1:12" onInput={(e:any) => w.updateFabObj('time-start-el', 'text', e.target.value)} /></div>
+                <div className="form-row"><label>End Time</label><input type="text" id="time-end" defaultValue="3:45" onInput={(e:any) => w.updateFabObj('time-end-el', 'text', e.target.value)} /></div>
               </div>
             </div>
 
@@ -837,8 +1090,8 @@ export default function SpotifyPosterBuilder() {
             <div className="accordion-content">
               <div className="form-row"><label>Background Color</label>
                 <div className="color-row">
-                  <input type="color" id="bg-color" defaultValue="#121212" onInput={(e:any) => { (window as any).canvas.setBackgroundColor(e.target.value, (window as any).canvas.renderAll.bind((window as any).canvas)); (window as any).syncColor('bg-color', 'bg-color-txt'); }} />
-                  <input type="text" id="bg-color-txt" defaultValue="#121212" onInput={(e:any) => { (window as any).syncColor('bg-color-txt', 'bg-color'); (window as any).canvas.setBackgroundColor(e.target.value, (window as any).canvas.renderAll.bind((window as any).canvas)); }} />
+                  <input type="color" id="bg-color" defaultValue="#121212" onInput={(e:any) => { w.canvas.setBackgroundColor(e.target.value, w.canvas.renderAll.bind(w.canvas)); w.syncColor('bg-color', 'bg-color-txt'); }} />
+                  <input type="text" id="bg-color-txt" defaultValue="#121212" onInput={(e:any) => { w.syncColor('bg-color-txt', 'bg-color'); w.canvas.setBackgroundColor(e.target.value, w.canvas.renderAll.bind(w.canvas)); }} />
                 </div>
               </div>
             </div>
@@ -848,38 +1101,38 @@ export default function SpotifyPosterBuilder() {
         <div style={{ display: posterMode === 'vinyl' ? 'block' : 'none' }}>
             <button className="accordion-btn open" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🔤 Top & Bottom Texts<span className="arrow">▼</span></button>
             <div className="accordion-content open">
-                <div className="form-row"><label>Artist Name (Top Left) Text</label><input type="text" id="v-label-input" defaultValue="ARTIST NAME" onInput={(e: any) => { (window as any).updateFabObj('v-top-left', 'text', e.target.value.toUpperCase()); }} /></div>
+                <div className="form-row"><label>Artist Name (Top Left) Text</label><input type="text" id="v-label-input" defaultValue="ARTIST NAME" onInput={(e: any) => { w.updateFabObj('v-top-left', 'text', e.target.value.toUpperCase()); }} /></div>
                 <div className="form-row"><label>Artist Name Color</label>
                     <div className="color-row">
-                        <input type="color" id="c-v-tl" defaultValue="#212121" onInput={(e:any)=>{ (window as any).updateFabObj('v-top-left', 'fill', e.target.value); (window as any).syncColor('c-v-tl', 'c-v-tl-t'); }} />
-                        <input type="text" id="c-v-tl-t" defaultValue="#212121" onInput={(e:any)=>{ (window as any).syncColor('c-v-tl-t', 'c-v-tl'); (window as any).updateFabObj('v-top-left', 'fill', document.getElementById('c-v-tl-t')!.value); }} />
+                        <input type="color" id="c-v-tl" defaultValue="#212121" onInput={(e:any)=>{ w.updateFabObj('v-top-left', 'fill', e.target.value); w.syncColor('c-v-tl', 'c-v-tl-t'); }} />
+                        <input type="text" id="c-v-tl-t" defaultValue="#212121" onInput={(e:any)=>{ w.syncColor('c-v-tl-t', 'c-v-tl'); w.updateFabObj('v-top-left', 'fill', document.getElementById('c-v-tl-t')!.value); }} />
                     </div>
                 </div>
 
-                <div className="form-row" style={{ marginTop: '12px' }}><label>Year (Top Right) Text</label><input type="text" id="v-year-input" defaultValue="1992" onInput={(e: any) => { (window as any).updateFabObj('v-top-right', 'text', e.target.value); }} /></div>
+                <div className="form-row" style={{ marginTop: '12px' }}><label>Year (Top Right) Text</label><input type="text" id="v-year-input" defaultValue="1992" onInput={(e: any) => { w.updateFabObj('v-top-right', 'text', e.target.value); }} /></div>
                 <div className="form-row"><label>Year Color</label>
                     <div className="color-row">
-                        <input type="color" id="c-v-tr" defaultValue="#212121" onInput={(e:any)=>{ (window as any).updateFabObj('v-top-right', 'fill', e.target.value); (window as any).syncColor('c-v-tr', 'c-v-tr-t'); }} />
-                        <input type="text" id="c-v-tr-t" defaultValue="#212121" onInput={(e:any)=>{ (window as any).syncColor('c-v-tr-t', 'c-v-tr'); (window as any).updateFabObj('v-top-right', 'fill', document.getElementById('c-v-tr-t')!.value); }} />
+                        <input type="color" id="c-v-tr" defaultValue="#212121" onInput={(e:any)=>{ w.updateFabObj('v-top-right', 'fill', e.target.value); w.syncColor('c-v-tr', 'c-v-tr-t'); }} />
+                        <input type="text" id="c-v-tr-t" defaultValue="#212121" onInput={(e:any)=>{ w.syncColor('c-v-tr-t', 'c-v-tr'); w.updateFabObj('v-top-right', 'fill', document.getElementById('c-v-tr-t')!.value); }} />
                     </div>
                 </div>
 
-                <div className="form-row" style={{ marginTop: '12px' }}><label>Bottom Text (Album Name / Optional)</label><input type="text" id="v-bottom-input" defaultValue="UNKNOWN ALBUM" onInput={(e: any) => { (window as any).updateFabObj('v-bottom-text', 'text', e.target.value.toUpperCase()); }} /></div>
+                <div className="form-row" style={{ marginTop: '12px' }}><label>Bottom Text (Album Name / Optional)</label><input type="text" id="v-bottom-input" defaultValue="UNKNOWN ALBUM" onInput={(e: any) => { w.updateFabObj('v-bottom-text', 'text', e.target.value.toUpperCase()); }} /></div>
                 <div className="form-row"><label>Bottom Text Color</label>
                     <div className="color-row">
-                        <input type="color" id="c-v-bot" defaultValue="#555555" onInput={(e:any)=>{ (window as any).updateFabObj('v-bottom-text', 'fill', e.target.value); (window as any).syncColor('c-v-bot', 'c-v-bot-t'); }} />
-                        <input type="text" id="c-v-bot-t" defaultValue="#555555" onInput={(e:any)=>{ (window as any).syncColor('c-v-bot-t', 'c-v-bot'); (window as any).updateFabObj('v-bottom-text', 'fill', document.getElementById('c-v-bot-t')!.value); }} />
+                        <input type="color" id="c-v-bot" defaultValue="#555555" onInput={(e:any)=>{ w.updateFabObj('v-bottom-text', 'fill', e.target.value); w.syncColor('c-v-bot', 'c-v-bot-t'); }} />
+                        <input type="text" id="c-v-bot-t" defaultValue="#555555" onInput={(e:any)=>{ w.syncColor('c-v-bot-t', 'c-v-bot'); w.updateFabObj('v-bottom-text', 'fill', document.getElementById('c-v-bot-t')!.value); }} />
                     </div>
                 </div>
             </div>
 
             <button className="accordion-btn open" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🎵 Song Details<span className="arrow">▼</span></button>
             <div className="accordion-content open">
-                <div className="form-row"><label>Song Title Text</label><input type="text" id="v-song-title-input" defaultValue="SONG NAME" onInput={(e: any) => { (window as any).updateFabObj('v-song-title', 'text', e.target.value.toUpperCase()); }} /></div>
+                <div className="form-row"><label>Song Title Text</label><input type="text" id="v-song-title-input" defaultValue="SONG NAME" onInput={(e: any) => { w.updateFabObj('v-song-title', 'text', e.target.value.toUpperCase()); }} /></div>
                 <div className="form-row"><label>Song Title Color</label>
                     <div className="color-row">
-                        <input type="color" id="c-v-st" defaultValue="#212121" onInput={(e:any)=>{ (window as any).updateFabObj('v-song-title', 'fill', e.target.value); (window as any).syncColor('c-v-st', 'c-v-st-t'); }} />
-                        <input type="text" id="c-v-st-t" defaultValue="#212121" onInput={(e:any)=>{ (window as any).syncColor('c-v-st-t', 'c-v-st'); (window as any).updateFabObj('v-song-title', 'fill', document.getElementById('c-v-st-t')!.value); }} />
+                        <input type="color" id="c-v-st" defaultValue="#212121" onInput={(e:any)=>{ w.updateFabObj('v-song-title', 'fill', e.target.value); w.syncColor('c-v-st', 'c-v-st-t'); }} />
+                        <input type="text" id="c-v-st-t" defaultValue="#212121" onInput={(e:any)=>{ w.syncColor('c-v-st-t', 'c-v-st'); w.updateFabObj('v-song-title', 'fill', document.getElementById('c-v-st-t')!.value); }} />
                     </div>
                 </div>
             </div>
@@ -900,8 +1153,8 @@ export default function SpotifyPosterBuilder() {
             <div className="accordion-content">
                 <div className="form-row"><label>Background Color</label>
                   <div className="color-row">
-                    <input type="color" id="v-bg-color" defaultValue="#f5f5f5" onInput={(e:any) => { (window as any).canvas.setBackgroundColor(e.target.value, (window as any).canvas.renderAll.bind((window as any).canvas)); (window as any).syncColor('v-bg-color', 'v-bg-color-txt'); (window as any).applyAutoContrast(e.target.value); }} />
-                    <input type="text" id="v-bg-color-txt" defaultValue="#f5f5f5" onInput={(e:any) => { (window as any).syncColor('v-bg-color-txt', 'v-bg-color'); (window as any).canvas.setBackgroundColor(e.target.value, (window as any).canvas.renderAll.bind((window as any).canvas)); (window as any).applyAutoContrast(e.target.value); }} />
+                    <input type="color" id="v-bg-color" defaultValue="#f5f5f5" onInput={(e:any) => { w.canvas.setBackgroundColor(e.target.value, w.canvas.renderAll.bind(w.canvas)); w.syncColor('v-bg-color', 'v-bg-color-txt'); w.applyAutoContrast(e.target.value); }} />
+                    <input type="text" id="v-bg-color-txt" defaultValue="#f5f5f5" onInput={(e:any) => { w.syncColor('v-bg-color-txt', 'v-bg-color'); w.canvas.setBackgroundColor(e.target.value, w.canvas.renderAll.bind(w.canvas)); w.applyAutoContrast(e.target.value); }} />
                   </div>
                 </div>
             </div>
