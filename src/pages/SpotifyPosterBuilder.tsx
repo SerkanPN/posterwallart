@@ -1,11 +1,3 @@
-Haklısın. Parça parça verip işi çorbaya çevirdiğim için özür dilerim. Bütün
-düzeltmeleri, 40+ font listesini, plağın font/ölçek ayarlarını, Spotify'ın jilet
-gibi hizalanmasını ve o yüksek çözünürlüklü indirme mantığını TEK BİR BLOKTA,
-hiçbir şeyi silmeden ve atlamadan eksiksiz olarak aşağıda veriyorum.
-
-Aşağıdaki kodu kopyala ve dosyanın tamamıyla değiştir. Tek seferde kusursuz
-çalışacak:
-
 import React, { useEffect, useRef, useState } from 'react';
 
 export default function SpotifyPosterBuilder() {
