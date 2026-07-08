@@ -1574,35 +1574,13 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page #barcode-svg { height: 48px; width: auto; }
         .spotify-poster-page .loading-spinner { width: 16px; height: 16px; border: 2px solid #333; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
 
-        {/* ════════════ VINYL CARD ════════════ */}
-                <div id="vinyl-card" style={{ display: posterMode === 'vinyl' ? 'flex' : 'none' }}>
-                    <div id="v-top-left" className="ed-el" data-ed="v-top-left">ARTIST NAME</div>
-                    <div id="v-top-right" className="ed-el" data-ed="v-top-right">1992</div>
-                    
-                    <div id="v-song-title" className="ed-el" data-ed="v-song-title">SONG NAME</div>
-                    
-                    <div id="v-vinyl-center" className="ed-el" data-ed="v-vinyl">
-                        <svg viewBox="0 0 800 800" width="100%" height="100%" id="vinyl-svg">
-                            <defs>
-                                <path id="v-spiral-path" d="" fill="none" />
-                            </defs>
-                            <circle id="v-vinyl-bg" cx="400" cy="400" r="395" fill="none" />
-                            <circle id="v-vinyl-groove1" cx="400" cy="400" r="88" fill="none" stroke="#2a2a2a" strokeWidth="1" />
-                            <circle id="v-vinyl-groove2" cx="400" cy="400" r="92" fill="none" stroke="#2a2a2a" strokeWidth="1" />
-                            
-                            <text fill="#212121" fontSize="12" letterSpacing="2" fontFamily="'DM Sans', sans-serif" fontWeight="700" textAnchor="middle">
-                                <textPath href="#v-spiral-path" id="v-spiral-text" startOffset="0%">
-                                    LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA
-                                </textPath>
-                            </text>
-                            
-                            <circle id="v-vinyl-label" cx="400" cy="400" r="80" fill="#e0e0e0" />
-                            <circle id="v-vinyl-hole" cx="400" cy="400" r="8" fill="#111111" />
-                        </svg>
-                    </div>
-
-                    <div id="v-bottom-text" className="ed-el" data-ed="v-bottom">UNKNOWN ALBUM</div>
-                </div>
+        /* VINYL CARD STYLES */
+        .spotify-poster-page #vinyl-card { width: 100%; height: 100%; position: relative; display: flex; flex-direction: column; }
+        .spotify-poster-page #v-top-left { position: absolute; top: 8%; left: 8%; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; color: #212121; letter-spacing: 0.1em; text-transform: uppercase !important; white-space: nowrap; }
+        .spotify-poster-page #v-top-right { position: absolute; top: 8%; right: 8%; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 700; color: #212121; letter-spacing: 0.1em; text-transform: uppercase !important; white-space: nowrap; }
+        .spotify-poster-page #v-song-title { position: absolute; top: 16%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 42px; font-weight: 800; color: #212121; letter-spacing: -0.02em; text-transform: uppercase !important; }
+        .spotify-poster-page #v-vinyl-center { position: absolute; top: 55%; left: 50%; translate: -50% -50%; width: 85%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
+        .spotify-poster-page #v-bottom-text { position: absolute; bottom: 8%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600; color: #555555; text-transform: uppercase !important; letter-spacing: 0.05em; }
         
         /* ===== ACCORDION ===== */
         .spotify-poster-page .accordion-btn { width: 100%; background: none; border: none; color: var(--spotify-subtext); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; text-align: left; padding: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); font-family: 'DM Sans', sans-serif; transition: color 0.15s; }
