@@ -59,50 +59,56 @@ export default function SpotifyPosterBuilder() {
         const selectEl = document.getElementById('canvas-size') as HTMLSelectElement;
         if(!selectEl) return;
         const key = selectEl.value;
-        const[w_size, h_size] = w.CANVAS_SIZES[key];
+        const [w_size, h_size] = w.CANVAS_SIZES[key];
         const ratio = w_size / h_size;
 
-        const area = document.getElementById('canvas-area');
-        if(!area) return;
-        const areaW = area.clientWidth - 80;
-        const areaH = area.clientHeight - 80;
+        if (w.POSTER_MODE === 'spotify') {
+            const area = document.getElementById('canvas-area');
+            if(!area) return;
+            const areaW = area.clientWidth - 80;
+            const areaH = area.clientHeight - 80;
 
-        let pw, ph;
-        if (areaW / ratio <= areaH) {
-          pw = areaW;
-          ph = areaW / ratio;
-        } else {
-          ph = areaH;
-          pw = areaH * ratio;
-        }
-
-        pw = Math.floor(pw);
-        ph = Math.floor(ph);
-
-        const containers = document.querySelectorAll('.poster-container');
-        
-        let previewW = pw;
-        let previewH = ph;
-        
-        // Eğer Vinyl moddaysak, 8 afişin ekrana sığması için görsel olarak (CSS) küçültüyoruz.
-        // İndirilirken HTML2Canvas gerçek boyutu (pw, ph) kullanacak.
-        if (w.POSTER_MODE === 'vinyl') {
-            previewW = pw * 0.18; // %18 ekrana sığdırma ölçeği
-            previewH = ph * 0.18;
-        }
-
-        containers.forEach((c: any) => {
-            c.style.width = pw + 'px';
-            c.style.height = ph + 'px';
-            if (w.POSTER_MODE === 'vinyl') {
-                c.style.transform = `scale(${previewW / pw})`;
-                c.style.transformOrigin = 'top left';
-                if(c.parentNode.classList.contains('vinyl-poster-wrapper')) {
-                    c.parentNode.style.width = previewW + 'px';
-                    c.parentNode.style.height = previewH + 'px';
-                }
+            let pw, ph;
+            if (areaW / ratio <= areaH) {
+              pw = areaW;
+              ph = areaW / ratio;
+            } else {
+              ph = areaH;
+              pw = areaH * ratio;
             }
-        });
+
+            pw = Math.floor(pw);
+            ph = Math.floor(ph);
+
+            const container = document.getElementById('poster-container');
+            if(container) {
+                container.style.width = pw + 'px';
+                container.style.height = ph + 'px';
+            }
+        } else {
+            // Vinyl Mode: Ekrana oturtmak için sabit sanal çözünürlük + CSS Scale kullanıyoruz
+            const areaW = window.innerWidth - 320 - 80; // Panel ve padding payı
+            const baseW = 1000;
+            const baseH = 1000 / ratio;
+            
+            const gridGap = 30;
+            const columns = 4;
+            let colW = (areaW - (gridGap * (columns - 1))) / columns;
+            if (colW < 180) colW = 180; // Mobilde çok küçülmesini engellemek için sınır
+            
+            const displayScale = colW / baseW;
+
+            document.querySelectorAll('.vinyl-poster-instance').forEach((c: any) => {
+                c.style.width = baseW + 'px';
+                c.style.height = baseH + 'px';
+                c.style.transform = `scale(${displayScale})`;
+                c.style.transformOrigin = 'top left';
+                if (c.parentNode) {
+                    c.parentNode.style.width = (baseW * displayScale) + 'px';
+                    c.parentNode.style.height = (baseH * displayScale) + 'px';
+                }
+            });
+        }
       };
 
       window.addEventListener('resize', w.updateCanvasSize);
@@ -232,7 +238,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.updateBg = function() {
-        if(w.POSTER_MODE === 'vinyl') return; // Vinyl uses 8 pre-defined dynamic colors
+        if(w.POSTER_MODE === 'vinyl') return; // Vinyl uses dynamic grid colors
 
         const type = (document.getElementById('bg-type') as HTMLSelectElement).value;
         const bgColorSection = document.getElementById('bg-color-section');
@@ -336,10 +342,8 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.updateTextColor = function(id: string, color: string) {
-        // IDs are now classes globally to support 8 posters syncing
         document.querySelectorAll(`.${id}`).forEach((el: any) => {
             el.style.color = color;
-            // Eger SVG ise (plak ortasi falan) fill de etkilesin
             el.querySelectorAll('path,circle,rect').forEach((p:any) => {
                 if(p.getAttribute('fill') !== 'none') p.setAttribute('fill', color);
             });
@@ -508,7 +512,7 @@ export default function SpotifyPosterBuilder() {
 
       // --- VINYL SPECIFIC LOGIC ---
       w.updateVinylSpiral = function() {
-          const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
+          const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "16");
           const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
           
           const textLen = input.length * (fs * 0.55); 
@@ -558,7 +562,6 @@ export default function SpotifyPosterBuilder() {
           let points = [];
           let steps = Math.ceil(loops * 100);
           
-          // Spiralin içten dışa doğru değil dıştan içe doğru çizilmesi: startOffset %0 olunca başı kesilmez
           for(let i=0; i<=steps; i++) {
               let t = -Math.PI/2 - (i/steps) * loops * Math.PI * 2;
               let r = maxR - ((maxR - minR) * (i/steps));
@@ -577,8 +580,7 @@ export default function SpotifyPosterBuilder() {
 
       w.updateVinylLyrics = function() {
           const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
-          
-          const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
+          const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "16");
           const textLen = input.length * (fs * 0.55);
           const minR = 100;
           const spacing = fs * 1.2;
@@ -701,13 +703,11 @@ export default function SpotifyPosterBuilder() {
             const yearInp = document.getElementById('v-year-input') as HTMLInputElement;
             if(yearInp) yearInp.value = year.toString();
 
-            // Albüm -> Bottom Text
             const album = item.collectionName ? item.collectionName.toUpperCase() : "UNKNOWN ALBUM";
             document.querySelectorAll('.v-bottom-text').forEach(el => el.textContent = album);
             const bottomInp = document.getElementById('v-bottom-input') as HTMLInputElement;
             if (bottomInp) bottomInp.value = album;
 
-            // Plak Şirketi kaldırıldı, yerine Artist yazıyoruz (Kullanıcı talebi)
             document.querySelectorAll('.v-top-left').forEach(el => el.textContent = artistName);
             const labelInp = document.getElementById('v-label-input') as HTMLInputElement;
             if (labelInp) labelInp.value = artistName;
@@ -754,7 +754,9 @@ export default function SpotifyPosterBuilder() {
         const origTransform = container.style.transform;
         
         container.style.boxShadow = 'none';
-        container.style.transform = 'none'; // Geçici olarak CSS scale'i sıfırla ki HTML2Canvas tam çözünürlük alsın
+        container.style.transform = 'none'; 
+        
+        await new Promise(r => setTimeout(r, 50)); 
         
         const currentScrollX = window.scrollX;
         const currentScrollY = window.scrollY;
@@ -810,7 +812,6 @@ export default function SpotifyPosterBuilder() {
         return base64;
       };
 
-      // Tek bir afişi veya tüm afişleri indir
       w.executeDownload = async function(format: 'png'|'pdf'|'svg') {
         w.showToast(`${format.toUpperCase()} hazırlanıyor...`);
         const containers = w.POSTER_MODE === 'vinyl' ? document.querySelectorAll('.vinyl-poster-instance') : document.querySelectorAll('#poster-container');
@@ -819,15 +820,15 @@ export default function SpotifyPosterBuilder() {
         
         let targetWidthPx = Math.round(wIn * 300);
         let targetHeightPx = Math.round(hIn * 300);
-        const MAX_DIMENSION = 16000;
+        const MAX_DIMENSION = 8000;
 
         for (let i = 0; i < containers.length; i++) {
             const container = containers[i] as HTMLElement;
-            // Orijinal pixel değerini almak için geçici sıfırlama yapıp offsetWidth'i ölç
-            const origTransform = container.style.transform;
-            container.style.transform = 'none';
-            let scale = targetWidthPx / container.offsetWidth;
-            container.style.transform = origTransform;
+            
+            let scale = targetWidthPx / 1000; // Vinyl baseW is 1000px
+            if (w.POSTER_MODE === 'spotify') {
+                scale = targetWidthPx / container.offsetWidth;
+            }
 
             let finalTW = targetWidthPx;
             let finalTH = targetHeightPx;
@@ -866,7 +867,6 @@ export default function SpotifyPosterBuilder() {
                     URL.revokeObjectURL(url);
                 }
                 
-                // Birden çok afiş inerken tarayıcı engellemesin diye hafif gecikme
                 await new Promise(r => setTimeout(r, 500));
             } catch(e: any) { 
                 console.error(e);
@@ -944,23 +944,15 @@ export default function SpotifyPosterBuilder() {
       w.edAlign = function(mode: string) {
         if (!w.edSel.length) return;
         
-        // Hizalama işlemini "Master" afişe (ekrandaki ilk afiş) göre yap, sonra tümüne uygula
         const pc = document.querySelector('.poster-container') as HTMLElement;
         if(!pc) return;
         const pcW = pc.offsetWidth, pcH = pc.offsetHeight;
-        const pcR = pc.getBoundingClientRect();
 
         w.edSel.forEach((id: string) => {
-          const el = w.edEl(id); if (!el) return; // Master element
-          const er = el.getBoundingClientRect();
-          
-          // Ölçeklenmiş DOM yüzünden getBoundingClientRect scale'li gelir, gerçek pixel lazım
-          // Basit bir yaklaşım için ilk canvas'in oranını bölebiliriz ama offsetWidth daha güvenli:
+          const el = w.edEl(id); if (!el) return; 
           const ew = el.offsetWidth, eh = el.offsetHeight;
           const o = w.edOffsets[id] || { tx: 0, ty: 0 };
           
-          // Yerel koordinat (Scale yoksayılarak kabaca, tam hassasiyet için transform'dan çözmek gerekir)
-          // Fakat basitçe:
           if (mode === 'cx')     o.tx = o.tx + (pcW/2) - (el.offsetLeft + ew/2);
           if (mode === 'cy')     o.ty = o.ty + (pcH/2) - (el.offsetTop + eh/2);
 
@@ -1119,7 +1111,7 @@ export default function SpotifyPosterBuilder() {
           let hw = 85;
           if (hwRaw.includes('%')) hw = parseFloat(hwRaw);
 
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,hw, `window.setEdStyle('v-vinyl', 'width', this.value+'%'); window.setEdStyle('v-vinyl', 'height', 'auto')`, '%')}</div><div class="pf-row"><label>Spiral Text Color</label>${cpair(tcol, `document.querySelectorAll('.v-spiral-text').forEach(e=>e.setAttribute('fill', this.value))`)}</div><div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,tsz, `document.querySelectorAll('.v-spiral-text').forEach(e=>e.setAttribute('font-size', this.value)); document.getElementById('vinyl-text-size').value=this.value; window.updateVinylSpiral();`)}</div><div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,ls, `document.querySelectorAll('.v-spiral-text').forEach(e=>e.setAttribute('letter-spacing', this.value))`)}</div><div class="pf-row"><label>Center Label Color</label>${cpair(lcol, `document.querySelectorAll('.v-vinyl-label').forEach(e=>e.setAttribute('fill', this.value))`)}</div><div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,lsz, `document.querySelectorAll('.v-vinyl-label').forEach(e=>e.setAttribute('r', this.value)); document.querySelectorAll('.v-vinyl-hole').forEach(e=>e.setAttribute('r', this.value/10)); document.querySelectorAll('.v-vinyl-groove1').forEach(e=>e.setAttribute('r', this.value*1.1)); document.querySelectorAll('.v-vinyl-groove2').forEach(e=>e.setAttribute('r', this.value*1.15))`)}</div></div>`;
+          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,hw, `window.setEdStyle('v-vinyl', 'width', this.value+'%'); window.setEdStyle('v-vinyl', 'height', 'auto')`, '%')}</div><div class="pf-row"><label>Spiral Text Color</label>${cpair(tcol, `document.querySelectorAll('.v-spiral-text').forEach(e=>e.setAttribute('fill', this.value))`)}</div><div class="pf-row"><label>Spiral Text Size</label>${rrow(6,60,1,tsz, `document.querySelectorAll('.v-spiral-text').forEach(e=>e.setAttribute('font-size', this.value)); document.getElementById('vinyl-text-size').value=this.value; window.updateVinylSpiral();`)}</div><div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,ls, `document.querySelectorAll('.v-spiral-text').forEach(e=>e.setAttribute('letter-spacing', this.value))`)}</div><div class="pf-row"><label>Center Label Color</label>${cpair(lcol, `document.querySelectorAll('.v-vinyl-label').forEach(e=>e.setAttribute('fill', this.value))`)}</div><div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,lsz, `document.querySelectorAll('.v-vinyl-label').forEach(e=>e.setAttribute('r', this.value)); document.querySelectorAll('.v-vinyl-hole').forEach(e=>e.setAttribute('r', this.value/10)); document.querySelectorAll('.v-vinyl-groove1').forEach(e=>e.setAttribute('r', this.value*1.1)); document.querySelectorAll('.v-vinyl-groove2').forEach(e=>e.setAttribute('r', this.value*1.15))`)}</div></div>`;
         }
 
         return html;
@@ -1146,7 +1138,6 @@ export default function SpotifyPosterBuilder() {
       setTimeout(() => {
         w.edInitOffsets();
         const mq = document.getElementById('ed-marquee');
-        // Marquee'yi en dış konteynera ekleyelim ki tüm afişlerin üstünde çalışabilsin
         const ca = document.getElementById('canvas-area');
         if (ca && mq) { ca.appendChild(mq); }
       }, 100);
@@ -1189,14 +1180,12 @@ export default function SpotifyPosterBuilder() {
 
       const handleMouseMove = function(e: MouseEvent) {
         if (w.edDragState) {
-          // Vinyl'deki görsel zoom (CSS scale) oranına göre farenin hareketini de scale edelim
-          // Aksi takdirde fare afişte çok az ilerlerken elementler fırlayıp gider veya geride kalır.
           let zoomScale = 1;
           if (w.POSTER_MODE === 'vinyl') {
-              const pc = document.querySelector('.poster-container') as HTMLElement;
-              if (pc) zoomScale = pc.offsetWidth / (pc.parentNode as HTMLElement).offsetWidth; 
-              // aslında pcWidth normali, parentNode width scale edilmis hali
-              zoomScale = (pc.parentNode as HTMLElement).offsetWidth / pc.offsetWidth; 
+              const pc = document.querySelector('.vinyl-poster-instance') as HTMLElement;
+              if (pc && pc.parentNode) {
+                 zoomScale = (pc.parentNode as HTMLElement).offsetWidth / pc.offsetWidth; 
+              }
           }
 
           const dx = (e.clientX - w.edDragState.startX) / zoomScale;
@@ -1477,8 +1466,8 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page #canvas-area::before { content: ''; position: fixed; inset: 0; background: radial-gradient(ellipse at center, #1a1a1a 0%, #0d0d0d 70%); pointer-events: none; z-index: 0; }
         
         /* Grid container for Vinyl 8 posters */
-        .spotify-poster-page #vinyl-multi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px; position: relative; z-index: 1; justify-content: center; }
-        .spotify-poster-page .vinyl-poster-wrapper { display: flex; justify-content: center; align-items: flex-start; }
+        .spotify-poster-page #vinyl-multi-grid { display: grid; grid-template-columns: repeat(4, auto); gap: 30px; position: relative; z-index: 1; justify-content: center; margin: 0 auto; }
+        .spotify-poster-page .vinyl-poster-wrapper { position: relative; }
         
         .spotify-poster-page #poster-wrapper { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; margin: auto; }
         
@@ -1527,12 +1516,12 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page .loading-spinner { width: 16px; height: 16px; border: 2px solid #333; border-top-color: var(--accent); border-radius: 50%; animation: spin 0.6s linear infinite; display: none; }
 
         /* VINYL CARD STYLES */
-        .spotify-poster-page .v-top-left { position: absolute; top: 8%; left: 8%; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 700; color: #dedede; letter-spacing: 0.1em; text-transform: uppercase !important; white-space: nowrap; }
-        .spotify-poster-page .v-top-right { position: absolute; top: 8%; right: 8%; font-family: 'DM Sans', sans-serif; font-size: 16px; font-weight: 800; color: #dedede; letter-spacing: 0.05em; text-transform: uppercase !important; white-space: nowrap; }
-        .spotify-poster-page .v-song-title { position: absolute; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 38px; font-weight: 800; color: #dedede; letter-spacing: -0.02em; text-transform: uppercase !important; }
-        .spotify-poster-page .v-song-artist { position: absolute; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 18px; font-weight: 500; color: #b3b3b3; text-transform: uppercase !important; }
-        .spotify-poster-page .v-vinyl-center { position: absolute; top: 55%; left: 50%; transform: translate(-50%, -50%); width: 85%; height: auto; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
-        .spotify-poster-page .v-bottom-text { position: absolute; bottom: 8%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 400; color: #b3b3b3; text-transform: uppercase !important; }
+        .spotify-poster-page .v-top-left { position: absolute; top: 6%; left: 6%; font-family: 'DM Sans', sans-serif; font-size: 20px; font-weight: 700; color: #dedede; letter-spacing: 0.1em; text-transform: uppercase !important; white-space: nowrap; }
+        .spotify-poster-page .v-top-right { position: absolute; top: 6%; right: 6%; font-family: 'DM Sans', sans-serif; font-size: 24px; font-weight: 800; color: #dedede; letter-spacing: 0.05em; text-transform: uppercase !important; white-space: nowrap; }
+        .spotify-poster-page .v-song-title { position: absolute; top: 12%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 72px; font-weight: 800; color: #dedede; letter-spacing: -0.02em; text-transform: uppercase !important; }
+        .spotify-poster-page .v-song-artist { position: absolute; top: 20%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 32px; font-weight: 500; color: #b3b3b3; text-transform: uppercase !important; }
+        .spotify-poster-page .v-vinyl-center { position: absolute; top: 28%; left: 7.5%; width: 85%; aspect-ratio: 1 / 1; display: flex; align-items: center; justify-content: center; }
+        .spotify-poster-page .v-bottom-text { position: absolute; bottom: 6%; left: 0; right: 0; text-align: center; font-family: 'DM Sans', sans-serif; font-size: 24px; font-weight: 400; color: #b3b3b3; text-transform: uppercase !important; }
 
         /* ===== ACCORDION ===== */
         .spotify-poster-page .accordion-btn { width: 100%; background: none; border: none; color: var(--spotify-subtext); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; text-align: left; padding: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); font-family: 'DM Sans', sans-serif; transition: color 0.15s; }
@@ -1704,6 +1693,13 @@ export default function SpotifyPosterBuilder() {
                 <label>Text</label>
                 <input type="text" id="label-top-input" defaultValue="Now Playing" onInput={(e: any) => document.getElementById('label-top')!.textContent = e.target.value} />
               </div>
+              <div className="form-row">
+                <label>Text Color</label>
+                <div className="color-row">
+                  <input type="color" id="c-s-tl" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).updateTextColor('label-top', e.target.value); (window as any).syncColor('c-s-tl', 'c-s-tl-t'); }} />
+                  <input type="text" id="c-s-tl-t" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).syncColor('c-s-tl', 'c-s-tl-t'); (window as any).updateTextColor('label-top', document.getElementById('c-s-tl-t')!.value); }} />
+                </div>
+              </div>
             </div>
 
             <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🎵 Song Title & Artist<span className="arrow">▼</span></button>
@@ -1713,8 +1709,22 @@ export default function SpotifyPosterBuilder() {
                 <input type="text" id="song-title-input" defaultValue="Song Title" onInput={(e: any) => document.getElementById('song-title')!.textContent = e.target.value} />
               </div>
               <div className="form-row">
+                <label>Song Title Color</label>
+                <div className="color-row">
+                  <input type="color" id="c-s-st" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).updateTextColor('song-title', e.target.value); (window as any).syncColor('c-s-st', 'c-s-st-t'); }} />
+                  <input type="text" id="c-s-st-t" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).syncColor('c-s-st', 'c-s-st-t'); (window as any).updateTextColor('song-title', document.getElementById('c-s-st-t')!.value); }} />
+                </div>
+              </div>
+              <div className="form-row" style={{ marginTop: '12px' }}>
                 <label>Artist Name Text</label>
                 <input type="text" id="song-artist-input" defaultValue="Artist Name" onInput={(e: any) => document.getElementById('song-artist')!.textContent = e.target.value} />
+              </div>
+              <div className="form-row">
+                <label>Artist Name Color</label>
+                <div className="color-row">
+                  <input type="color" id="c-s-sa" defaultValue="#B3B3B3" onInput={(e:any) => { (window as any).updateTextColor('song-artist', e.target.value); (window as any).syncColor('c-s-sa', 'c-s-sa-t'); }} />
+                  <input type="text" id="c-s-sa-t" defaultValue="#B3B3B3" onInput={(e:any) => { (window as any).syncColor('c-s-sa', 'c-s-sa-t'); (window as any).updateTextColor('song-artist', document.getElementById('c-s-sa-t')!.value); }} />
+                </div>
               </div>
             </div>
 
@@ -1806,13 +1816,36 @@ export default function SpotifyPosterBuilder() {
                     <label>Top Left Text (Artist Name)</label>
                     <input type="text" id="v-label-input" defaultValue="ARTIST NAME" onInput={(e: any) => { document.querySelectorAll('.v-top-left').forEach(el=>el.textContent=e.target.value.toUpperCase()) }} />
                 </div>
+                <div className="form-row">
+                    <label>Top Left Color</label>
+                    <div className="color-row">
+                        <input type="color" id="c-v-tl" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).updateTextColor('v-top-left', e.target.value); (window as any).syncColor('c-v-tl', 'c-v-tl-t'); }} />
+                        <input type="text" id="c-v-tl-t" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).syncColor('c-v-tl', 'c-v-tl-t'); (window as any).updateTextColor('v-top-left', document.getElementById('c-v-tl-t')!.value); }} />
+                    </div>
+                </div>
+
                 <div className="form-row" style={{ marginTop: '12px' }}>
                     <label>Year (Top Right) Text</label>
                     <input type="text" id="v-year-input" defaultValue="1992" onInput={(e: any) => { document.querySelectorAll('.v-top-right').forEach(el=>el.textContent=e.target.value.toUpperCase()) }} />
                 </div>
+                <div className="form-row">
+                    <label>Year Color</label>
+                    <div className="color-row">
+                        <input type="color" id="c-v-tr" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).updateTextColor('v-top-right', e.target.value); (window as any).syncColor('c-v-tr', 'c-v-tr-t'); }} />
+                        <input type="text" id="c-v-tr-t" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).syncColor('c-v-tr', 'c-v-tr-t'); (window as any).updateTextColor('v-top-right', document.getElementById('c-v-tr-t')!.value); }} />
+                    </div>
+                </div>
+
                 <div className="form-row" style={{ marginTop: '12px' }}>
                     <label>Bottom Text (Album Name / Optional)</label>
                     <input type="text" id="v-bottom-input" defaultValue="ALBUM NAME" onInput={(e: any) => { document.querySelectorAll('.v-bottom-text').forEach(el=>el.textContent=e.target.value.toUpperCase()) }} />
+                </div>
+                <div className="form-row">
+                    <label>Bottom Text Color</label>
+                    <div className="color-row">
+                        <input type="color" id="c-v-bot" defaultValue="#b3b3b3" onInput={(e:any)=>{ (window as any).updateTextColor('v-bottom-text', e.target.value); (window as any).syncColor('c-v-bot', 'c-v-bot-t'); }} />
+                        <input type="text" id="c-v-bot-t" defaultValue="#b3b3b3" onInput={(e:any)=>{ (window as any).syncColor('c-v-bot', 'c-v-bot-t'); (window as any).updateTextColor('v-bottom-text', document.getElementById('c-v-bot-t')!.value); }} />
+                    </div>
                 </div>
             </div>
 
@@ -1822,9 +1855,24 @@ export default function SpotifyPosterBuilder() {
                     <label>Song Title Text</label>
                     <input type="text" id="v-song-title-input" defaultValue="SONG NAME" onInput={(e: any) => { document.querySelectorAll('.v-song-title').forEach(el=>el.textContent=e.target.value.toUpperCase()) }} />
                 </div>
+                <div className="form-row">
+                    <label>Song Title Color</label>
+                    <div className="color-row">
+                        <input type="color" id="c-v-st" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).updateTextColor('v-song-title', e.target.value); (window as any).syncColor('c-v-st', 'c-v-st-t'); }} />
+                        <input type="text" id="c-v-st-t" defaultValue="#dedede" onInput={(e:any)=>{ (window as any).syncColor('c-v-st', 'c-v-st-t'); (window as any).updateTextColor('v-song-title', document.getElementById('c-v-st-t')!.value); }} />
+                    </div>
+                </div>
+
                 <div className="form-row" style={{ marginTop: '12px' }}>
                     <label>Artist Name Text</label>
                     <input type="text" id="v-song-artist-input" defaultValue="ARTIST NAME" onInput={(e: any) => { document.querySelectorAll('.v-song-artist').forEach(el=>el.textContent=e.target.value.toUpperCase()) }} />
+                </div>
+                <div className="form-row">
+                    <label>Artist Name Color</label>
+                    <div className="color-row">
+                        <input type="color" id="c-v-sa" defaultValue="#b3b3b3" onInput={(e:any)=>{ (window as any).updateTextColor('v-song-artist', e.target.value); (window as any).syncColor('c-v-sa', 'c-v-sa-t'); }} />
+                        <input type="text" id="c-v-sa-t" defaultValue="#b3b3b3" onInput={(e:any)=>{ (window as any).syncColor('c-v-sa', 'c-v-sa-t'); (window as any).updateTextColor('v-song-artist', document.getElementById('c-v-sa-t')!.value); }} />
+                    </div>
                 </div>
             </div>
 
@@ -1833,8 +1881,8 @@ export default function SpotifyPosterBuilder() {
                 <div className="form-row">
                     <label>Spiral Text Size</label>
                     <div className="range-row">
-                        <input type="range" id="vinyl-text-size" min="6" max="40" defaultValue="12" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value+'px'; document.querySelectorAll('.v-spiral-text').forEach(el=>el.setAttribute('font-size', e.target.value)); (window as any).updateVinylSpiral(); }} />
-                        <span className="range-val">12px</span>
+                        <input type="range" id="vinyl-text-size" min="10" max="60" defaultValue="16" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value+'px'; document.querySelectorAll('.v-spiral-text').forEach(el=>el.setAttribute('font-size', e.target.value)); (window as any).updateVinylSpiral(); }} />
+                        <span className="range-val">16px</span>
                     </div>
                 </div>
                 <div className="form-row">
@@ -1963,14 +2011,14 @@ export default function SpotifyPosterBuilder() {
         <div id="vinyl-multi-grid">
             {vinylBgColors.map((color, i) => (
             <div className="vinyl-poster-wrapper" key={i}>
-              <div className="poster-container vinyl-poster-instance" id={`v-poster-${i}`} style={{ backgroundColor: color, width: '400px', height: '500px' }}>
+              <div className="poster-container vinyl-poster-instance" id={`v-poster-${i}`} style={{ backgroundColor: color }}>
                 <div className="poster">
                   <div className="poster-content">
                       <div className="v-top-left ed-el" data-ed="v-top-left">ARTIST NAME</div>
                       <div className="v-top-right ed-el" data-ed="v-top-right">1992</div>
                       
-                      <div className="v-song-title ed-el" data-ed="v-song-title" style={{ top: '15%' }}>SONG NAME</div>
-                      <div className="v-song-artist ed-el" data-ed="v-song-artist" style={{ top: '22%' }}>ARTIST NAME</div>
+                      <div className="v-song-title ed-el" data-ed="v-song-title">SONG NAME</div>
+                      <div className="v-song-artist ed-el" data-ed="v-song-artist">ARTIST NAME</div>
                       
                       <div className="v-vinyl-center ed-el" data-ed="v-vinyl">
                           <svg viewBox="0 0 800 800" width="100%" height="100%" className="vinyl-svg">
@@ -1982,7 +2030,7 @@ export default function SpotifyPosterBuilder() {
                               <circle className="v-vinyl-groove1" cx="400" cy="400" r="88" fill="none" stroke="#2a2a2a" strokeWidth="1" />
                               <circle className="v-vinyl-groove2" cx="400" cy="400" r="92" fill="none" stroke="#2a2a2a" strokeWidth="1" />
                               
-                              <text fill="#b3b3b3" fontSize="12" letterSpacing="2" fontFamily="'DM Sans', sans-serif" fontWeight="700" textAnchor="start">
+                              <text fill="#b3b3b3" fontSize="16" letterSpacing="2" fontFamily="'DM Sans', sans-serif" fontWeight="700" textAnchor="start">
                                   <textPath href={`#v-spiral-path-${i}`} className="v-spiral-text" startOffset="0%">
                                       LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA
                                   </textPath>
