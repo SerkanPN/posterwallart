@@ -1,14 +1,36 @@
+Buradaki sorunun temel kaynağı, Fabric.js kütüphanesinin React render döngüsüyle
+senkronize olamaması, eski sürümdeki statik width: 100% !important CSS
+kurallarının Fabric.js'in oluşturduğu wrapper elementleri (üst ve alt katman
+canvas elementlerini) çökertmesi ve canvas elementinin React referansı (useRef)
+yerine ID ile seçilmeye çalışılmasıdır.
+
+Aşağıdaki güncellenmiş kodda;
+
+1.  Canvas elementine doğrudan React useRef bağlanmıştır.
+2.  Fabric.js'in kendi boyutlandırma mekanizmasını bozan agresif CSS kuralları
+    temizlenmiştir.
+3.  React yaşam döngüsüne (lifecycle) uygun olarak sayfa değişimlerinde eski
+    canvas bellekten silinip (dispose) her seferinde taze bir canvas ayağa
+    kaldırılacak şekilde ayarlanmıştır.
+4.  Orijinal kodda yer alan tüm özellikler, arama motorları, renk paletleri,
+    yerleşim ayarları, barkod üretimi, toplu ZIP çıktısı, DPI düzeltmeli yüksek
+    çözünürlüklü indirme işlevleri eksiksiz korunmuştur.
+
+İşte Fabric.js altyapısına uyarlanmış yeni kod:
+
 import React, { useEffect, useRef, useState } from 'react';
 
 export default function SpotifyPosterBuilder() {
-  const isInitialized = useRef(false);
   const [posterMode, setPosterMode] = useState<'select' | 'spotify' | 'vinyl'>('select');
-  const canvasRef = useRef<any>(null);
+  const canvasElRef = useRef<HTMLCanvasElement>(null);
+  const fabricCanvasRef = useRef<any>(null);
+  const [dimensions, setDimensions] = useState({ width: 420, height: 525 });
 
   useEffect(() => {
     if (posterMode === 'select') return;
-    if (isInitialized.current) return;
-    isInitialized.current = true;
+
+    let active = true;
+    let canvas: any = null;
 
     // Load External Scripts (Fabric.js, jsPDF, JSZip)
     const loadScript = (src: string) => {
@@ -27,20 +49,29 @@ export default function SpotifyPosterBuilder() {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
 
+      if (!active) return;
+      if (!canvasElRef.current) return;
+
       const w = window as any;
       const fabric = w.fabric;
       w.POSTER_MODE = posterMode;
 
-      // Initialize Fabric.js Canvas
-      const canvas = new fabric.Canvas('canvas-el', {
+      // Clean up previous instance if exists
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.dispose();
+        fabricCanvasRef.current = null;
+      }
+
+      // Initialize Fabric Canvas on direct DOM Ref
+      canvas = new fabric.Canvas(canvasElRef.current, {
         preserveObjectStacking: true,
         backgroundColor: posterMode === 'vinyl' ? '#f5f5f5' : '#121212',
         selection: true
       });
-      canvasRef.current = canvas;
+      fabricCanvasRef.current = canvas;
 
       // ══════════════════════════════════════════════════════════════
-      // COMMON LAYOUT & UTILITIES
+      // ORIGINAL JAVASCRIPT LOGIC + FABRIC EXTENSIONS
       // ══════════════════════════════════════════════════════════════
 
       w.toggleAccordion = function(btn: HTMLElement) {
@@ -63,7 +94,6 @@ export default function SpotifyPosterBuilder() {
         '68x80': [68,80], '88x104': [88,104]
       };
 
-      // Virtual base coordinate space
       const BASE_WIDTH = 800;
 
       w.updateCanvasSize = function() {
@@ -86,16 +116,12 @@ export default function SpotifyPosterBuilder() {
           scale = areaH / baseHeight;
         }
 
-        const container = document.getElementById('poster-container');
-        if(container) {
-          container.style.width = Math.floor(BASE_WIDTH * scale) + 'px';
-          container.style.height = Math.floor(baseHeight * scale) + 'px';
-        }
+        const pw = Math.floor(BASE_WIDTH * scale);
+        const ph = Math.floor(baseHeight * scale);
 
-        canvas.setDimensions({
-          width: Math.floor(BASE_WIDTH * scale),
-          height: Math.floor(baseHeight * scale)
-        });
+        setDimensions({ width: pw, height: ph });
+
+        canvas.setDimensions({ width: pw, height: ph });
         canvas.setZoom(scale);
         canvas.requestRenderAll();
       };
@@ -113,10 +139,6 @@ export default function SpotifyPosterBuilder() {
         const s = Math.floor(secs % 60);
         return `${m}:${s < 10 ? '0' : ''}${s}`;
       };
-
-      // ══════════════════════════════════════════════════════════════
-      // PLAYBACK & PROGRESS UPDATER
-      // ══════════════════════════════════════════════════════════════
 
       w.handleStartTimeChange = function() {
         const startStr = (document.getElementById('time-start') as HTMLInputElement).value;
@@ -174,7 +196,6 @@ export default function SpotifyPosterBuilder() {
       // ══════════════════════════════════════════════════════════════
       // BACKGROUND LOGIC (BLUR / SOLID COLOR)
       // ══════════════════════════════════════════════════════════════
-
       w.currentCoverSrc = '';
       w.vCurrentCoverSrc = '';
 
@@ -194,22 +215,26 @@ export default function SpotifyPosterBuilder() {
         if (!w.currentCoverSrc) return;
 
         fabric.Image.fromURL(w.currentCoverSrc, (img: any) => {
+          const key = (document.getElementById('canvas-size') as HTMLSelectElement).value;
+          const [w_size, h_size] = w.CANVAS_SIZES[key];
+          const ratio = w_size / h_size;
+          const baseHeight = BASE_WIDTH / ratio;
+
           img.set({
             originX: 'center',
             originY: 'center',
             left: BASE_WIDTH / 2,
-            top: (BASE_WIDTH / (canvas.width / canvas.height)) / 2,
+            top: baseHeight / 2,
             selectable: false,
             evented: false,
             id: 'bg-image'
           });
 
-          // Scale to cover entire canvas bounds
-          const canvasRatio = canvas.width / canvas.height;
+          const canvasRatio = BASE_WIDTH / baseHeight;
           const imgRatio = img.width / img.height;
           let scale;
           if (imgRatio > canvasRatio) {
-            scale = (BASE_WIDTH / canvasRatio) / img.height;
+            scale = baseHeight / img.height;
           } else {
             scale = BASE_WIDTH / img.width;
           }
@@ -223,7 +248,6 @@ export default function SpotifyPosterBuilder() {
           img.filters.push(new fabric.Image.filters.Brightness({ brightness: brightnessVal - 1 }));
           img.applyFilters();
 
-          // Remove old bg-image
           const oldBg = canvas.getObjects().find((o: any) => o.id === 'bg-image');
           if (oldBg) canvas.remove(oldBg);
 
@@ -245,21 +269,26 @@ export default function SpotifyPosterBuilder() {
         if (!w.vCurrentCoverSrc) return;
 
         fabric.Image.fromURL(w.vCurrentCoverSrc, (img: any) => {
+          const key = (document.getElementById('canvas-size') as HTMLSelectElement).value;
+          const [w_size, h_size] = w.CANVAS_SIZES[key];
+          const ratio = w_size / h_size;
+          const baseHeight = BASE_WIDTH / ratio;
+
           img.set({
             originX: 'center',
             originY: 'center',
             left: BASE_WIDTH / 2,
-            top: (BASE_WIDTH / (canvas.width / canvas.height)) / 2,
+            top: baseHeight / 2,
             selectable: false,
             evented: false,
             id: 'bg-image'
           });
 
-          const canvasRatio = canvas.width / canvas.height;
+          const canvasRatio = BASE_WIDTH / baseHeight;
           const imgRatio = img.width / img.height;
           let scale;
           if (imgRatio > canvasRatio) {
-            scale = (BASE_WIDTH / canvasRatio) / img.height;
+            scale = baseHeight / img.height;
           } else {
             scale = BASE_WIDTH / img.width;
           }
@@ -293,7 +322,6 @@ export default function SpotifyPosterBuilder() {
 
         const mainTextCol = isDark ? '#ffffff' : '#212121';
         const subTextCol  = isDark ? '#cccccc' : '#555555';
-        const labelCol    = isDark ? '#eeeeee' : '#e0e0e0';
 
         const updateFill = (id: string, col: string) => {
           const obj = canvas.getObjects().find((o: any) => o.id === id);
@@ -305,7 +333,6 @@ export default function SpotifyPosterBuilder() {
         updateFill('v-song-title', mainTextCol);
         updateFill('v-bottom', subTextCol);
 
-        // Update HTML Inputs to synchronize
         const setInp = (id: string, col: string) => { 
           const el = document.getElementById(id) as HTMLInputElement; if(el) el.value = col; 
           const txt = document.getElementById(id+'-t') as HTMLInputElement; if(txt) txt.value = col;
@@ -315,7 +342,7 @@ export default function SpotifyPosterBuilder() {
         setInp('c-v-st', mainTextCol);
         setInp('c-v-bot', subTextCol);
 
-        w.updateVinylSpiral(); // Will trigger internal color updates
+        w.updateVinylSpiral(); 
       };
 
       w.updateBgColor = function() {
@@ -366,7 +393,7 @@ export default function SpotifyPosterBuilder() {
         } else {
           if(bgColorSection) bgColorSection.style.display = 'none';
           if(bgBlurSection) bgBlurSection.style.display = 'block';
-          w.applyAutoContrast('#121212'); // Enforce high contrast for blurred background
+          w.applyAutoContrast('#121212'); 
           w.updateVinylBgBlur();
         }
       };
@@ -383,7 +410,7 @@ export default function SpotifyPosterBuilder() {
             left: 0,
             top: 0,
             width: BASE_WIDTH,
-            height: 2000, // Safe height limit
+            height: 2000, 
             fill: 'rgba(0,0,0,0)',
             selectable: false,
             evented: false,
@@ -393,7 +420,6 @@ export default function SpotifyPosterBuilder() {
         }
         overlayObj.set('fill', `rgba(0,0,0,${val})`);
         
-        // Ensure proper layer hierarchy
         const bgImg = canvas.getObjects().find((o: any) => o.id === 'bg-image');
         if (bgImg) {
           bgImg.sendToBack();
@@ -413,7 +439,6 @@ export default function SpotifyPosterBuilder() {
         fabric.Image.fromURL(src, (img: any) => {
           const coverObj = canvas.getObjects().find((o: any) => o.id === 'cover');
           if (coverObj) {
-            // Re-load image source into existing bounding structure
             coverObj.setSrc(src, () => {
               canvas.requestRenderAll();
             }, { crossOrigin: 'anonymous' });
@@ -543,7 +568,6 @@ export default function SpotifyPosterBuilder() {
             height: barcodeHeight,
             id: 'barcode'
           });
-          // Adjust aspect ratio manually
           const initialRatio = (fetched.viewBox.baseVal.width / fetched.viewBox.baseVal.height) || 4;
           img.set('width', barcodeHeight * initialRatio);
 
@@ -670,7 +694,6 @@ export default function SpotifyPosterBuilder() {
 
         const pathD = points.join(' ');
 
-        // Format dynamic lyrics string
         let finalStr = input.trim();
         if (textLen < standardLen) {
            let repeats = Math.ceil(standardLen / (textLen + 20));
@@ -680,7 +703,6 @@ export default function SpotifyPosterBuilder() {
         }
         finalStr = finalStr.toUpperCase().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 
-        // Construct dynamic inline SVG
         const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize}" height="${svgSize}">
           <defs>
             <path id="v-spiral-path" d="${pathD}" fill="none" />
@@ -741,7 +763,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       // ══════════════════════════════════════════════════════════════
-      // SEARCH SEARCH RESULTS & DATA INJECTIONS
+      // SEARCH RESULTS & DATA INJECTIONS
       // ══════════════════════════════════════════════════════════════
 
       w.searchSong = async function() {
@@ -947,7 +969,7 @@ export default function SpotifyPosterBuilder() {
           for (let i = 0; i < colorsToExport.length; i++) {
               const color = colorsToExport[i];
               canvas.setBackgroundColor(color, canvas.renderAll.bind(canvas));
-              if(bgImg) bgImg.set('visible', false); // Ensure solid background during batch export
+              if(bgImg) bgImg.set('visible', false); 
               w.applyAutoContrast(color);
               
               await new Promise(r => setTimeout(r, 150));
@@ -1004,7 +1026,6 @@ export default function SpotifyPosterBuilder() {
               w.showToast(`✓ ZIP dosyası indirildi!`);
           });
 
-          // Restore state
           canvas.setBackgroundColor(originalBg, canvas.renderAll.bind(canvas));
           if(bgImg) bgImg.set('visible', originalBgImgVisible);
           const currentType = (document.getElementById('v-bg-type') as HTMLSelectElement)?.value || 'color';
@@ -1203,7 +1224,6 @@ export default function SpotifyPosterBuilder() {
         activeObjs.forEach((o: any) => {
           o.set(prop, val);
           if (prop === 'text' && o.id) {
-            // Sync React controls HTML
             const map: any = { 
                 'song-title': 'song-title-input', 'song-artist': 'song-artist-input', 'label-top': 'label-top-input',
                 'v-top-left': 'v-label-input', 'v-top-right': 'v-year-input', 'v-song-title': 'v-song-title-input',
@@ -1271,7 +1291,6 @@ export default function SpotifyPosterBuilder() {
         <div class="pf-row"><label>Opacity</label><div class="pf-range-row"><input type="range" min="0" max="100" value="100" oninput="window.edSetFabricProp('opacity', parseFloat(this.value)/100);this.nextElementSibling.textContent=this.value+'%'"><span class="pf-range-val">100%</span></div></div><div class="pf-row"><label>Visibility</label><div class="pf-2col"><button class="pf-btn" onclick="window.edSetFabricProp('visible', true)">Show All</button><button class="pf-btn" onclick="window.edSetFabricProp('visible', false)">Hide All</button></div></div></div>`;
       };
 
-      // Handle selection binding from Fabric
       canvas.on('selection:created', () => { w.edUpdatePanel(); w.edUpdateAlignBar(); });
       canvas.on('selection:updated', () => { w.edUpdatePanel(); w.edUpdateAlignBar(); });
       canvas.on('selection:cleared', () => { w.edUpdatePanel(); w.edUpdateAlignBar(); });
@@ -1282,13 +1301,62 @@ export default function SpotifyPosterBuilder() {
       // SCENE BUILDER (INITIAL OBJECT LOADERS)
       // ══════════════════════════════════════════════════════════════
 
+      w.updateContentPosition = function() {
+        const val = parseFloat((document.getElementById('content-y') as HTMLInputElement).value) / 100;
+        document.getElementById('content-y-display')!.textContent = Math.round(val * 100) + '%';
+        
+        const key = (document.getElementById('canvas-size') as HTMLSelectElement).value;
+        const [wIn, hIn] = w.CANVAS_SIZES[key];
+        const canvasHeight = BASE_WIDTH / (wIn / hIn);
+        const centerY = canvasHeight * val;
+
+        const nowPlaying = canvas.getObjects().find((o: any) => o.id === 'label-top');
+        const cover = canvas.getObjects().find((o: any) => o.id === 'cover');
+        const title = canvas.getObjects().find((o: any) => o.id === 'song-title');
+        const artist = canvas.getObjects().find((o: any) => o.id === 'song-artist');
+        const heart = canvas.getObjects().find((o: any) => o.id === 'heart');
+        const track = canvas.getObjects().find((o: any) => o.id === 'progress-track');
+        const fill = canvas.getObjects().find((o: any) => o.id === 'progress-fill');
+        const tStart = canvas.getObjects().find((o: any) => o.id === 'time-start-el');
+        const tEnd = canvas.getObjects().find((o: any) => o.id === 'time-end-el');
+        const bShuffle = canvas.getObjects().find((o: any) => o.id === 'btn-shuffle');
+        const bPrev = canvas.getObjects().find((o: any) => o.id === 'btn-prev');
+        const bPlay = canvas.getObjects().find((o: any) => o.id === 'play');
+        const bNext = canvas.getObjects().find((o: any) => o.id === 'btn-next');
+        const bRepeat = canvas.getObjects().find((o: any) => o.id === 'btn-repeat');
+        const barcode = canvas.getObjects().find((o: any) => o.id === 'barcode');
+
+        if (nowPlaying) nowPlaying.set('top', centerY - 400);
+        if (cover) cover.set('top', centerY - 320);
+        if (title) title.set('top', centerY + 230);
+        if (artist) artist.set('top', centerY + 285);
+        if (heart) heart.set('top', centerY + 240);
+        if (track) track.set('top', centerY + 350);
+        if (fill) fill.set('top', centerY + 350);
+        if (tStart) tStart.set('top', centerY + 370);
+        if (tEnd) tEnd.set('top', centerY + 370);
+        if (bShuffle) bShuffle.set('top', centerY + 420);
+        if (bPrev) bPrev.set('top', centerY + 420);
+        if (bPlay) bPlay.set('top', centerY + 420);
+        if (bNext) bNext.set('top', centerY + 420);
+        if (bRepeat) bRepeat.set('top', centerY + 420);
+        if (barcode) barcode.set('top', centerY + 490);
+
+        canvas.requestRenderAll();
+      };
+
       w.initSpotifyScene = function() {
         canvas.clear();
         canvas.setBackgroundColor('#121212', canvas.renderAll.bind(canvas));
 
+        const key = (document.getElementById('canvas-size') as HTMLSelectElement).value;
+        const [wIn, hIn] = w.CANVAS_SIZES[key];
+        const canvasHeight = BASE_WIDTH / (wIn / hIn);
+        const centerY = canvasHeight * 0.5;
+
         const nowPlaying = new fabric.Text('Now Playing', {
           left: 400,
-          top: 100,
+          top: centerY - 400,
           originX: 'center',
           fontFamily: 'DM Sans',
           fontSize: 22,
@@ -1300,7 +1368,7 @@ export default function SpotifyPosterBuilder() {
 
         const coverPlaceholder = new fabric.Rect({
           left: 150,
-          top: 180,
+          top: centerY - 320,
           width: 500,
           height: 500,
           fill: '#282828',
@@ -1312,7 +1380,7 @@ export default function SpotifyPosterBuilder() {
 
         const title = new fabric.Text('Song Title', {
           left: 150,
-          top: 730,
+          top: centerY + 230,
           fontFamily: 'DM Sans',
           fontSize: 36,
           fontWeight: '700',
@@ -1322,7 +1390,7 @@ export default function SpotifyPosterBuilder() {
 
         const artist = new fabric.Text('Artist Name', {
           left: 150,
-          top: 785,
+          top: centerY + 285,
           fontFamily: 'DM Sans',
           fontSize: 24,
           fill: '#B3B3B3',
@@ -1332,17 +1400,16 @@ export default function SpotifyPosterBuilder() {
         const heartPath = "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z";
         const heart = new fabric.Path(heartPath, {
           left: 610,
-          top: 740,
+          top: centerY + 240,
           fill: '#6366f1',
           scaleX: 1.5,
           scaleY: 1.5,
           id: 'heart'
         });
 
-        // Progress components
         const track = new fabric.Rect({
           left: 150,
-          top: 850,
+          top: centerY + 350,
           width: 500,
           height: 8,
           fill: '#535353',
@@ -1354,7 +1421,7 @@ export default function SpotifyPosterBuilder() {
 
         const fill = new fabric.Rect({
           left: 150,
-          top: 850,
+          top: centerY + 350,
           width: 175,
           height: 8,
           fill: '#FFFFFF',
@@ -1366,7 +1433,7 @@ export default function SpotifyPosterBuilder() {
 
         const tStart = new fabric.Text('1:12', {
           left: 150,
-          top: 870,
+          top: centerY + 370,
           fontFamily: 'DM Sans',
           fontSize: 18,
           fill: '#B3B3B3',
@@ -1375,7 +1442,7 @@ export default function SpotifyPosterBuilder() {
 
         const tEnd = new fabric.Text('3:45', {
           left: 650,
-          top: 870,
+          top: centerY + 370,
           originX: 'right',
           fontFamily: 'DM Sans',
           fontSize: 18,
@@ -1383,7 +1450,57 @@ export default function SpotifyPosterBuilder() {
           id: 'time-end-el'
         });
 
-        canvas.add(nowPlaying, coverPlaceholder, title, artist, heart, track, fill, tStart, tEnd);
+        // Add Playback Control Buttons (Vector Paths)
+        const btnShuffle = new fabric.Path("M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6", {
+          left: 170,
+          top: centerY + 420,
+          fill: 'none',
+          stroke: '#B3B3B3',
+          strokeWidth: 2,
+          scaleX: 1.5,
+          scaleY: 1.5,
+          id: 'btn-shuffle'
+        });
+
+        const btnPrev = new fabric.Path("M19 20L9 12l10-8v16z M5 19V5h2v14H5z", {
+          left: 270,
+          top: centerY + 420,
+          fill: '#B3B3B3',
+          scaleX: 1.5,
+          scaleY: 1.5,
+          id: 'btn-prev'
+        });
+
+        const playBtn = new fabric.Path("M5 3l14 9-14 9V3z", {
+          left: 380,
+          top: centerY + 410,
+          fill: '#FFFFFF',
+          scaleX: 2.2,
+          scaleY: 2.2,
+          id: 'play'
+        });
+
+        const btnNext = new fabric.Path("M5 4l10 8-10 8V4z M17 5v14h2V5h-2z", {
+          left: 490,
+          top: centerY + 420,
+          fill: '#B3B3B3',
+          scaleX: 1.5,
+          scaleY: 1.5,
+          id: 'btn-next'
+        });
+
+        const btnRepeat = new fabric.Path("M17 1l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3", {
+          left: 590,
+          top: centerY + 420,
+          fill: 'none',
+          stroke: '#B3B3B3',
+          strokeWidth: 2,
+          scaleX: 1.5,
+          scaleY: 1.5,
+          id: 'btn-repeat'
+        });
+
+        canvas.add(nowPlaying, coverPlaceholder, title, artist, heart, track, fill, tStart, tEnd, btnShuffle, btnPrev, playBtn, btnNext, btnRepeat);
         canvas.requestRenderAll();
         w.updateCanvasSize();
       };
@@ -1391,6 +1508,10 @@ export default function SpotifyPosterBuilder() {
       w.initVinylScene = function() {
         canvas.clear();
         canvas.setBackgroundColor('#f5f5f5', canvas.renderAll.bind(canvas));
+
+        const key = (document.getElementById('canvas-size') as HTMLSelectElement).value;
+        const [wIn, hIn] = w.CANVAS_SIZES[key];
+        const canvasHeight = BASE_WIDTH / (wIn / hIn);
 
         const labelTopLeft = new fabric.Text('ARTIST NAME', {
           left: 80,
@@ -1429,7 +1550,7 @@ export default function SpotifyPosterBuilder() {
 
         const labelBottom = new fabric.Text('UNKNOWN ALBUM', {
           left: 400,
-          top: 920,
+          top: canvasHeight - 100,
           originX: 'center',
           fontFamily: 'DM Sans',
           fontSize: 20,
@@ -1445,21 +1566,27 @@ export default function SpotifyPosterBuilder() {
         w.updateCanvasSize();
       };
 
-      // Boot application structure
-      if(w.POSTER_MODE === 'vinyl') {
-        w.initVinylScene();
-      } else {
-        w.initSpotifyScene();
-        w.updateOverlay();
-      }
-
+      // Scene Selector Trigger
+      setTimeout(() => {
+        if(w.POSTER_MODE === 'vinyl') {
+          w.initVinylScene();
+        } else {
+          w.initSpotifyScene();
+          w.updateOverlay();
+        }
+      }, 50);
     };
 
     initApp();
 
     return () => {
+      active = false;
       const w = window as any;
       window.removeEventListener('resize', w.updateCanvasSize);
+      if (fabricCanvasRef.current) {
+        fabricCanvasRef.current.dispose();
+        fabricCanvasRef.current = null;
+      }
     };
   }, [posterMode]);
 
@@ -1635,9 +1762,7 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page #canvas-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0d0d0d; padding: 30px; overflow: hidden; position: relative; }
         .spotify-poster-page #canvas-area::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse at center, #1a1a1a 0%, #0d0d0d 70%); pointer-events: none; }
         .spotify-poster-page #poster-wrapper { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 20px; }
-        .spotify-poster-page #poster-container { position: relative; overflow: hidden; box-shadow: 0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05); border-radius: 4px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1), height 0.4s cubic-bezier(0.4,0,0.2,1); }
-        .spotify-poster-page .canvas-container { width: 100% !important; height: 100% !important; }
-        .spotify-poster-page #canvas-el { width: 100% !important; height: 100% !important; }
+        .spotify-poster-page #poster-container { position: relative; overflow: hidden; box-shadow: 0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05); border-radius: 4px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1), height 0.4s cubic-bezier(0.4,0,0.2,1); display: flex; align-items: center; justify-content: center; }
         
         /* ===== ACCORDION ===== */
         .spotify-poster-page .accordion-btn { width: 100%; background: none; border: none; color: var(--spotify-subtext); font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; text-align: left; padding: 16px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--panel-border); font-family: 'DM Sans', sans-serif; transition: color 0.15s; }
@@ -1841,12 +1966,12 @@ export default function SpotifyPosterBuilder() {
               <div className="toggle-row">
                 <label>Visible</label>
                 <label className="toggle"><input type="checkbox" defaultChecked onChange={(e: any) => {
-                  const trackObj = canvasRef.current?.getObjects().find((o: any) => o.id === 'progress-track');
-                  const fillObj = canvasRef.current?.getObjects().find((o: any) => o.id === 'progress-fill');
-                  const stObj = canvasRef.current?.getObjects().find((o: any) => o.id === 'time-start-el');
-                  const etObj = canvasRef.current?.getObjects().find((o: any) => o.id === 'time-end-el');
+                  const trackObj = fabricCanvasRef.current?.getObjects().find((o: any) => o.id === 'progress-track');
+                  const fillObj = fabricCanvasRef.current?.getObjects().find((o: any) => o.id === 'progress-fill');
+                  const stObj = fabricCanvasRef.current?.getObjects().find((o: any) => o.id === 'time-start-el');
+                  const etObj = fabricCanvasRef.current?.getObjects().find((o: any) => o.id === 'time-end-el');
                   [trackObj, fillObj, stObj, etObj].forEach(o => { if(o) o.set('visible', e.target.checked); });
-                  canvasRef.current?.requestRenderAll();
+                  fabricCanvasRef.current?.requestRenderAll();
                 }} /><span className="slider"></span></label>
               </div>
               <div className="two-col">
@@ -1903,6 +2028,17 @@ export default function SpotifyPosterBuilder() {
                 <input type="file" id="cover-upload" accept="image/*" onChange={(e: any) => (window as any).handleCoverUpload(e)} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer' }} />
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 <p>Click to upload image</p>
+              </div>
+            </div>
+
+            <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>📏 Layout Settings<span className="arrow">▼</span></button>
+            <div className="accordion-content">
+              <div className="form-row">
+                <label>Content Vertical Position (%)</label>
+                <div className="range-row">
+                  <input type="range" min="20" max="80" defaultValue="50" id="content-y" onInput={() => (window as any).updateContentPosition()} />
+                  <span className="range-val" id="content-y-display">50%</span>
+                </div>
               </div>
             </div>
         </div>
@@ -2070,8 +2206,8 @@ export default function SpotifyPosterBuilder() {
         </div>
         
         <div id="poster-wrapper">
-          <div id="poster-container" style={{ width: '420px', height: '525px' }}>
-            <canvas id="canvas-el"></canvas>
+          <div id="poster-container" style={{ width: `${dimensions.width}px`, height: `${dimensions.height}px` }}>
+            <canvas ref={canvasElRef} id="canvas-el"></canvas>
           </div>
         </div>
       </div>
