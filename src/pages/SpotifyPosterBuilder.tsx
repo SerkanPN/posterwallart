@@ -169,8 +169,10 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.applySearchResult = async function(item: any) {
+        const hdCover = item.artworkUrl100.replace('100x100bb', '600x600bb');
+        
         if(w.POSTER_MODE === 'spotify') {
-            w.currentCoverSrc = item.artworkUrl100.replace('100x100bb', '600x600bb');
+            w.currentCoverSrc = hdCover;
             const tinp = document.getElementById('song-title-input') as HTMLInputElement;
             const ainp = document.getElementById('song-artist-input') as HTMLInputElement;
             if(tinp) tinp.value = item.trackName;
@@ -186,12 +188,17 @@ export default function SpotifyPosterBuilder() {
             w.renderSpotifyFabric();
             w.showToast('✓ Yüklendi');
         } else {
+            w.vCurrentCoverSrc = hdCover;
+            
             const tinp = document.getElementById('v-song-title-input') as HTMLInputElement;
             if(tinp) tinp.value = item.trackName.toUpperCase();
+            
             const yearInp = document.getElementById('v-year-input') as HTMLInputElement;
             if(yearInp) yearInp.value = (new Date(item.releaseDate).getFullYear() || "1992").toString();
+            
             const bottomInp = document.getElementById('v-bottom-input') as HTMLInputElement;
             if (bottomInp) bottomInp.value = (item.collectionName ? item.collectionName : "UNKNOWN ALBUM").toUpperCase();
+            
             const labelInp = document.getElementById('v-label-input') as HTMLInputElement;
             if (labelInp) labelInp.value = (item.artistName || 'ARTIST').toUpperCase();
 
@@ -217,8 +224,10 @@ export default function SpotifyPosterBuilder() {
           const src = w.POSTER_MODE === 'vinyl' ? w.vCurrentCoverSrc : w.currentCoverSrc;
           const blurVal = parseInt((document.getElementById(w.POSTER_MODE === 'vinyl' ? 'v-blur-val' : 'blur-val') as HTMLInputElement).value || "10");
 
+          // Eski arka plan resmini KESİNLİKLE temizle
+          w.canvas.setBackgroundImage(null, w.canvas.renderAll.bind(w.canvas));
+
           if (type === 'color' || !src) {
-              w.canvas.backgroundImage = null;
               w.canvas.setBackgroundColor(color, w.canvas.renderAll.bind(w.canvas));
               if (w.POSTER_MODE === 'vinyl') w.applyAutoContrast(color);
           } else {
@@ -343,7 +352,7 @@ export default function SpotifyPosterBuilder() {
           let startY = currentY - (totalHeight / 2);
 
           if ((document.getElementById('show-label-top') as HTMLInputElement).checked) {
-              let lbl = new w.fabric.IText((document.getElementById('label-top-input') as HTMLInputElement).value || "NOW PLAYING", { id: 'label-top', left: W/2, top: startY, fontSize: 36*S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-s-tl') as HTMLInputElement).value || "#FFFFFF", originX: 'center', charSpacing: 150 });
+              let lbl = new w.fabric.IText((document.getElementById('label-top-input') as HTMLInputElement).value || "NOW PLAYING", { id: 'label-top', left: W/2, top: startY, fontSize: 36*S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-s-tl') as HTMLInputElement).value || "#FFFFFF", originX: 'center', charSpacing: 150, textTransform: 'uppercase' });
               w.canvas.add(lbl); 
           }
           startY += (40*S) + itemSpacing;
@@ -459,10 +468,17 @@ export default function SpotifyPosterBuilder() {
              let arr = []; for(let k=0; k<repeats; k++) arr.push(finalStr);
              finalStr = arr.join(' • ');
           }
-          finalStr = finalStr.toUpperCase();
+          
+          // Özel Karakterleri XML/SVG uyumlu hale getirmezsek Fabric.js plağı yüklemez!
+          finalStr = finalStr.toUpperCase()
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
 
           const upscale = 4;
-          const fontF = w.vinylState.fontFamily.replace(/'/g, ""); 
+          // Font içindeki tırnakları ayıklıyoruz, yoksa SVG formatını bozuyor
+          const fontF = w.vinylState.fontFamily.replace(/['"]/g, "").split(',')[0].trim(); 
           
           const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize * upscale}" height="${svgSize * upscale}">
               <defs><path id="spiral" d="${pathData}" fill="none" /></defs>
@@ -561,7 +577,7 @@ export default function SpotifyPosterBuilder() {
               }
               
               if(prop === 'fontFamily' && (o.type === 'i-text' || o.type === 'textbox')) {
-                  const cleanedFont = val.replace(/'/g, '').split(',')[0];
+                  const cleanedFont = val.replace(/['"]/g, '').split(',')[0].trim();
                   (document as any).fonts.load(`1em ${cleanedFont}`).then(() => {
                       o.set('fontFamily', cleanedFont);
                       w.canvas.requestRenderAll();
@@ -772,7 +788,7 @@ export default function SpotifyPosterBuilder() {
       });
 
       // ──────────────────────────────────────────────────────────
-      // HIGH-RES EXPORT ENGINE (ZOOM RESET)
+      // HIGH-RES EXPORT ENGINE
       // ──────────────────────────────────────────────────────────
       w.getExportFilename = function(ext: string) {
         let artist = 'artist'; let song = 'song';
