@@ -403,7 +403,8 @@ export default function SpotifyPosterBuilder() {
           const labelColor = isDark ? '#eeeeee' : '#e0e0e0';
           const holeColor = isDark ? '#111111' : '#111111';
 
-          const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize}" height="${svgSize}">
+          // Çıktıda piksellenme olmaması için SVG'yi kendi içinde 4 KAT büyütüyoruz (width/height * 4)
+          const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize * 4}" height="${svgSize * 4}">
               <defs><path id="spiral" d="${pathData}" fill="none" /></defs>
               <circle cx="${cx}" cy="${cy}" r="${maxR+15}" fill="none" />
               <circle cx="${cx}" cy="${cy}" r="88" fill="none" stroke="#2a2a2a" stroke-width="1" />
@@ -415,12 +416,17 @@ export default function SpotifyPosterBuilder() {
               <circle cx="${cx}" cy="${cy}" r="8" fill="${holeColor}" />
           </svg>`;
 
-          w.fabric.loadSVGFromString(svgString, function(objects:any, options:any) {
-              const obj = w.fabric.util.groupSVGElements(objects, options);
-              obj.set({ id: 'v-vinyl-group', originX: 'center', originY: 'center', left: W / 2, top: H * 0.55 });
-              obj.scaleToWidth(W * 0.85);
-              w.canvas.add(obj); w.canvas.sendToBack(obj); w.canvas.requestRenderAll();
-          });
+          // Fabric.js'in bozuk parser'ını atlatıp, SVG'yi mükemmel çalışan BASE64 Image formatına çeviriyoruz
+          const svgBase64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgString)));
+
+          w.fabric.Image.fromURL(svgBase64, function(img: any) {
+              img.set({ id: 'v-vinyl-group', originX: 'center', originY: 'center', left: W / 2, top: H * 0.55 });
+              // Objeyi ekrana sığacak şekilde tekrar daraltıyoruz, iç yapısı 4K olduğu için jilet gibi keskin kalıyor
+              img.scaleToWidth(W * 0.85); 
+              w.canvas.add(img); 
+              w.canvas.sendToBack(img); 
+              w.canvas.requestRenderAll();
+          }, { crossOrigin: 'anonymous' });
       };
 
       w.applyAutoContrast = function(bgHex: string) {
