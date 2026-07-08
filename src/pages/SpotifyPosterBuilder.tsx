@@ -1,23 +1,3 @@
-Buradaki sorunun temel kaynağı, Fabric.js kütüphanesinin React render döngüsüyle
-senkronize olamaması, eski sürümdeki statik width: 100% !important CSS
-kurallarının Fabric.js'in oluşturduğu wrapper elementleri (üst ve alt katman
-canvas elementlerini) çökertmesi ve canvas elementinin React referansı (useRef)
-yerine ID ile seçilmeye çalışılmasıdır.
-
-Aşağıdaki güncellenmiş kodda;
-
-1.  Canvas elementine doğrudan React useRef bağlanmıştır.
-2.  Fabric.js'in kendi boyutlandırma mekanizmasını bozan agresif CSS kuralları
-    temizlenmiştir.
-3.  React yaşam döngüsüne (lifecycle) uygun olarak sayfa değişimlerinde eski
-    canvas bellekten silinip (dispose) her seferinde taze bir canvas ayağa
-    kaldırılacak şekilde ayarlanmıştır.
-4.  Orijinal kodda yer alan tüm özellikler, arama motorları, renk paletleri,
-    yerleşim ayarları, barkod üretimi, toplu ZIP çıktısı, DPI düzeltmeli yüksek
-    çözünürlüklü indirme işlevleri eksiksiz korunmuştur.
-
-İşte Fabric.js altyapısına uyarlanmış yeni kod:
-
 import React, { useEffect, useRef, useState } from 'react';
 
 export default function SpotifyPosterBuilder() {
