@@ -521,28 +521,24 @@ export default function SpotifyPosterBuilder() {
           const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
           const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
           
-          const textLen = input.length * (fs * 0.55); 
-          const minR = 100;
-          const spacing = fs * 1.2;
+          // Metnin kaplayacağı yaklaşık piksel uzunluğu
+          const textLen = input.length * (fs * 0.6); 
+          const minR = 100; // İç boşluk (Göbek)
+          const spacing = fs * 1.2; // Satır arası boşluk
           
-          const standardLoops = (380 - minR) / spacing;
-          const standardLen = Math.PI * spacing * standardLoops * standardLoops + 2 * Math.PI * minR * standardLoops;
+          // Tüm metni sığdırmak için plağın ne kadar büyümesi gerektiğini hesaplıyoruz
+          let maxR = Math.sqrt((textLen * spacing / Math.PI) + (minR * minR));
           
-          let loops = standardLoops;
-          let maxR = 380;
+          // Plak boş durmasın diye en az 380px boyutunda kalmasını sağlıyoruz
+          if (maxR < 380) maxR = 380;
           
-          if (textLen > standardLen) {
-              const a = Math.PI * spacing;
-              const b = 2 * Math.PI * minR;
-              const c = -textLen;
-              loops = (-b + Math.sqrt(b*b - 4*a*c)) / (2*a);
-              maxR = minR + loops * spacing;
-          }
+          let loops = (maxR - minR) / spacing;
           
           let svgSize = 800;
           let cx = 400;
           let cy = 400;
           
+          // Metin devasa boyuttaysa SVG çerçevesini (tuvali) de genişletiyoruz ki dışı kesilmesin
           if (maxR > 380) {
               svgSize = (maxR + 30) * 2;
               cx = svgSize / 2;
@@ -570,9 +566,10 @@ export default function SpotifyPosterBuilder() {
           let points = [];
           let steps = Math.ceil(loops * 100);
           
+          // BURASI ÖNEMLİ: Spirali İÇERİDEN (minR) DIŞARIYA (maxR) doğru ve SAAT YÖNÜNDE çiziyoruz.
           for(let i=0; i<=steps; i++) {
-              let t = -Math.PI/2 - (i/steps) * loops * Math.PI * 2;
-              let r = maxR - ((maxR - minR) * (i/steps));
+              let t = -Math.PI/2 + (i/steps) * loops * Math.PI * 2;
+              let r = minR + ((maxR - minR) * (i/steps));
               let x = cx + r * Math.cos(t);
               let y = cy + r * Math.sin(t);
               if(i===0) points.push(`M ${x} ${y}`);
@@ -589,15 +586,16 @@ export default function SpotifyPosterBuilder() {
           if(!textEl) return;
           
           const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
-          const textLen = input.length * (fs * 0.55);
+          const textLen = input.length * (fs * 0.6);
           
           const minR = 100;
           const spacing = fs * 1.2;
-          const standardLoops = (380 - minR) / spacing;
-          const standardLen = Math.PI * spacing * standardLoops * standardLoops + 2 * Math.PI * minR * standardLoops;
+          const standardLen = Math.PI * (380 + minR) * (380 - minR) / spacing;
           
           let finalStr = input.trim();
           
+          // Şarkı sözü kısaysa ve varsayılan plağı (380) boş bırakacaksa, estetik için tekrar ederek doldur. 
+          // Ama çok uzunsa zaten üstteki fonksiyon plağı genişletecek ve sözler KESİLMEDEN 1 kere tam yazılacak.
           if (textLen < standardLen) {
              let repeats = Math.ceil(standardLen / (textLen + 20));
              let arr = [];
