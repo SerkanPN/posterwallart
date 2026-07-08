@@ -35,33 +35,23 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.CANVAS_SIZES = {
-        '5.83x8.27': [5.83, 8.27], '8.27x11.69':[8.27, 11.69],
-        '11.69x16.54': [11.69, 16.54], '16.54x23.39': [16.54, 23.39],
-        '23.39x33.11': [23.39, 33.11], '5x7': [5,7], '6x8': [6,8],
-        '8x10': [8,10], '9x11': [9,11], '11x14': [11,14], '11x17': [11,17],
-        '11.7x16.5': [11.7,16.5], '12x16': [12,16], '12x18':[12,18],
-        '16x20': [16,20], '16x24': [16,24], '16.5x23.4':[16.5,23.4],
-        '18x24': [18,24], '20x30': [20,30], '22x34':[22,34],
-        '23.4x33.1':[23.4,33.1], '24x32': [24,32], '24x36': [24,36],
-        '26x36': [26,36], '28x40': [28,40], '30x40':[30,40],
-        '40x50': [40, 50], '50x60': [50,60], '60x80': [60,80], 
+        '5.83x8.27': [5.83, 8.27], '8.27x11.69':[8.27, 11.69], '11.69x16.54': [11.69, 16.54], '16.54x23.39': [16.54, 23.39],
+        '23.39x33.11': [23.39, 33.11], '5x7': [5,7], '6x8': [6,8], '8x10': [8,10], '9x11': [9,11], '11x14': [11,14], '11x17': [11,17],
+        '11.7x16.5': [11.7,16.5], '12x16': [12,16], '12x18':[12,18], '16x20': [16,20], '16x24': [16,24], '16.5x23.4':[16.5,23.4],
+        '18x24': [18,24], '20x30': [20,30], '22x34':[22,34], '23.4x33.1':[23.4,33.1], '24x32': [24,32], '24x36': [24,36],
+        '26x36': [26,36], '28x40': [28,40], '30x40':[30,40], '40x50': [40, 50], '50x60': [50,60], '60x80': [60,80], 
         '68x80': [68,80], '88x104': [88,104]
       };
 
-      w.vinylProps = {
-          fontFamily: "'DM Sans', sans-serif",
-          fontSize: 12,
-          letterSpacing: 2,
-          textColor: '#212121',
-          labelColor: '#e0e0e0',
-          labelSize: 80,
-          scale: 1,
-          lyrics: "LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA"
-      };
-
-      w.coverProps = {
-          radius: 12, borderWidth: 0, borderColor: '#ffffff', borderStyle: 'solid',
-          shadow: 40, imgX: 0, imgY: 0, imgScale: 1
+      w.ED_LABELS = {
+        'label-top':  'Top Label', 'cover': 'Cover Art', 'song-info': 'Song Info Group',
+        'song-title': 'Song Title', 'song-artist':'Artist Name', 'heart': 'Heart Icon',
+        'progress': 'Progress Bar', 'play': 'Play Button', 'btn-shuffle':'Shuffle Button',
+        'btn-prev': 'Previous Button', 'btn-next': 'Next Button', 'btn-repeat': 'Repeat Button',
+        'barcode': 'Spotify Barcode',
+        'v-top-left': 'Artist Name', 'v-top-right': 'Year',
+        'v-song-title': 'Vinyl Song Title',
+        'v-vinyl': 'Vinyl Record Graphic', 'v-bottom': 'Bottom Text'
       };
 
       w.canvas = new w.fabric.Canvas('poster-canvas', { preserveObjectStacking: true, selection: true });
@@ -100,7 +90,7 @@ export default function SpotifyPosterBuilder() {
         if (w.canvas) {
             w.canvas.setWidth(targetW);
             w.canvas.setHeight(targetH);
-            w.canvas.setZoom(visualW / targetW);
+            w.canvas.setZoom(visualW / targetW); 
             
             const lowerCanvas = document.querySelector('.canvas-container') as HTMLElement;
             if(lowerCanvas) {
@@ -108,8 +98,8 @@ export default function SpotifyPosterBuilder() {
                 lowerCanvas.style.height = visualH + 'px';
             }
             
-            if (w.POSTER_MODE === 'vinyl' && !w.vRendered) w.renderVinylFabric();
-            else if (w.POSTER_MODE === 'spotify' && !w.sRendered) w.renderSpotifyFabric();
+            if (w.POSTER_MODE === 'vinyl' && w.canvas.getObjects().length === 0) w.renderVinylFabric();
+            else if (w.POSTER_MODE === 'spotify' && w.canvas.getObjects().length === 0) w.renderSpotifyFabric();
         }
       };
 
@@ -120,16 +110,7 @@ export default function SpotifyPosterBuilder() {
         if(!toast) return;
         toast.textContent = msg;
         toast.classList.add('show');
-        setTimeout(() => toast.classList.remove('show'), 3500);
-      };
-
-      w.updateFabObj = function(id: string, prop: string, val: any) {
-          let obj = w.canvas.getObjects().find((o: any) => o.id === id);
-          if (obj) { 
-              obj.set(prop, val); 
-              w.canvas.requestRenderAll(); 
-              w.edUpdatePanelPos();
-          }
+        setTimeout(() => toast.classList.remove('show'), 3000);
       };
 
       w.syncColor = function(colorId: string, textId: string) {
@@ -144,99 +125,9 @@ export default function SpotifyPosterBuilder() {
         }
       };
 
-      // Background Handling
       w.currentCoverSrc = '';
       w.vCurrentCoverSrc = '';
 
-      w.updateBgBlur = function() {
-          const typeId = w.POSTER_MODE === 'vinyl' ? 'v-bg-type' : 'bg-type';
-          const blurId = w.POSTER_MODE === 'vinyl' ? 'v-blur-val' : 'blur-val';
-          const src = w.POSTER_MODE === 'vinyl' ? w.vCurrentCoverSrc : w.currentCoverSrc;
-          const type = (document.getElementById(typeId) as HTMLSelectElement)?.value;
-          const blurVal = parseFloat((document.getElementById(blurId) as HTMLInputElement)?.value || "10");
-
-          if (type === 'blur' && src) {
-              w.fabric.Image.fromURL(src, function(img: any) {
-                  const W = w.canvas.getWidth();
-                  const H = w.canvas.getHeight();
-                  const scale = Math.max(W / img.width, H / img.height);
-                  img.set({ originX: 'center', originY: 'center', left: W/2, top: H/2, scaleX: scale, scaleY: scale });
-                  img.filters.push(new w.fabric.Image.filters.Blur({ blur: blurVal / 25 }));
-                  img.applyFilters();
-                  w.canvas.setBackgroundImage(img, w.canvas.renderAll.bind(w.canvas));
-                  if(w.POSTER_MODE === 'vinyl') w.applyAutoContrast('#121212');
-              }, { crossOrigin: 'anonymous' });
-          } else {
-              w.updateBgColor();
-          }
-      };
-
-      w.updateBgColor = function() {
-          const colorId = w.POSTER_MODE === 'vinyl' ? 'v-bg-color' : 'bg-color';
-          const color = (document.getElementById(colorId) as HTMLInputElement)?.value || '#121212';
-          w.canvas.setBackgroundImage(null, w.canvas.renderAll.bind(w.canvas));
-          w.canvas.setBackgroundColor(color, w.canvas.renderAll.bind(w.canvas));
-          if (w.POSTER_MODE === 'vinyl') w.applyAutoContrast(color);
-      };
-
-      w.updateBg = function() {
-        const type = (document.getElementById('bg-type') as HTMLSelectElement).value;
-        document.getElementById('bg-color-section')!.style.display = type === 'color' ? 'block' : 'none';
-        document.getElementById('bg-blur-section')!.style.display = type === 'blur' ? 'block' : 'none';
-        if (type === 'blur') w.updateBgBlur(); else w.updateBgColor();
-      };
-
-      w.updateVinylBg = function() {
-        const type = (document.getElementById('v-bg-type') as HTMLSelectElement).value;
-        document.getElementById('v-bg-color-section')!.style.display = type === 'color' ? 'block' : 'none';
-        document.getElementById('v-bg-blur-section')!.style.display = type === 'blur' ? 'block' : 'none';
-        if (type === 'blur') w.updateBgBlur(); else w.updateBgColor();
-      };
-
-      w.handleCoverUpload = function(event: any) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e: any) => { w.currentCoverSrc = e.target.result; w.renderSpotifyFabric(); w.updateBg(); };
-        reader.readAsDataURL(file);
-      };
-
-      w.handleVinylCoverUpload = function(event: any) {
-        const file = event.target.files[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = (e: any) => { w.vCurrentCoverSrc = e.target.result; w.updateVinylBg(); };
-        reader.readAsDataURL(file);
-      };
-
-      w.applyAutoContrast = function(bgHex: string) {
-          if (w.POSTER_MODE !== 'vinyl') return;
-          let hex = bgHex.replace('#', '');
-          if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
-          const yiq = ((parseInt(hex.substr(0,2), 16) * 299) + (parseInt(hex.substr(2,2), 16) * 587) + (parseInt(hex.substr(4,2), 16) * 114)) / 1000;
-          const isDark = yiq < 128; 
-
-          const mainTextCol = isDark ? '#ffffff' : '#212121';
-          const subTextCol  = isDark ? '#cccccc' : '#555555';
-          const labelCol    = isDark ? '#eeeeee' : '#e0e0e0';
-
-          w.updateFabObj('v-top-left', 'fill', mainTextCol);
-          w.updateFabObj('v-top-right', 'fill', mainTextCol);
-          w.updateFabObj('v-song-title', 'fill', mainTextCol);
-          w.updateFabObj('v-bottom', 'fill', subTextCol);
-
-          w.vinylProps.textColor = mainTextCol;
-          w.vinylProps.labelColor = labelCol;
-          w.updateVinylSpiralFabric();
-
-          const setInp = (id: string, col: string) => { 
-            const el = document.getElementById(id) as HTMLInputElement; if(el) el.value = col; 
-            const txt = document.getElementById(id+'-t') as HTMLInputElement; if(txt) txt.value = col;
-          };
-          setInp('c-v-tl', mainTextCol); setInp('c-v-tr', mainTextCol); setInp('c-v-st', mainTextCol); setInp('c-v-bot', subTextCol);
-      };
-
-      // API
       w.searchSong = async function() {
         const q = (document.getElementById('search-input') as HTMLInputElement).value.trim();
         if (!q) return;
@@ -249,15 +140,12 @@ export default function SpotifyPosterBuilder() {
           const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(q)}&entity=song&limit=6`);
           const data = await res.json();
           if(spinner) spinner.style.display = 'none';
-
-          if (!data.results || data.results.length === 0) {
-            w.showToast('Sonuç bulunamadı'); return;
-          }
-
+          if (!data.results || data.results.length === 0) { w.showToast('Sonuç bulunamadı'); return; }
           if(results) {
               results.innerHTML = '';
               data.results.forEach((item: any) => {
-                const div = document.createElement('div'); div.className = 'search-result-item';
+                const div = document.createElement('div');
+                div.className = 'search-result-item';
                 div.innerHTML = `<img src="${item.artworkUrl100}" alt=""><div class="result-info"><p>${item.trackName}</p><span>${item.artistName}</span></div>`;
                 div.onclick = () => { w.applySearchResult(item); results.style.display = 'none'; };
                 results.appendChild(div);
@@ -280,43 +168,32 @@ export default function SpotifyPosterBuilder() {
           return null;
       };
 
-      w.timeToSeconds = function(timeStr: string) {
-        const parts = timeStr.split(':');
-        if (parts.length !== 2) return 0;
-        return parseInt(parts[0]) * 60 + parseInt(parts[1]);
-      };
-      w.secondsToTime = function(secs: number) {
-        const m = Math.floor(secs / 60); const s = Math.floor(secs % 60);
-        return `${m}:${s < 10 ? '0' : ''}${s}`;
-      };
-
       w.applySearchResult = async function(item: any) {
-        w.currentCoverSrc = item.artworkUrl100.replace('100x100bb', '600x600bb');
         if(w.POSTER_MODE === 'spotify') {
+            w.currentCoverSrc = item.artworkUrl100.replace('100x100bb', '600x600bb');
             const tinp = document.getElementById('song-title-input') as HTMLInputElement;
             const ainp = document.getElementById('song-artist-input') as HTMLInputElement;
-            if(tinp) { tinp.value = item.trackName; w.updateFabObj('song-title', 'text', item.trackName); }
-            if(ainp) { ainp.value = item.artistName; w.updateFabObj('song-artist', 'text', item.artistName); }
+            if(tinp) tinp.value = item.trackName;
+            if(ainp) ainp.value = item.artistName;
+
             if (item.trackTimeMillis) {
               const totalSecs = item.trackTimeMillis / 1000;
-              const endStr = w.secondsToTime(totalSecs);
+              const m = Math.floor(totalSecs / 60); const s = Math.floor(totalSecs % 60);
+              const endStr = `${m}:${s < 10 ? '0' : ''}${s}`;
               const tend = document.getElementById('time-end') as HTMLInputElement;
               if(tend) tend.value = endStr;
-              w.updateFabObj('time-end-el', 'text', endStr);
-              w.updateProgress();
             }
             w.renderSpotifyFabric();
-            w.updateBg();
             w.showToast('✓ Yüklendi');
         } else {
             const tinp = document.getElementById('v-song-title-input') as HTMLInputElement;
-            if(tinp) { tinp.value = item.trackName.toUpperCase(); w.updateFabObj('v-song-title', 'text', item.trackName.toUpperCase()); }
+            if(tinp) tinp.value = item.trackName.toUpperCase();
             const yearInp = document.getElementById('v-year-input') as HTMLInputElement;
-            if(yearInp) { yearInp.value = (new Date(item.releaseDate).getFullYear() || "1992").toString(); w.updateFabObj('v-top-right', 'text', yearInp.value); }
+            if(yearInp) yearInp.value = (new Date(item.releaseDate).getFullYear() || "1992").toString();
             const bottomInp = document.getElementById('v-bottom-input') as HTMLInputElement;
-            if (bottomInp) { bottomInp.value = (item.collectionName ? item.collectionName : "UNKNOWN ALBUM").toUpperCase(); w.updateFabObj('v-bottom', 'text', bottomInp.value); }
+            if (bottomInp) bottomInp.value = (item.collectionName ? item.collectionName : "UNKNOWN ALBUM").toUpperCase();
             const labelInp = document.getElementById('v-label-input') as HTMLInputElement;
-            if (labelInp) { labelInp.value = (item.artistName || 'ARTIST').toUpperCase(); w.updateFabObj('v-top-left', 'text', labelInp.value); }
+            if (labelInp) labelInp.value = (item.artistName || 'ARTIST').toUpperCase();
 
             w.showToast('Sözler aranıyor...');
             let lyrics = await w.fetchLyrics(item.artistName, item.trackName);
@@ -328,23 +205,137 @@ export default function SpotifyPosterBuilder() {
                 if(linp) linp.value = "LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA";
                 w.showToast('Sözler bulunamadı, taslak eklendi');
             }
-            w.vinylProps.lyrics = linp.value;
-            w.updateVinylSpiralFabric(); 
+            w.renderVinylFabric(); 
         }
       };
 
-      // Spotify Logic
-      w.sRendered = false;
-      w.renderSpotifyFabric = function() {
-          w.canvas.clear();
-          w.sRendered = true;
+      w.getFabObj = (id: string) => w.canvas.getObjects().find((o:any) => o.id === id);
+
+      w.applyBgFabric = function() {
+          const type = (document.getElementById(w.POSTER_MODE === 'vinyl' ? 'v-bg-type' : 'bg-type') as HTMLSelectElement).value;
+          const color = (document.getElementById(w.POSTER_MODE === 'vinyl' ? 'v-bg-color' : 'bg-color') as HTMLInputElement).value || '#121212';
+          const src = w.POSTER_MODE === 'vinyl' ? w.vCurrentCoverSrc : w.currentCoverSrc;
+          const blurVal = parseInt((document.getElementById(w.POSTER_MODE === 'vinyl' ? 'v-blur-val' : 'blur-val') as HTMLInputElement).value || "10");
+
+          if (type === 'color' || !src) {
+              w.canvas.backgroundImage = null;
+              w.canvas.setBackgroundColor(color, w.canvas.renderAll.bind(w.canvas));
+              if (w.POSTER_MODE === 'vinyl') w.applyAutoContrast(color);
+          } else {
+              w.canvas.setBackgroundColor('#121212', w.canvas.renderAll.bind(w.canvas));
+              w.fabric.Image.fromURL(src, function(img: any) {
+                  const W = w.canvas.getWidth();
+                  const H = w.canvas.getHeight();
+                  const scale = Math.max(W / img.width, H / img.height);
+                  img.set({ originX: 'center', originY: 'center', left: W/2, top: H/2, scaleX: scale, scaleY: scale });
+                  const filter = new w.fabric.Image.filters.Blur({ blur: blurVal / 10 });
+                  const bright = new w.fabric.Image.filters.Brightness({ brightness: -0.2 });
+                  img.filters.push(filter, bright);
+                  img.applyFilters();
+                  w.canvas.setBackgroundImage(img, w.canvas.renderAll.bind(w.canvas));
+                  if (w.POSTER_MODE === 'vinyl') w.applyAutoContrast('#121212');
+              }, { crossOrigin: 'anonymous' });
+          }
+      };
+
+      w.applyAutoContrast = function(bgHex: string) {
+          if (w.POSTER_MODE !== 'vinyl') return;
+          let hex = bgHex.replace('#', '');
+          if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+          const yiq = ((parseInt(hex.substr(0,2), 16) * 299) + (parseInt(hex.substr(2,2), 16) * 587) + (parseInt(hex.substr(4,2), 16) * 114)) / 1000;
+          const isDark = yiq < 128; 
+
+          const main = isDark ? '#ffffff' : '#212121';
+          const sub = isDark ? '#cccccc' : '#555555';
+
+          w.setFabProp('v-top-left', 'fill', main);
+          w.setFabProp('v-top-right', 'fill', main);
+          w.setFabProp('v-song-title', 'fill', main);
+          w.setFabProp('v-bottom', 'fill', sub);
+
+          const setInp = (id: string, col: string) => { 
+            const el = document.getElementById(id) as HTMLInputElement; if(el) el.value = col; 
+            const txt = document.getElementById(id+'-t') as HTMLInputElement; if(txt) txt.value = col;
+          };
+          setInp('c-v-tl', main); setInp('c-v-tr', main); setInp('c-v-st', main); setInp('c-v-bot', sub);
+      };
+
+      w.setFabProp = (id: string, prop: string, val: any) => {
+          const obj = w.getFabObj(id);
+          if (obj) { obj.set(prop, val); w.canvas.requestRenderAll(); }
+      };
+
+      w.handleSpotifyInput = async function() {
+        const input = (document.getElementById('spotify-uri') as HTMLInputElement).value.trim();
+        let uri = null;
+        if (input.match(/track\/([a-zA-Z0-9]+)/)) uri = `spotify:track:${input.match(/track\/([a-zA-Z0-9]+)/)![1]}`;
+        else if (input.match(/spotify:track:([a-zA-Z0-9]+)/)) uri = input;
+        
+        if (uri) {
+            w.currentTrackUri = uri;
+            const spotifyUrl = `https://scannables.scdn.co/uri/plain/svg/ffffff/black/640/${uri}`;
+            const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(spotifyUrl)}`;
+            try {
+                const res = await fetch(url);
+                if (res.ok) {
+                    w.cachedSvgText = await res.text();
+                    w.renderSpotifyBarcode();
+                }
+            } catch(e) {}
+        }
+      };
+
+      w.renderSpotifyBarcode = function() {
+          const old = w.getFabObj('barcode');
+          if (old) w.canvas.remove(old);
+          
+          const show = (document.getElementById('show-barcode') as HTMLInputElement).checked;
+          if (!show || !w.cachedSvgText) return;
+
           const W = w.canvas.getWidth();
           const H = w.canvas.getHeight();
           const S = W / 2400; 
-          w.updateBg();
 
-          const cwPct = parseFloat((document.getElementById('content-width') as HTMLInputElement)?.value || "71") / 100;
-          const cardW = W * cwPct;
+          const logoColor = (document.getElementById('barcode-logo-color') as HTMLInputElement).value || '#FFFFFF';
+          const barColor  = (document.getElementById('barcode-bar-color') as HTMLInputElement).value || '#FFFFFF';
+          const heightPx  = parseFloat((document.getElementById('barcode-height') as HTMLInputElement).value || "48");
+          const opacity   = parseFloat((document.getElementById('barcode-section')?.style.opacity || "1"));
+
+          const parser = new DOMParser();
+          const doc = parser.parseFromString(w.cachedSvgText, 'image/svg+xml');
+          const fetched = doc.querySelector('svg');
+          if (!fetched) return;
+
+          Array.from(fetched.querySelectorAll('rect')).forEach((r, i) => {
+            if (i === 0) r.remove(); 
+            else r.setAttribute('fill', barColor);
+          });
+          fetched.querySelectorAll('circle').forEach(el => el.setAttribute('fill', logoColor));
+          fetched.querySelectorAll('path').forEach(el => {
+            if (el.getAttribute('fill') && el.getAttribute('fill') !== 'none') el.setAttribute('fill', logoColor);
+            if (el.getAttribute('stroke') && el.getAttribute('stroke') !== 'none') el.setAttribute('stroke', logoColor);
+          });
+
+          w.fabric.loadSVGFromString(fetched.outerHTML, (objs:any, opts:any) => {
+              let ctrl = w.fabric.util.groupSVGElements(objs, opts);
+              ctrl.set({ id: 'barcode', originX: 'center', originY: 'bottom', left: W/2, top: H - (120*S), opacity: opacity });
+              const scale = (heightPx * 3) / ctrl.height; 
+              ctrl.scale(scale);
+              w.canvas.add(ctrl);
+              w.canvas.requestRenderAll();
+          });
+      };
+
+      w.renderSpotifyFabric = function() {
+          w.canvas.clear();
+          w.applyBgFabric();
+
+          const W = w.canvas.getWidth();
+          const H = w.canvas.getHeight();
+          const S = W / 2400; 
+          
+          const contentW = parseFloat((document.getElementById('spotify-card')?.style.width || "71.4")) / 100;
+          const cardW = W * contentW;
           const cardX = (W - cardW) / 2;
           let currentY = H * (parseFloat((document.getElementById('content-y') as HTMLInputElement)?.value || "50") / 100);
           
@@ -352,134 +343,74 @@ export default function SpotifyPosterBuilder() {
           let totalHeight = (40*S) + itemSpacing + cardW + itemSpacing + (75*S) + (45*S) + itemSpacing + (12*S) + itemSpacing + (35*S) + (60*S);
           let startY = currentY - (totalHeight / 2);
 
-          const lblTopVis = (document.getElementById('show-label-top') as HTMLInputElement)?.checked ?? true;
-          let lbl = new w.fabric.IText((document.getElementById('label-top-input') as HTMLInputElement)?.value || "NOW PLAYING", { id: 'label-top', left: W/2, top: startY, fontSize: 36*S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-s-tl') as HTMLInputElement)?.value || "#FFFFFF", originX: 'center', charSpacing: 150, textTransform: 'uppercase', visible: lblTopVis });
-          w.canvas.add(lbl); startY += lbl.height + itemSpacing;
+          if ((document.getElementById('show-label-top') as HTMLInputElement).checked) {
+              let lbl = new w.fabric.IText((document.getElementById('label-top-input') as HTMLInputElement).value || "NOW PLAYING", { id: 'label-top', left: W/2, top: startY, fontSize: 36*S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-s-tl') as HTMLInputElement).value || "#FFFFFF", originX: 'center', charSpacing: 150, textTransform: 'uppercase' });
+              w.canvas.add(lbl); 
+          }
+          startY += (40*S) + itemSpacing;
 
-          const br = w.coverProps.radius * S;
-          const bw = w.coverProps.borderWidth * S;
-          let coverBg = new w.fabric.Rect({ id: 'cover', left: cardX, top: startY, width: cardW, height: cardW, fill: '#282828', rx: br, ry: br, stroke: w.coverProps.borderColor, strokeWidth: bw, shadow: new w.fabric.Shadow({ color: 'rgba(0,0,0,0.8)', blur: w.coverProps.shadow*S, offsetX: 0, offsetY: (w.coverProps.shadow/2)*S }) });
-          w.canvas.add(coverBg);
+          let coverGroup = new w.fabric.Group([], { id: 'cover', left: W/2, top: startY + cardW/2, originX: 'center', originY: 'center', width: cardW, height: cardW, clipPath: new w.fabric.Rect({ width: cardW, height: cardW, rx: 12*S, ry: 12*S, originX: 'center', originY: 'center' }) });
+          let coverBg = new w.fabric.Rect({ left: 0, top: 0, originX: 'center', originY: 'center', width: cardW, height: cardW, fill: '#282828' });
+          coverGroup.addWithUpdate(coverBg);
           
           if (w.currentCoverSrc) {
               w.fabric.Image.fromURL(w.currentCoverSrc, function(img: any) {
-                  img.scale(w.coverProps.imgScale * (cardW / img.width));
-                  img.set({ id: 'cover-img', left: cardX + (w.coverProps.imgX*S), top: coverBg.top + (w.coverProps.imgY*S), clipPath: new w.fabric.Rect({ width: cardW, height: cardW, left: cardX, top: coverBg.top, rx: br, ry: br, absolutePositioned: true }) });
-                  w.canvas.add(img); w.canvas.sendToBack(img); w.canvas.sendToBack(w.canvas.backgroundImage); w.canvas.bringForward(img); w.canvas.requestRenderAll();
+                  img.scaleToWidth(cardW);
+                  img.set({ originX: 'center', originY: 'center', left: 0, top: 0 });
+                  coverGroup.addWithUpdate(img);
+                  w.canvas.requestRenderAll();
               }, { crossOrigin: 'anonymous' });
           }
+          w.canvas.add(coverGroup);
           startY += cardW + itemSpacing + (20*S);
 
-          let title = new w.fabric.IText((document.getElementById('song-title-input') as HTMLInputElement)?.value || "Song Title", { id: 'song-title', left: cardX, top: startY, fontSize: 75*S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-s-st') as HTMLInputElement)?.value || "#FFFFFF" });
+          let title = new w.fabric.IText((document.getElementById('song-title-input') as HTMLInputElement).value || "Song Title", { id: 'song-title', left: cardX, top: startY, fontSize: 75*S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-s-st') as HTMLInputElement).value || "#FFFFFF" });
           w.canvas.add(title);
-          let artist = new w.fabric.IText((document.getElementById('song-artist-input') as HTMLInputElement)?.value || "Artist Name", { id: 'song-artist', left: cardX, top: startY + 80*S, fontSize: 45*S, fontFamily: 'DM Sans', fontWeight: 400, fill: (document.getElementById('c-s-sa') as HTMLInputElement)?.value || "#B3B3B3" });
-          w.canvas.add(artist);
-          
-          const heartVis = (document.getElementById('show-heart') as HTMLInputElement)?.checked ?? true;
-          const heartSvg = `<svg viewBox="0 0 24 24" fill="#1DB954"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>`;
-          w.fabric.loadSVGFromString(heartSvg, (objs:any, opts:any) => {
-              let ctrl = w.fabric.util.groupSVGElements(objs, opts);
-              ctrl.scaleToWidth(60*S); ctrl.set({ left: cardX + cardW, top: startY + 10*S, originX: 'right', id: 'heart', visible: heartVis });
-              w.canvas.add(ctrl);
-          });
-          startY += 180*S;
+          let artist = new w.fabric.IText((document.getElementById('song-artist-input') as HTMLInputElement).value || "Artist Name", { id: 'song-artist', left: cardX, top: startY + 80*S, fontSize: 45*S, fontFamily: 'DM Sans', fontWeight: 400, fill: (document.getElementById('c-s-sa') as HTMLInputElement).value || "#B3B3B3" });
+          w.canvas.add(artist); startY += 180*S;
 
-          const progVis = (document.getElementById('show-progress') as HTMLInputElement)?.checked ?? true;
-          let pct = parseFloat((document.getElementById('progress-val') as HTMLInputElement)?.value || "35");
-          let track = new w.fabric.Rect({ left: cardX, top: startY, width: cardW, height: 12*S, fill: '#535353', rx: 6*S, ry: 6*S });
-          let fill = new w.fabric.Rect({ left: cardX, top: startY, width: cardW * (pct/100), height: 12*S, fill: '#FFFFFF', rx: 6*S, ry: 6*S });
-          let timeStart = new w.fabric.IText((document.getElementById('time-start') as HTMLInputElement)?.value || "1:12", { id: 'time-start-el', left: cardX, top: startY + 30*S, fontSize: 32*S, fontFamily: 'DM Sans', fill: '#B3B3B3' });
-          let timeEnd = new w.fabric.IText((document.getElementById('time-end') as HTMLInputElement)?.value || "3:45", { id: 'time-end-el', left: cardX + cardW, top: startY + 30*S, fontSize: 32*S, fontFamily: 'DM Sans', fill: '#B3B3B3', originX: 'right' });
-          let progGroup = new w.fabric.Group([track, fill, timeStart, timeEnd], { id: 'progress', visible: progVis });
-          w.canvas.add(progGroup); startY += 100*S;
+          const progShow = (document.querySelector('#progress-section')?.closest('.toggle-row')?.querySelector('input') as HTMLInputElement)?.checked ?? true;
+          if (progShow) {
+              let track = new w.fabric.Rect({ id: 'progress', left: cardX, top: startY, width: cardW, height: 12*S, fill: '#535353', rx: 6*S, ry: 6*S });
+              let pct = parseFloat((document.getElementById('progress-val') as HTMLInputElement).value || "35");
+              let fill = new w.fabric.Rect({ id: 'progress-fill', left: cardX, top: startY, width: cardW * (pct/100), height: 12*S, fill: '#FFFFFF', rx: 6*S, ry: 6*S });
+              w.canvas.add(track, fill);
+              
+              let timeStart = new w.fabric.IText((document.getElementById('time-start') as HTMLInputElement)?.value || "1:12", { id: 'time-start-el', left: cardX, top: startY + 30*S, fontSize: 32*S, fontFamily: 'DM Sans', fill: '#B3B3B3' });
+              let timeEnd = new w.fabric.IText((document.getElementById('time-end') as HTMLInputElement)?.value || "3:45", { id: 'time-end-el', left: cardX + cardW, top: startY + 30*S, fontSize: 32*S, fontFamily: 'DM Sans', fill: '#B3B3B3', originX: 'right' });
+              w.canvas.add(timeStart, timeEnd); 
+          }
+          startY += 100*S;
 
-          const ctrlVis = (document.getElementById('show-controls') as HTMLInputElement)?.checked ?? true;
-          const ctrlSvg = `<svg viewBox="0 0 500 80" xmlns="http://www.w3.org/2000/svg"><path d="M10,30 L30,15 V45 Z" fill="#b3b3b3"/><path d="M30,30 L50,15 V45 Z" fill="#b3b3b3"/><path d="M120,40 L160,20 V60 Z" fill="#b3b3b3"/><rect x="110" y="20" width="8" height="40" fill="#b3b3b3"/><circle cx="250" cy="40" r="40" fill="#fff"/><polygon points="235,20 275,40 235,60" fill="#000"/><path d="M340,20 L380,40 L340,60 Z" fill="#b3b3b3"/><rect x="382" y="20" width="8" height="40" fill="#b3b3b3"/><path d="M450,15 L470,30 L450,45 Z" fill="#b3b3b3"/><path d="M470,15 L490,30 L470,45 Z" fill="#b3b3b3"/></svg>`;
-          w.fabric.loadSVGFromString(ctrlSvg, (objs:any, opts:any) => {
-              let ctrl = w.fabric.util.groupSVGElements(objs, opts);
-              ctrl.scaleToWidth(cardW * 0.9); ctrl.set({ left: W/2, top: startY, originX: 'center', id: 'controls', visible: ctrlVis });
-              w.canvas.add(ctrl); w.canvas.requestRenderAll();
-          });
-          
-          w.drawBarcode();
-      };
-
-      w.updateLayout = function() {
-          if (w.POSTER_MODE === 'spotify') w.renderSpotifyFabric();
-      };
-
-      w.updateProgress = function() {
-          const s = w.timeToSeconds((document.getElementById('time-start') as HTMLInputElement)?.value || "0:00");
-          const e = w.timeToSeconds((document.getElementById('time-end') as HTMLInputElement)?.value || "0:01");
-          let pct = e > 0 ? (s / e) * 100 : 0;
-          if(pct < 0) pct=0; if(pct>100) pct=100;
-          const pval = document.getElementById('progress-val') as HTMLInputElement;
-          if(pval) pval.value = pct.toString();
-          document.getElementById('progress-display')!.textContent = Math.round(pct) + '%';
-          w.renderSpotifyFabric();
-      };
-
-      w.cachedSvgText = null;
-      w.drawBarcode = async function() {
-          if(w.POSTER_MODE !== 'spotify') return;
-          const uri = (document.getElementById('spotify-uri') as HTMLInputElement)?.value || w.currentTrackUri;
-          if (!uri) return;
-          const vis = (document.getElementById('show-barcode') as HTMLInputElement)?.checked ?? true;
-          const ht = parseFloat((document.getElementById('barcode-height') as HTMLInputElement)?.value || "48");
-          const op = parseFloat((document.getElementById('barcode-opacity') as HTMLInputElement)?.value || "100") / 100;
-          const lCol = (document.getElementById('barcode-logo-color') as HTMLInputElement)?.value || "#ffffff";
-          const bCol = (document.getElementById('barcode-bar-color') as HTMLInputElement)?.value || "#ffffff";
-          
-          let existing = w.canvas.getObjects().find((o:any) => o.id === 'barcode');
-          if(existing) w.canvas.remove(existing);
-
-          if (!w.cachedSvgText || w.currentTrackUri !== uri) {
-              w.currentTrackUri = uri;
-              let trackId = uri.replace('spotify:track:', '');
-              const url = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://scannables.scdn.co/uri/plain/svg/ffffff/black/640/spotify:track:${trackId}`)}`;
-              try {
-                  const res = await fetch(url);
-                  w.cachedSvgText = await res.text();
-              } catch(e) { return; }
+          const ctrlShow = (document.querySelector('#controls-row')?.closest('.accordion-content')?.querySelector('.toggle-row input') as HTMLInputElement)?.checked ?? true;
+          if (ctrlShow) {
+              const ctrlSvg = `<svg viewBox="0 0 500 80" xmlns="http://www.w3.org/2000/svg"><path d="M10,30 L30,15 V45 Z" fill="#b3b3b3"/><path d="M30,30 L50,15 V45 Z" fill="#b3b3b3"/><path d="M120,40 L160,20 V60 Z" fill="#b3b3b3"/><rect x="110" y="20" width="8" height="40" fill="#b3b3b3"/><circle cx="250" cy="40" r="40" fill="#fff"/><polygon points="235,20 275,40 235,60" fill="#000"/><path d="M340,20 L380,40 L340,60 Z" fill="#b3b3b3"/><rect x="382" y="20" width="8" height="40" fill="#b3b3b3"/><path d="M450,15 L470,30 L450,45 Z" fill="#b3b3b3"/><path d="M470,15 L490,30 L470,45 Z" fill="#b3b3b3"/></svg>`;
+              w.fabric.loadSVGFromString(ctrlSvg, (objs:any, opts:any) => {
+                  let ctrl = w.fabric.util.groupSVGElements(objs, opts);
+                  ctrl.scaleToWidth(cardW * 0.9); ctrl.set({ left: W/2, top: startY, originX: 'center', id: 'controls' });
+                  w.canvas.add(ctrl); w.canvas.requestRenderAll();
+              });
           }
 
-          if(!w.cachedSvgText) return;
-          const parser = new DOMParser();
-          const doc = parser.parseFromString(w.cachedSvgText, 'image/svg+xml');
-          const fetched = doc.querySelector('svg');
-          if(!fetched) return;
-
-          const allRects = Array.from(fetched.querySelectorAll('rect'));
-          allRects.forEach((r, i) => { if (i === 0) r.remove(); else r.setAttribute('fill', bCol); });
-          fetched.querySelectorAll('circle').forEach(el => el.setAttribute('fill', lCol));
-          fetched.querySelectorAll('path').forEach(el => {
-              if (el.getAttribute('fill') && el.getAttribute('fill') !== 'none') el.setAttribute('fill', lCol);
-              if (el.getAttribute('stroke') && el.getAttribute('stroke') !== 'none') el.setAttribute('stroke', lCol);
-          });
-
-          w.fabric.loadSVGFromString(fetched.outerHTML, (objs:any, opts:any) => {
-              let ctrl = w.fabric.util.groupSVGElements(objs, opts);
-              const S = w.canvas.getWidth() / 2400;
-              ctrl.scaleToHeight(ht * S * 4); 
-              ctrl.set({ left: w.canvas.getWidth()/2, top: w.canvas.getHeight() - (150*S), originX: 'center', id: 'barcode', visible: vis, opacity: op });
-              w.canvas.add(ctrl); w.canvas.requestRenderAll();
-          });
+          w.renderSpotifyBarcode();
       };
 
-      // Vinyl Logic
-      w.vRendered = false;
+      w.vinylState = {
+          spiralColor: '#212121', labelColor: '#e0e0e0', tsz: 12, lsz: 80, ls: 2, hw: 85
+      };
+
       w.renderVinylFabric = function() {
           w.canvas.clear();
-          w.vRendered = true;
+          w.applyBgFabric();
+          
           const W = w.canvas.getWidth();
           const H = w.canvas.getHeight();
           const S = W / 2400; 
-          w.updateVinylBg();
 
-          const tl = new w.fabric.IText((document.getElementById('v-label-input') as HTMLInputElement)?.value || "ARTIST NAME", { id: 'v-top-left', left: W * 0.08, top: H * 0.08, fontSize: 50 * S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-v-tl') as HTMLInputElement)?.value || '#212121', originX: 'left', originY: 'top', charSpacing: 100, textTransform: 'uppercase' });
-          const tr = new w.fabric.IText((document.getElementById('v-year-input') as HTMLInputElement)?.value || "1992", { id: 'v-top-right', left: W * 0.92, top: H * 0.08, fontSize: 50 * S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-v-tr') as HTMLInputElement)?.value || '#212121', originX: 'right', originY: 'top', charSpacing: 100, textTransform: 'uppercase' });
-          const st = new w.fabric.IText((document.getElementById('v-song-title-input') as HTMLInputElement)?.value || "SONG NAME", { id: 'v-song-title', left: W / 2, top: H * 0.12, fontSize: 130 * S, fontFamily: 'Josefin Sans', fontWeight: 800, fill: (document.getElementById('c-v-st') as HTMLInputElement)?.value || '#212121', originX: 'center', originY: 'top', charSpacing: 40, textAlign: 'center', textTransform: 'uppercase' });
-          const bot = new w.fabric.IText((document.getElementById('v-bottom-input') as HTMLInputElement)?.value || "UNKNOWN ALBUM", { id: 'v-bottom', left: W / 2, top: H * 0.92, fontSize: 46 * S, fontFamily: 'DM Sans', fontWeight: 600, fill: (document.getElementById('c-v-bot') as HTMLInputElement)?.value || '#555555', originX: 'center', originY: 'bottom', charSpacing: 50, textAlign: 'center', textTransform: 'uppercase' });
+          const tl = new w.fabric.IText((document.getElementById('v-label-input') as HTMLInputElement).value || "ARTIST NAME", { id: 'v-top-left', left: W * 0.08, top: H * 0.08, fontSize: 50 * S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-v-tl') as HTMLInputElement).value || '#212121', originX: 'left', originY: 'top', charSpacing: 100 });
+          const tr = new w.fabric.IText((document.getElementById('v-year-input') as HTMLInputElement).value || "1992", { id: 'v-top-right', left: W * 0.92, top: H * 0.08, fontSize: 50 * S, fontFamily: 'DM Sans', fontWeight: 700, fill: (document.getElementById('c-v-tr') as HTMLInputElement).value || '#212121', originX: 'right', originY: 'top', charSpacing: 100 });
+          const st = new w.fabric.IText((document.getElementById('v-song-title-input') as HTMLInputElement).value || "SONG NAME", { id: 'v-song-title', left: W / 2, top: H * 0.12, fontSize: 130 * S, fontFamily: 'Josefin Sans', fontWeight: 800, fill: (document.getElementById('c-v-st') as HTMLInputElement).value || '#212121', originX: 'center', originY: 'top', charSpacing: 40, textAlign: 'center' });
+          const bot = new w.fabric.IText((document.getElementById('v-bottom-input') as HTMLInputElement).value || "UNKNOWN ALBUM", { id: 'v-bottom', left: W / 2, top: H * 0.92, fontSize: 46 * S, fontFamily: 'DM Sans', fontWeight: 600, fill: (document.getElementById('c-v-bot') as HTMLInputElement).value || '#555555', originX: 'center', originY: 'bottom', charSpacing: 50, textAlign: 'center' });
 
           w.canvas.add(tl, tr, st, bot);
           w.updateVinylSpiralFabric();
@@ -489,18 +420,20 @@ export default function SpotifyPosterBuilder() {
           if(w.POSTER_MODE !== 'vinyl') return;
           
           let existing = w.canvas.getObjects().find((o:any) => o.id === 'v-vinyl');
+          let currentScale = existing ? existing.scaleX : null;
+          let currentLeft = existing ? existing.left : null;
+          let currentTop = existing ? existing.top : null;
           if (existing) w.canvas.remove(existing);
 
           const W = w.canvas.getWidth();
           const H = w.canvas.getHeight();
           
-          const fs = w.vinylProps.fontSize;
-          const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || w.vinylProps.lyrics;
-          w.vinylProps.lyrics = input;
+          const fs = w.vinylState.tsz;
+          const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
           
           const textLen = input.length * (fs * 0.6); 
           const minR = 100;
-          const spacing = fs * (w.vinylProps.letterSpacing / 2 + 1);
+          const spacing = fs * 1.2;
           
           let maxR = Math.sqrt((textLen * spacing / Math.PI) + (minR * minR));
           if (maxR < 380) maxR = 380;
@@ -534,32 +467,38 @@ export default function SpotifyPosterBuilder() {
           const svgString = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize * upscale}" height="${svgSize * upscale}">
               <defs><path id="spiral" d="${pathData}" fill="none" /></defs>
               <circle cx="${cx}" cy="${cy}" r="${maxR+15}" fill="none" />
-              <circle cx="${cx}" cy="${cy}" r="${w.vinylProps.labelSize*1.1}" fill="none" stroke="#2a2a2a" stroke-width="1" />
-              <circle cx="${cx}" cy="${cy}" r="${w.vinylProps.labelSize*1.15}" fill="none" stroke="#2a2a2a" stroke-width="1" />
-              <text fill="${w.vinylProps.textColor}" font-size="${fs}" letter-spacing="${w.vinylProps.letterSpacing}" font-family="${w.vinylProps.fontFamily.replace(/'/g, '')}" font-weight="700" text-anchor="start">
-                  <textPath href="#spiral" startOffset="0%">${finalStr.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textPath>
+              <circle cx="${cx}" cy="${cy}" r="${w.vinylState.lsz * 1.1}" fill="none" stroke="#2a2a2a" stroke-width="1" />
+              <circle cx="${cx}" cy="${cy}" r="${w.vinylState.lsz * 1.15}" fill="none" stroke="#2a2a2a" stroke-width="1" />
+              <text fill="${w.vinylState.spiralColor}" font-size="${fs}" letter-spacing="${w.vinylState.ls}" font-family="DM Sans" font-weight="700" text-anchor="start">
+                  <textPath href="#spiral" startOffset="0%">${finalStr}</textPath>
               </text>
-              <circle cx="${cx}" cy="${cy}" r="${w.vinylProps.labelSize}" fill="${w.vinylProps.labelColor}" />
-              <circle cx="${cx}" cy="${cy}" r="${w.vinylProps.labelSize/10}" fill="#111111" />
+              <circle cx="${cx}" cy="${cy}" r="${w.vinylState.lsz}" fill="${w.vinylState.labelColor}" />
+              <circle cx="${cx}" cy="${cy}" r="${w.vinylState.lsz/10}" fill="#111111" />
           </svg>`;
 
           const svgBase64 = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgString)));
 
           w.fabric.Image.fromURL(svgBase64, function(img: any) {
-              img.set({ id: 'v-vinyl', originX: 'center', originY: 'center', left: W / 2, top: H * 0.55 });
-              img.scaleToWidth(W * 0.85 * w.vinylProps.scale); 
-              w.canvas.add(img); w.canvas.sendToBack(img); w.canvas.sendToBack(w.canvas.backgroundImage);
+              const defScale = (W * (w.vinylState.hw / 100)) / img.width;
+              img.set({ 
+                  id: 'v-vinyl', 
+                  originX: 'center', 
+                  originY: 'center', 
+                  left: currentLeft !== null ? currentLeft : W / 2, 
+                  top: currentTop !== null ? currentTop : H * 0.55,
+                  scaleX: currentScale !== null ? currentScale : defScale,
+                  scaleY: currentScale !== null ? currentScale : defScale
+              });
+              w.canvas.add(img); 
+              w.canvas.sendToBack(img); 
               w.canvas.requestRenderAll();
+              if (w.canvas.getActiveObject()?.id === 'v-vinyl') w.edUpdatePanel();
           }, { crossOrigin: 'anonymous' });
       };
 
-      // Editor Engine
-      w.ED_LABELS = {
-        'label-top':  'Top Label', 'cover': 'Cover Art', 'song-title': 'Song Title', 'song-artist':'Artist Name', 
-        'heart': 'Heart Icon', 'progress': 'Progress Group', 'controls': 'Controls Group', 'barcode': 'Spotify Barcode',
-        'v-top-left': 'Artist Name', 'v-top-right': 'Year', 'v-song-title': 'Vinyl Song Title', 'v-vinyl': 'Vinyl Record Graphic', 'v-bottom': 'Bottom Text'
-      };
-
+      // ──────────────────────────────────────────────────────────
+      // NEW RIGHT PANEL EDITOR (DIRECT FABRIC CONTROL)
+      // ──────────────────────────────────────────────────────────
       w.edSel = [];
       w.canvas.on('selection:created', function() { w.handleSelection(); });
       w.canvas.on('selection:updated', function() { w.handleSelection(); });
@@ -584,11 +523,13 @@ export default function SpotifyPosterBuilder() {
         const activeObj = w.canvas.getActiveObject();
 
         if (!activeObj) {
-          if(empty) empty.style.display = ''; if(fields) fields.style.display = 'none';
+          if(empty) empty.style.display = ''; 
+          if(fields) fields.style.display = 'none';
           if(nameEl) nameEl.textContent = ''; return;
         }
 
-        if(empty) empty.style.display = 'none'; if(fields) fields.style.display = '';
+        if(empty) empty.style.display = 'none'; 
+        if(fields) fields.style.display = '';
 
         if (activeObj.type === 'activeSelection') {
           if(nameEl) nameEl.textContent = w.edSel.length + ' elements';
@@ -596,7 +537,7 @@ export default function SpotifyPosterBuilder() {
           return;
         }
 
-        if(nameEl) nameEl.textContent = w.ED_LABELS[activeObj.id] || activeObj.id.toUpperCase();
+        if(nameEl) nameEl.textContent = w.ED_LABELS[activeObj.id] || activeObj.id;
         if(fields) fields.innerHTML = w.edBuildSingle(activeObj);
       };
 
@@ -612,18 +553,10 @@ export default function SpotifyPosterBuilder() {
           if (!obj) return;
 
           const applyChange = (o: any) => {
-              if (o.id === 'v-vinyl') {
-                  if (prop === 'fontFamily') { w.vinylProps.fontFamily = val; w.updateVinylSpiralFabric(); return; }
-                  if (prop === 'scaleX') { w.vinylProps.scale = val; w.updateVinylSpiralFabric(); return; }
-              }
-
-              if (['left', 'top', 'width', 'height', 'fontSize', 'charSpacing', 'lineHeight', 'opacity', 'strokeWidth', 'scaleX', 'scaleY'].includes(prop)) {
+              if (['left', 'top', 'width', 'height', 'fontSize', 'charSpacing', 'lineHeight', 'opacity', 'strokeWidth'].includes(prop)) {
                   o.set(prop, parseFloat(val));
               } else if (prop === 'text' && (o.type === 'i-text' || o.type === 'textbox')) {
-                  o.set('text', o.textTransform === 'uppercase' ? val.toUpperCase() : val);
-              } else if (prop === 'textTransform') {
-                  o.set('textTransform', val);
-                  if (val === 'uppercase') o.set('text', o.text.toUpperCase());
+                  o.set('text', val);
               } else {
                   o.set(prop, val);
               }
@@ -667,18 +600,27 @@ export default function SpotifyPosterBuilder() {
           const col = obj.fill || '#000000';
           const ls  = obj.charSpacing || 0;
           const lh  = obj.lineHeight || 1.2;
-          const isUC = obj.textTransform === 'uppercase';
           const ff = obj.fontFamily ? `'${obj.fontFamily}'` : "'DM Sans', sans-serif";
 
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text properties</div><div class="pf-row"><label>Content</label><input type="text" value="${txt}" oninput="window.applyToActiveObject('text', this.value)"></div><div class="pf-row"><label>Font Family</label><select onchange="window.applyToActiveObject('fontFamily', this.value)"><option value="${ff}" selected>Current Font</option>${fontOpts}</select></div><div class="pf-2col"><div class="pf-row"><label>Font Size</label><input type="number" value="${fs}" min="6" max="1000" oninput="window.applyToActiveObject('fontSize', this.value)"></div><div class="pf-row"><label>Weight</label><select onchange="window.applyToActiveObject('fontWeight', this.value)"><option value="300" ${fw==='300'?'selected':''}>Light</option><option value="400" ${fw==='400'||fw==='normal'?'selected':''}>Regular</option><option value="500" ${fw==='500'?'selected':''}>Medium</option><option value="600" ${fw==='600'?'selected':''}>SemiBold</option><option value="700" ${fw==='700'||fw==='bold'?'selected':''}>Bold</option><option value="900" ${fw==='900'?'selected':''}>Black</option></select></div></div><div class="pf-row"><label>Letter Spacing</label>${rrow(-50,500,1,ls, `window.applyToActiveObject('charSpacing', this.value)`)}</div><div class="pf-row"><label>Line Height</label>${rrow(0.8,4,0.05,parseFloat(lh), `window.applyToActiveObject('lineHeight', this.value)`, '')}</div><div class="pf-row"><label>Alignment</label><div class="pf-3col"><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'left')">Left</button><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'center')">Center</button><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'right')">Right</button></div></div><div class="pf-toggle-row"><span>Uppercase</span><label class="toggle"><input type="checkbox" ${isUC?'checked':''} onchange="window.applyToActiveObject('textTransform', this.checked ? 'uppercase' : 'none')"><span class="slider"></span></label></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text Color</div><div class="pf-row">${cpair(col, `window.applyToActiveObject('fill', this.value)`)}</div></div>`;
-        }
-
-        if (obj.id === 'cover') {
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Cover Art</div><div class="pf-row"><label>Border Radius</label>${rrow(0,50,1,w.coverProps.radius, `window.coverProps.radius=this.value; window.renderSpotifyFabric();`)}</div><div class="pf-row"><label>Border Width</label>${rrow(0,20,1,w.coverProps.borderWidth, `window.coverProps.borderWidth=this.value; window.renderSpotifyFabric();`)}</div><div class="pf-row"><label>Border Color</label>${cpair(w.coverProps.borderColor, `window.coverProps.borderColor=this.value; window.renderSpotifyFabric();`)}</div><div class="pf-row"><label>Shadow Blur</label>${rrow(0,80,1,w.coverProps.shadow, `window.coverProps.shadow=this.value; window.renderSpotifyFabric();`)}</div><div class="pf-row"><label>Image X offset</label>${rrow(-100,100,1,w.coverProps.imgX, `window.coverProps.imgX=this.value; window.renderSpotifyFabric();`)}</div><div class="pf-row"><label>Image Y offset</label>${rrow(-100,100,1,w.coverProps.imgY, `window.coverProps.imgY=this.value; window.renderSpotifyFabric();`)}</div><div class="pf-row"><label>Image Scale</label>${rrow(80,200,1,w.coverProps.imgScale*100, `window.coverProps.imgScale=this.value/100; window.renderSpotifyFabric();`, '%')}</div></div>`;
+          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text properties</div><div class="pf-row"><label>Content</label><input type="text" value="${txt}" oninput="window.applyToActiveObject('text', this.value)"></div><div class="pf-row"><label>Font Family</label><select onchange="window.applyToActiveObject('fontFamily', this.value)"><option value="${ff}" selected>Current Font</option>${fontOpts}</select></div><div class="pf-2col"><div class="pf-row"><label>Font Size</label><input type="number" value="${fs}" min="6" max="1000" oninput="window.applyToActiveObject('fontSize', this.value)"></div><div class="pf-row"><label>Weight</label><select onchange="window.applyToActiveObject('fontWeight', this.value)"><option value="300" ${fw==='300'?'selected':''}>Light</option><option value="400" ${fw==='400'||fw==='normal'?'selected':''}>Regular</option><option value="500" ${fw==='500'?'selected':''}>Medium</option><option value="600" ${fw==='600'?'selected':''}>SemiBold</option><option value="700" ${fw==='700'||fw==='bold'?'selected':''}>Bold</option><option value="900" ${fw==='900'?'selected':''}>Black</option></select></div></div><div class="pf-row"><label>Letter Spacing</label>${rrow(-50,500,1,ls, `window.applyToActiveObject('charSpacing', this.value)`)}</div><div class="pf-row"><label>Line Height</label>${rrow(0.8,4,0.05,parseFloat(lh), `window.applyToActiveObject('lineHeight', this.value)`, '')}</div><div class="pf-row"><label>Alignment</label><div class="pf-3col"><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'left')">Left</button><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'center')">Center</button><button class="pf-btn" onclick="window.applyToActiveObject('textAlign', 'right')">Right</button></div></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text Color</div><div class="pf-row">${cpair(col, `window.applyToActiveObject('fill', this.value)`)}</div></div>`;
         }
 
         if (obj.id === 'v-vinyl') {
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,w.vinylProps.scale*100, `window.applyToActiveObject('scaleX', this.value/100)`, '%')}</div><div class="pf-row"><label>Font Family</label><select onchange="window.applyToActiveObject('fontFamily', this.value)"><option value="${w.vinylProps.fontFamily}" selected>Current Font</option>${fontOpts}</select></div><div class="pf-row"><label>Spiral Text Color</label>${cpair(w.vinylProps.textColor, `window.vinylProps.textColor=this.value; window.updateVinylSpiralFabric();`)}</div><div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,w.vinylProps.fontSize, `window.vinylProps.fontSize=this.value; window.updateVinylSpiralFabric();`)}</div><div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,w.vinylProps.letterSpacing, `window.vinylProps.letterSpacing=this.value; window.updateVinylSpiralFabric();`)}</div><div class="pf-row"><label>Center Label Color</label>${cpair(w.vinylProps.labelColor, `window.vinylProps.labelColor=this.value; window.updateVinylSpiralFabric();`)}</div><div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,w.vinylProps.labelSize, `window.vinylProps.labelSize=this.value; window.updateVinylSpiralFabric();`)}</div></div>`;
+          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record Configuration</div>
+          <div class="pf-row"><label>Overall Scale (%)</label>${rrow(10,200,1,Math.round(obj.scaleX*100), `window.applyToActiveObject('scaleX', this.value/100); window.applyToActiveObject('scaleY', this.value/100)`, '%')}</div>
+          <div class="pf-row"><label>Spiral Text Color</label>${cpair(w.vinylState.spiralColor, `window.vinylState.spiralColor=this.value; window.updateVinylSpiralFabric()`)}</div>
+          <div class="pf-row"><label>Spiral Text Size</label>${rrow(6,40,1,w.vinylState.tsz, `window.vinylState.tsz=parseFloat(this.value); window.updateVinylSpiralFabric()`)}</div>
+          <div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,w.vinylState.ls, `window.vinylState.ls=parseFloat(this.value); window.updateVinylSpiralFabric()`)}</div>
+          <div class="pf-row"><label>Center Label Color</label>${cpair(w.vinylState.labelColor, `window.vinylState.labelColor=this.value; window.updateVinylSpiralFabric()`)}</div>
+          <div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,w.vinylState.lsz, `window.vinylState.lsz=parseFloat(this.value); window.updateVinylSpiralFabric()`)}</div>
+          <div class="pf-row"><label>Edit Lyrics</label><textarea style="width:100%;height:60px;background:#09090b;color:#fff;border:1px solid #27272a;border-radius:4px;padding:4px;font-size:10px" oninput="document.getElementById('vinyl-lyrics-input').value=this.value; window.updateVinylSpiralFabric()">${(document.getElementById('vinyl-lyrics-input') as HTMLInputElement)?.value || ''}</textarea></div>
+          </div>`;
+        }
+
+        if (obj.id === 'cover') {
+            const bgRect = obj.getObjects()[0];
+            html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Cover Art Background</div>
+            <div class="pf-row"><label>Background Color</label>${cpair(bgRect.fill, `window.canvas.getActiveObject().getObjects()[0].set('fill', this.value); window.canvas.requestRenderAll();`)}</div></div>`;
         }
 
         return html;
@@ -772,12 +714,14 @@ export default function SpotifyPosterBuilder() {
             activeObj.setCoords();
             w.canvas.fire('object:modified', {target: activeObj});
         }
+        
         w.canvas.requestRenderAll();
       };
 
       w.edDistribute = function(axis: string) {
         let activeObj = w.canvas.getActiveObject();
         if (!activeObj || activeObj.type !== 'activeSelection') return;
+        
         const objs = activeObj.getObjects();
         if (objs.length < 3) return; 
 
@@ -785,29 +729,19 @@ export default function SpotifyPosterBuilder() {
 
         const items = objs.map((obj: any) => {
             const bound = obj.getBoundingRect();
-            return {
-                obj,
-                pos: axis === 'h' ? bound.left : bound.top,
-                size: axis === 'h' ? bound.width : bound.height
-            };
+            return { obj, pos: axis === 'h' ? bound.left : bound.top, size: axis === 'h' ? bound.width : bound.height };
         }).sort((a: any, b: any) => a.pos - b.pos);
 
-        const first = items[0];
-        const last = items[items.length - 1];
-        
+        const first = items[0], last = items[items.length - 1];
         const totalSpan = (last.pos + last.size) - first.pos;
         const totalSize = items.reduce((sum: number, item: any) => sum + item.size, 0);
         const gap = (totalSpan - totalSize) / (items.length - 1);
-        
         let cursor = first.pos + first.size + gap;
 
         for (let i = 1; i < items.length - 1; i++) {
             let it = items[i];
-            if (axis === 'h') {
-                it.obj.set('left', it.obj.left + (cursor - it.pos));
-            } else {
-                it.obj.set('top', it.obj.top + (cursor - it.pos));
-            }
+            if (axis === 'h') it.obj.set('left', it.obj.left + (cursor - it.pos));
+            else it.obj.set('top', it.obj.top + (cursor - it.pos));
             it.obj.setCoords();
             cursor += it.size + gap;
         }
@@ -837,7 +771,9 @@ export default function SpotifyPosterBuilder() {
           }
       });
 
-      // Export System
+      // ──────────────────────────────────────────────────────────
+      // HIGH-RES EXPORT ENGINE (ZOOM RESET)
+      // ──────────────────────────────────────────────────────────
       w.getExportFilename = function(ext: string) {
         let artist = 'artist'; let song = 'song';
         if(w.POSTER_MODE === 'spotify') {
@@ -881,9 +817,12 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.exportVinylLoop = async function(format: string) {
-          w.canvas.discardActiveObject(); w.canvas.requestRenderAll();
-          w.canvas.setZoom(1); 
+          w.canvas.discardActiveObject(); 
           
+          const currentZoom = w.canvas.getZoom();
+          w.canvas.setZoom(1); 
+          w.canvas.requestRenderAll();
+
           const items = document.querySelectorAll('.multi-export-item');
           const colorsToExport: string[] = [];
           items.forEach((item: any) => {
@@ -892,12 +831,16 @@ export default function SpotifyPosterBuilder() {
               if (chk && chk.checked && pck) colorsToExport.push(pck.value);
           });
 
-          if (colorsToExport.length === 0) { w.updateCanvasSize(); return w.showToast('Lütfen en az bir renk seçin.'); }
+          if (colorsToExport.length === 0) {
+              w.canvas.setZoom(currentZoom); w.canvas.requestRenderAll();
+              return w.showToast('Lütfen en az bir renk seçin.');
+          }
           w.showToast(`${colorsToExport.length} renk için ZIP hazırlanıyor...`);
 
           const zip = new (window as any).JSZip();
           const folder = zip.folder(`vinyl-posters-${format}`);
-          const originalBg = w.canvas.backgroundColor;
+          
+          const originalColor = (document.getElementById('v-bg-color') as HTMLInputElement).value || '#f5f5f5';
 
           for (let i = 0; i < colorsToExport.length; i++) {
               const color = colorsToExport[i];
@@ -935,61 +878,68 @@ export default function SpotifyPosterBuilder() {
               w.showToast(`✓ ZIP dosyası indirildi!`);
           });
 
-          w.canvas.setBackgroundColor(originalBg, w.canvas.renderAll.bind(w.canvas));
-          w.applyAutoContrast(originalBg);
-          w.updateCanvasSize();
+          w.canvas.setBackgroundColor(originalColor, w.canvas.renderAll.bind(w.canvas));
+          w.applyAutoContrast(originalColor);
+          w.canvas.setZoom(currentZoom); 
+          w.canvas.requestRenderAll();
       };
 
       w.downloadPNG = async function() {
-        w.canvas.discardActiveObject(); w.canvas.requestRenderAll();
+        w.canvas.discardActiveObject(); 
         if (w.POSTER_MODE === 'vinyl') { await w.exportVinylLoop('png'); return; }
 
         w.showToast('PNG hazırlanıyor...');
-        w.canvas.setZoom(1); 
+        const currentZoom = w.canvas.getZoom();
+        w.canvas.setZoom(1); w.canvas.requestRenderAll();
+
         const rawUrl = w.canvas.toDataURL({ format: 'png', multiplier: 1 });
         const dpiUrl = w.changeDpiDataUrl(rawUrl, 300);
         const link = document.createElement('a');
         link.download = w.getExportFilename('png'); link.href = dpiUrl; link.click();
-        w.updateCanvasSize();
+        
+        w.canvas.setZoom(currentZoom); w.canvas.requestRenderAll();
         w.showToast('✓ PNG indirildi!');
       };
 
       w.downloadPDF = async function() {
-        w.canvas.discardActiveObject(); w.canvas.requestRenderAll();
+        w.canvas.discardActiveObject(); 
         if (w.POSTER_MODE === 'vinyl') { await w.exportVinylLoop('pdf'); return; }
 
         w.showToast('PDF hazırlanıyor...');
-        w.canvas.setZoom(1); 
+        const currentZoom = w.canvas.getZoom();
+        w.canvas.setZoom(1); w.canvas.requestRenderAll();
+
         const imgData = w.canvas.toDataURL({ format: 'jpeg', quality: 0.95 });
         const { jsPDF } = w.jspdf;
         const w_in = w.canvas.getWidth(), h_in = w.canvas.getHeight();
         const pdf = new jsPDF({ orientation: w_in > h_in ? 'landscape' : 'portrait', unit: 'px', format: [w_in, h_in] });
         pdf.addImage(imgData, 'JPEG', 0, 0, w_in, h_in);
         pdf.save(w.getExportFilename('pdf'));
-        w.updateCanvasSize();
+
+        w.canvas.setZoom(currentZoom); w.canvas.requestRenderAll();
         w.showToast('✓ PDF indirildi!');
       };
 
       w.downloadSVG = async function() {
-        w.canvas.discardActiveObject(); w.canvas.requestRenderAll();
+        w.canvas.discardActiveObject(); 
         if (w.POSTER_MODE === 'vinyl') { await w.exportVinylLoop('svg'); return; }
 
         w.showToast('SVG hazırlanıyor...');
-        w.canvas.setZoom(1); 
+        const currentZoom = w.canvas.getZoom();
+        w.canvas.setZoom(1); w.canvas.requestRenderAll();
+
         const svgData = w.canvas.toSVG({ width: w.canvas.getWidth(), height: w.canvas.getHeight() });
         const blob = new Blob([svgData], { type: 'image/svg+xml' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.download = w.getExportFilename('svg'); link.href = url; link.click();
         URL.revokeObjectURL(url);
-        w.updateCanvasSize();
+
+        w.canvas.setZoom(currentZoom); w.canvas.requestRenderAll();
         w.showToast('✓ SVG indirildi!');
       };
 
-      setTimeout(() => {
-        w.updateCanvasSize();
-      }, 500);
-
+      setTimeout(() => { w.updateCanvasSize(); }, 500);
     };
 
     initApp();
@@ -1010,24 +960,52 @@ export default function SpotifyPosterBuilder() {
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100vw', background: '#09090b', color: '#fff', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif", padding: '20px' }}>
         <h1 style={{ fontSize: '36px', marginBottom: '50px', fontWeight: 700, letterSpacing: '-0.02em' }}>Choose Poster Template</h1>
         <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          <div onClick={() => setPosterMode('spotify')} style={{ width: '360px', padding: '40px 30px', background: '#18181b', border: '2px solid #27272a', borderRadius: '16px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#1DB954'; e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(29, 185, 84, 0.15)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#27272a'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+          
+          <div 
+            onClick={() => setPosterMode('spotify')} 
+            style={{ width: '360px', padding: '40px 30px', background: '#18181b', border: '2px solid #27272a', borderRadius: '16px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' }} 
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#1DB954'; e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(29, 185, 84, 0.15)'; }} 
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#27272a'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
             <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
               <svg width="160" height="200" viewBox="0 0 200 250" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 20px 30px rgba(0,0,0,0.5))' }}>
-                <rect width="200" height="250" rx="8" fill="#121212" stroke="#333" strokeWidth="2"/><rect x="20" y="20" width="160" height="160" rx="4" fill="#282828"/><rect x="20" y="195" width="100" height="12" rx="6" fill="#FFFFFF"/><rect x="20" y="215" width="60" height="8" rx="4" fill="#B3B3B3"/><circle cx="160" cy="210" r="16" fill="#1DB954"/><path d="M156 205L166 210L156 215V205Z" fill="#121212"/>
+                <rect width="200" height="250" rx="8" fill="#121212" stroke="#333" strokeWidth="2"/>
+                <rect x="20" y="20" width="160" height="160" rx="4" fill="#282828"/>
+                <rect x="20" y="195" width="100" height="12" rx="6" fill="#FFFFFF"/>
+                <rect x="20" y="215" width="60" height="8" rx="4" fill="#B3B3B3"/>
+                <circle cx="160" cy="210" r="16" fill="#1DB954"/>
+                <path d="M156 205L166 210L156 215V205Z" fill="#121212"/>
               </svg>
             </div>
             <h2 style={{ fontSize: '22px', marginBottom: '12px', fontWeight: 600 }}>Spotify Poster</h2>
             <p style={{ fontSize: '14px', color: '#a1a1aa', lineHeight: 1.6, margin: 0 }}>Modern music player interface with cover art, progress bar, and play controls.</p>
           </div>
-          <div onClick={() => setPosterMode('vinyl')} style={{ width: '360px', padding: '40px 30px', background: '#18181b', border: '2px solid #27272a', borderRadius: '16px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' }} onMouseEnter={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(99, 102, 241, 0.15)'; }} onMouseLeave={e => { e.currentTarget.style.borderColor = '#27272a'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}>
+          
+          <div 
+            onClick={() => setPosterMode('vinyl')} 
+            style={{ width: '360px', padding: '40px 30px', background: '#18181b', border: '2px solid #27272a', borderRadius: '16px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' }} 
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#6366f1'; e.currentTarget.style.transform = 'translateY(-8px)'; e.currentTarget.style.boxShadow = '0 12px 40px rgba(99, 102, 241, 0.15)'; }} 
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#27272a'; e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = 'none'; }}
+          >
             <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
               <svg width="160" height="200" viewBox="0 0 200 250" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 20px 30px rgba(0,0,0,0.5))' }}>
-                <rect width="200" height="250" rx="8" fill="#f5f5f5" stroke="#333" strokeWidth="2"/><rect x="20" y="20" width="40" height="6" rx="3" fill="#212121"/><rect x="150" y="20" width="30" height="6" rx="3" fill="#212121"/><rect x="40" y="45" width="120" height="12" rx="6" fill="#212121"/><rect x="60" y="65" width="80" height="6" rx="3" fill="#555555"/><circle cx="100" cy="155" r="60" fill="none" stroke="#212121" strokeWidth="24"/><circle cx="100" cy="155" r="54" fill="none" stroke="#444" strokeWidth="1"/><circle cx="100" cy="155" r="48" fill="none" stroke="#444" strokeWidth="1"/><circle cx="100" cy="155" r="66" fill="none" stroke="#444" strokeWidth="1"/><circle cx="100" cy="155" r="22" fill="#e0e0e0"/><circle cx="100" cy="155" r="4" fill="#111"/>
+                <rect width="200" height="250" rx="8" fill="#f5f5f5" stroke="#333" strokeWidth="2"/>
+                <rect x="20" y="20" width="40" height="6" rx="3" fill="#212121"/>
+                <rect x="150" y="20" width="30" height="6" rx="3" fill="#212121"/>
+                <rect x="40" y="45" width="120" height="12" rx="6" fill="#212121"/>
+                <rect x="60" y="65" width="80" height="6" rx="3" fill="#555555"/>
+                <circle cx="100" cy="155" r="60" fill="none" stroke="#212121" strokeWidth="24"/>
+                <circle cx="100" cy="155" r="54" fill="none" stroke="#444" strokeWidth="1"/>
+                <circle cx="100" cy="155" r="48" fill="none" stroke="#444" strokeWidth="1"/>
+                <circle cx="100" cy="155" r="66" fill="none" stroke="#444" strokeWidth="1"/>
+                <circle cx="100" cy="155" r="22" fill="#e0e0e0"/>
+                <circle cx="100" cy="155" r="4" fill="#111"/>
               </svg>
             </div>
             <h2 style={{ fontSize: '22px', marginBottom: '12px', fontWeight: 600 }}>Vinyl Song Poster</h2>
             <p style={{ fontSize: '14px', color: '#a1a1aa', lineHeight: 1.6, margin: 0 }}>Retro record design with spiral lyrics forming the vinyl grooves in the center.</p>
           </div>
+
         </div>
       </div>
     );
@@ -1056,16 +1034,13 @@ export default function SpotifyPosterBuilder() {
         .btn-download-group { display: flex; gap: 6px; margin-top: 6px; }
         .btn-secondary { background: #18181b; color: #FFF; border: 1px solid var(--panel-border); flex: 1; padding: 9px; border-radius: 8px; cursor: pointer; font-size: 12px; font-weight: 600; }
         .range-row { display: flex; align-items: center; gap: 8px; } .range-val { font-size: 11px; color: var(--accent); font-weight: 600; min-width: 28px; text-align: right; }
-        .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-        .toggle-row label { font-size: 12px; color: #B3B3B3; margin-bottom:0;}
-        .toggle { position: relative; width: 36px; height: 20px; }
-        .toggle input { opacity: 0; width: 0; height: 0; }
+        .toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; } .toggle-row label { font-size: 12px; color: #B3B3B3; margin-bottom:0;}
+        .toggle { position: relative; width: 36px; height: 20px; } .toggle input { opacity: 0; width: 0; height: 0; }
         .slider { position: absolute; inset: 0; background: #333; border-radius: 20px; cursor: pointer; transition: 0.2s; }
         .slider:before { content: ''; position: absolute; width: 14px; height: 14px; background: white; border-radius: 50%; left: 3px; top: 3px; transition: 0.2s; }
-        .toggle input:checked + .slider { background: var(--accent); }
-        .toggle input:checked + .slider:before { transform: translateX(16px); }
+        .toggle input:checked + .slider { background: var(--accent); } .toggle input:checked + .slider:before { transform: translateX(16px); }
         .upload-area { border: 1.5px dashed var(--panel-border); border-radius: var(--radius); padding: 16px; text-align: center; cursor: pointer; transition: border-color 0.2s; position: relative; overflow: hidden; }
-        .upload-area:hover { border-color: var(--accent); }
+        .upload-area:hover { border-color: var(--accent); } .upload-area input { position: absolute; inset: 0; opacity: 0; cursor: pointer; } .upload-area p { font-size: 11px; color: #B3B3B3; margin-top: 4px; }
         
         #canvas-area { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0d0d0d; padding: 30px; overflow: hidden; position: relative; }
         #poster-container { position: relative; box-shadow: 0 32px 80px rgba(0,0,0,0.8); border-radius: 0; overflow: hidden; background: #fff;}
@@ -1083,14 +1058,14 @@ export default function SpotifyPosterBuilder() {
         #ed-align-bar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #111; border: 1px solid var(--panel-border); border-radius: 8px; display: none; align-items: center; gap: 2px; padding: 4px 6px; z-index: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.6); }
         #ed-align-bar.ed-bar-visible { display: flex; }
         .ed-ab-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: none; border: none; color: #B3B3B3; border-radius: 5px; cursor: pointer; transition: all 0.15s; }
-        .ed-ab-btn:hover { background: #1a1a1a; color: #FFF; }
+        .ed-ab-btn:hover { background: #1a1a1a; color: #FFFFFF; }
         .ed-ab-sep { width: 1px; height: 18px; background: var(--panel-border); margin: 0 3px; }
         
         .pf-section { margin-bottom: 4px; }
         .pf-section-title { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #555; margin: 12px 0 6px; }
         .pf-row { margin-bottom: 7px; }
         .pf-row label { display: block; font-size: 10px; color: #B3B3B3; margin-bottom: 3px; }
-        .pf-row input[type=text], .pf-row input[type=number], .pf-row select { width: 100%; background: var(--input-bg); border: 1px solid var(--panel-border); border-radius: 5px; color: #FFF; padding: 5px 8px; font-size: 11px; outline: none; }
+        .pf-row input[type=text], .pf-row input[type=number], .pf-row select { width: 100%; background: var(--input-bg); border: 1px solid var(--panel-border); border-radius: 5px; color: #FFFFFF; padding: 5px 8px; font-size: 11px; outline: none; }
         .pf-row input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
         .pf-row input[type=color] { width: 30px; height: 26px; border: none; border-radius: 4px; cursor: pointer; padding: 2px; background: var(--input-bg); }
         .pf-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -1100,7 +1075,7 @@ export default function SpotifyPosterBuilder() {
         .pf-toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; } .pf-toggle-row > span { font-size: 11px; color: #B3B3B3; }
         .pf-divider { border: none; border-top: 1px solid #1e1e1e; margin: 10px 0; }
         .pf-btn { flex: 1; padding: 5px 4px; background: var(--input-bg); border: 1px solid var(--panel-border); border-radius: 4px; color: #B3B3B3; font-size: 10px; cursor: pointer; transition: all 0.15s; text-align: center; }
-        .pf-btn:hover { background: #252525; color: #FFF; }
+        .pf-btn:hover { background: #252525; color: #FFFFFF; }
       `}</style>
 
       <div id="panel">
@@ -1131,214 +1106,133 @@ export default function SpotifyPosterBuilder() {
           <div className="form-row">
             <label>Print Size</label>
             <select id="canvas-size" defaultValue="40x50" onChange={() => (window as any).updateCanvasSize()}>
-              <option value="5.83x8.27">A5 (5.83" x 8.27")</option>
-              <option value="8.27x11.69">A4 (8.27" x 11.69")</option>
-              <option value="11.69x16.54">A3 (11.69" x 16.54")</option>
-              <option value="16.54x23.39">A2 (16.54" x 23.39")</option>
-              <option value="23.39x33.11">A1 (23.39" x 33.11")</option>
-              <option value="8x10">8" x 10"</option>
-              <option value="11x14">11" x 14"</option>
-              <option value="16x20">16" x 20"</option>
-              <option value="18x24">18" x 24"</option>
-              <option value="24x36">24" x 36"</option>
-              <option value="40x50">40" x 50" (Default)</option>
-              <option value="50x60">50" x 60"</option>
-              <option value="60x80">60" x 80"</option>
+              <option value="5.83x8.27">A5 (5.83" x 8.27")</option><option value="8.27x11.69">A4 (8.27" x 11.69")</option><option value="11.69x16.54">A3 (11.69" x 16.54")</option><option value="16.54x23.39">A2 (16.54" x 23.39")</option><option value="23.39x33.11">A1 (23.39" x 33.11")</option><option value="5x7">5" x 7"</option><option value="6x8">6" x 8"</option><option value="8x10">8" x 10"</option><option value="9x11">9" x 11"</option><option value="11x14">11" x 14"</option><option value="11x17">11" x 17"</option><option value="11.7x16.5">11.7" x 16.5"</option><option value="12x16">12" x 16"</option><option value="12x18">12" x 18"</option><option value="16x20">16" x 20"</option><option value="16x24">16" x 24"</option><option value="16.5x23.4">16.5" x 23.4"</option><option value="18x24">18" x 24"</option><option value="20x30">20" x 30"</option><option value="22x34">22" x 34"</option><option value="23.4x33.1">23.4" x 33.1"</option><option value="24x32">24" x 32"</option><option value="24x36">24" x 36"</option><option value="26x36">26" x 36"</option><option value="28x40">28" x 40"</option><option value="30x40">30" x 40"</option><option value="40x50">40" x 50" (Default)</option><option value="50x60">50" x 60"</option><option value="60x80">60" x 80"</option><option value="68x80">68" x 80"</option><option value="88x104">88" x 104"</option>
             </select>
           </div>
         </div>
 
-        {/* SPOTIFY ACCORDIONS */}
         <div style={{ display: posterMode === 'spotify' ? 'block' : 'none' }}>
             <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🎵 Spotify Barcode<span className="arrow">▼</span></button>
             <div className="accordion-content">
-              <div className="toggle-row">
-                <label>Visible</label>
-                <label className="toggle"><input type="checkbox" id="show-barcode" defaultChecked onChange={(e:any) => {w.updateFabObj('barcode','visible',e.target.checked)}} /><span className="slider"></span></label>
-              </div>
-              <div className="form-row"><label>Spotify Link or URI</label><input type="text" id="spotify-uri" placeholder="https://open.spotify.com/track/..." onInput={() => (window as any).drawBarcode()} /></div>
-              <div className="form-row" style={{ marginTop: '8px' }}><label>Height (px)</label><div className="range-row"><input type="range" min="24" max="120" defaultValue="48" id="barcode-height" onInput={(e: any) => { e.target.nextElementSibling!.textContent = e.target.value + 'px'; (window as any).drawBarcode(); }} /><span className="range-val" id="barcode-height-display">48px</span></div></div>
-              <div className="form-row"><label>Opacity (%)</label><div className="range-row"><input type="range" min="0" max="100" defaultValue="100" id="barcode-opacity" onInput={(e: any) => { e.target.nextElementSibling!.textContent = e.target.value + '%'; (window as any).drawBarcode(); }} /><span className="range-val">100%</span></div></div>
-              <div className="form-row"><label>Logo Color</label><div className="color-row"><input type="color" id="barcode-logo-color" defaultValue="#FFFFFF" onChange={() => (window as any).drawBarcode()} /><input type="text" id="barcode-logo-color-txt" defaultValue="#FFFFFF" onInput={() => { (window as any).syncColor('barcode-logo-color', 'barcode-logo-color-txt'); (window as any).drawBarcode(); }} /></div></div>
-              <div className="form-row"><label>Wave Color</label><div className="color-row"><input type="color" id="barcode-bar-color" defaultValue="#FFFFFF" onChange={() => (window as any).drawBarcode()} /><input type="text" id="barcode-bar-color-txt" defaultValue="#FFFFFF" onInput={() => { (window as any).syncColor('barcode-bar-color', 'barcode-bar-color-txt'); (window as any).drawBarcode(); }} /></div></div>
+              <div className="toggle-row"><label>Visible</label><label className="toggle"><input type="checkbox" id="show-barcode" defaultChecked onChange={() => (window as any).renderSpotifyBarcode()} /><span className="slider"></span></label></div>
+              <div className="form-row"><label>Spotify Link or URI</label><input type="text" id="spotify-uri" placeholder="https://open.spotify.com/track/..." onInput={() => (window as any).handleSpotifyInput()} /></div>
+              <div className="form-row" style={{ marginTop: '8px' }}><label>Height (px)</label><div className="range-row"><input type="range" min="24" max="120" defaultValue="48" id="barcode-height" onInput={(e: any) => { document.getElementById('barcode-height-display')!.textContent = e.target.value + 'px'; (window as any).renderSpotifyBarcode(); }} /><span className="range-val" id="barcode-height-display">48px</span></div></div>
+              <div className="form-row"><label>Logo Color</label><div className="color-row"><input type="color" id="barcode-logo-color" defaultValue="#FFFFFF" onChange={() => (window as any).renderSpotifyBarcode()} /><input type="text" id="barcode-logo-color-txt" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).syncColor('barcode-logo-color', 'barcode-logo-color-txt'); (window as any).renderSpotifyBarcode(); }} /></div></div>
+              <div className="form-row"><label>Wave Color</label><div className="color-row"><input type="color" id="barcode-bar-color" defaultValue="#FFFFFF" onChange={() => (window as any).renderSpotifyBarcode()} /><input type="text" id="barcode-bar-color-txt" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).syncColor('barcode-bar-color', 'barcode-bar-color-txt'); (window as any).renderSpotifyBarcode(); }} /></div></div>
             </div>
 
             <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🔤 Top Label<span className="arrow">▼</span></button>
             <div className="accordion-content">
-              <div className="toggle-row">
-                <label>Visible</label>
-                <label className="toggle"><input type="checkbox" id="show-label-top" defaultChecked onChange={(e:any) => w.updateFabObj('label-top','visible',e.target.checked)} /><span className="slider"></span></label>
-              </div>
-              <div className="form-row"><label>Text</label><input type="text" id="label-top-input" defaultValue="Now Playing" onInput={(e: any) => { w.updateFabObj('label-top', 'text', e.target.value); }} /></div>
+              <div className="toggle-row"><label>Visible</label><label className="toggle"><input type="checkbox" id="show-label-top" defaultChecked onChange={() => (window as any).renderSpotifyFabric()} /><span className="slider"></span></label></div>
+              <div className="form-row"><label>Text</label><input type="text" id="label-top-input" defaultValue="Now Playing" onInput={(e: any) => { (window as any).setFabProp('label-top', 'text', e.target.value.toUpperCase()); }} /></div>
               <div className="form-row"><label>Text Color</label>
-                <div className="color-row">
-                  <input type="color" id="c-s-tl" defaultValue="#FFFFFF" onInput={(e:any) => { w.updateFabObj('label-top', 'fill', e.target.value); w.syncColor('c-s-tl', 'c-s-tl-t'); }} />
-                  <input type="text" id="c-s-tl-t" defaultValue="#FFFFFF" onInput={(e:any) => { w.syncColor('c-s-tl-t', 'c-s-tl'); w.updateFabObj('label-top', 'fill', e.target.value); }} />
-                </div>
+                <div className="color-row"><input type="color" id="c-s-tl" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).setFabProp('label-top', 'fill', e.target.value); (window as any).syncColor('c-s-tl', 'c-s-tl-t'); }} /><input type="text" id="c-s-tl-t" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).syncColor('c-s-tl-t', 'c-s-tl'); (window as any).setFabProp('label-top', 'fill', e.target.value); }} /></div>
               </div>
             </div>
 
             <button className="accordion-btn open" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🎵 Song Details<span className="arrow">▼</span></button>
             <div className="accordion-content open">
-              <div className="form-row"><label>Song Title Text</label><input type="text" id="song-title-input" defaultValue="Song Title" onInput={(e: any) => { w.updateFabObj('song-title', 'text', e.target.value); }} /></div>
+              <div className="form-row"><label>Song Title Text</label><input type="text" id="song-title-input" defaultValue="Song Title" onInput={(e: any) => { (window as any).setFabProp('song-title', 'text', e.target.value); }} /></div>
               <div className="form-row"><label>Song Title Color</label>
-                <div className="color-row">
-                  <input type="color" id="c-s-st" defaultValue="#FFFFFF" onInput={(e:any) => { w.updateFabObj('song-title', 'fill', e.target.value); w.syncColor('c-s-st', 'c-s-st-t'); }} />
-                  <input type="text" id="c-s-st-t" defaultValue="#FFFFFF" onInput={(e:any) => { w.syncColor('c-s-st-t', 'c-s-st'); w.updateFabObj('song-title', 'fill', e.target.value); }} />
-                </div>
+                <div className="color-row"><input type="color" id="c-s-st" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).setFabProp('song-title', 'fill', e.target.value); (window as any).syncColor('c-s-st', 'c-s-st-t'); }} /><input type="text" id="c-s-st-t" defaultValue="#FFFFFF" onInput={(e:any) => { (window as any).syncColor('c-s-st-t', 'c-s-st'); (window as any).setFabProp('song-title', 'fill', e.target.value); }} /></div>
               </div>
-              <div className="form-row" style={{ marginTop: '12px' }}><label>Artist Name Text</label><input type="text" id="song-artist-input" defaultValue="Artist Name" onInput={(e: any) => { w.updateFabObj('song-artist', 'text', e.target.value); }} /></div>
+              <div className="form-row" style={{ marginTop: '12px' }}><label>Artist Name Text</label><input type="text" id="song-artist-input" defaultValue="Artist Name" onInput={(e: any) => { (window as any).setFabProp('song-artist', 'text', e.target.value); }} /></div>
               <div className="form-row"><label>Artist Name Color</label>
-                <div className="color-row">
-                  <input type="color" id="c-s-sa" defaultValue="#B3B3B3" onInput={(e:any) => { w.updateFabObj('song-artist', 'fill', e.target.value); w.syncColor('c-s-sa', 'c-s-sa-t'); }} />
-                  <input type="text" id="c-s-sa-t" defaultValue="#B3B3B3" onInput={(e:any) => { w.syncColor('c-s-sa-t', 'c-s-sa'); w.updateFabObj('song-artist', 'fill', e.target.value); }} />
-                </div>
+                <div className="color-row"><input type="color" id="c-s-sa" defaultValue="#B3B3B3" onInput={(e:any) => { (window as any).setFabProp('song-artist', 'fill', e.target.value); (window as any).syncColor('c-s-sa', 'c-s-sa-t'); }} /><input type="text" id="c-s-sa-t" defaultValue="#B3B3B3" onInput={(e:any) => { (window as any).syncColor('c-s-sa-t', 'c-s-sa'); (window as any).setFabProp('song-artist', 'fill', e.target.value); }} /></div>
               </div>
             </div>
 
             <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>⏱️ Progress & Time<span className="arrow">▼</span></button>
             <div className="accordion-content">
-              <div className="toggle-row">
-                <label>Visible</label>
-                <label className="toggle"><input type="checkbox" id="show-progress" defaultChecked onChange={(e:any) => w.updateFabObj('progress','visible',e.target.checked)} /><span className="slider"></span></label>
-              </div>
+              <div className="toggle-row"><label>Visible</label><label className="toggle"><input type="checkbox" defaultChecked onChange={() => (window as any).renderSpotifyFabric()} /><span className="slider"></span></label></div>
               <div className="two-col">
-                <div className="form-row"><label>Start Time</label><input type="text" id="time-start" defaultValue="1:12" onInput={(e:any) => {w.updateFabObj('time-start-el', 'text', e.target.value); w.updateProgress();}} /></div>
-                <div className="form-row"><label>End Time</label><input type="text" id="time-end" defaultValue="3:45" onInput={(e:any) => {w.updateFabObj('time-end-el', 'text', e.target.value); w.updateProgress();}} /></div>
+                <div className="form-row"><label>Start Time</label><input type="text" id="time-start" defaultValue="1:12" onInput={(e:any) => (window as any).setFabProp('time-start-el', 'text', e.target.value)} /></div>
+                <div className="form-row"><label>End Time</label><input type="text" id="time-end" defaultValue="3:45" onInput={(e:any) => (window as any).setFabProp('time-end-el', 'text', e.target.value)} /></div>
               </div>
-              <div className="form-row"><label>Progress %</label>
-                <div className="range-row"><input type="range" min="0" max="100" defaultValue="35" id="progress-val" onInput={(e:any)=>{e.target.nextElementSibling.textContent=e.target.value+'%'; w.updateLayout();}} /><span className="range-val" id="progress-display">35%</span></div>
-              </div>
+              <div className="form-row"><label>Progress %</label><div className="range-row"><input type="range" min="0" max="100" defaultValue="35" id="progress-val" onInput={(e:any) => { document.getElementById('progress-display')!.textContent = e.target.value+'%'; (window as any).renderSpotifyFabric(); }} /><span className="range-val" id="progress-display">35%</span></div></div>
             </div>
 
-            <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>▶️ Controls & Heart<span className="arrow">▼</span></button>
+            <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>▶️ Controls<span className="arrow">▼</span></button>
             <div className="accordion-content">
-              <div className="toggle-row">
-                <label>Controls Visible</label>
-                <label className="toggle"><input type="checkbox" id="show-controls" defaultChecked onChange={(e:any) => w.updateFabObj('controls','visible',e.target.checked)} /><span className="slider"></span></label>
-              </div>
-              <div className="toggle-row">
-                <label>Heart Visible</label>
-                <label className="toggle"><input type="checkbox" id="show-heart" defaultChecked onChange={(e:any) => w.updateFabObj('heart','visible',e.target.checked)} /><span className="slider"></span></label>
-              </div>
+              <div className="toggle-row"><label>Visible</label><label className="toggle"><input type="checkbox" defaultChecked onChange={() => (window as any).renderSpotifyFabric()} /><span className="slider"></span></label></div>
             </div>
 
             <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🖼️ Background & Cover<span className="arrow">▼</span></button>
             <div className="accordion-content">
               <div className="form-row">
                 <label>Background Type</label>
-                <select id="bg-type" defaultValue="blur" onChange={() => (window as any).updateBg()}>
-                  <option value="blur">Blurred Cover Image</option>
+                <select id="bg-type" defaultValue="color" onChange={(e:any) => { 
+                    document.getElementById('bg-color-section')!.style.display = e.target.value === 'color' ? 'block' : 'none';
+                    document.getElementById('bg-blur-section')!.style.display = e.target.value === 'blur' ? 'block' : 'none';
+                    (window as any).applyBgFabric(); 
+                }}>
                   <option value="color">Solid Color</option>
+                  <option value="blur">Blurred Cover Image</option>
                 </select>
               </div>
-              <div id="bg-color-section" style={{ display: 'none' }}>
+              <div id="bg-color-section">
                 <div className="form-row"><label>Background Color</label>
-                  <div className="color-row">
-                    <input type="color" id="bg-color" defaultValue="#121212" onInput={(e:any) => { w.syncColor('bg-color', 'bg-color-txt'); w.updateBgColor(); }} />
-                    <input type="text" id="bg-color-txt" defaultValue="#121212" onInput={(e:any) => { w.syncColor('bg-color-txt', 'bg-color'); w.updateBgColor(); }} />
-                  </div>
+                  <div className="color-row"><input type="color" id="bg-color" defaultValue="#121212" onInput={(e:any) => { (window as any).syncColor('bg-color', 'bg-color-txt'); (window as any).applyBgFabric(); }} /><input type="text" id="bg-color-txt" defaultValue="#121212" onInput={(e:any) => { (window as any).syncColor('bg-color-txt', 'bg-color'); (window as any).applyBgFabric(); }} /></div>
                 </div>
               </div>
-              <div id="bg-blur-section">
-                <div className="form-row"><label>Blur Radius</label>
-                  <div className="range-row"><input type="range" min="0" max="40" defaultValue="10" id="blur-val" onInput={(e:any)=>{e.target.nextElementSibling.textContent=e.target.value+'px'; w.updateBgBlur();}} /><span className="range-val" id="blur-display">10px</span></div>
-                </div>
+              <div id="bg-blur-section" style={{display:'none'}}>
+                <div className="form-row"><label>Blur</label><div className="range-row"><input type="range" min="0" max="40" defaultValue="10" id="blur-val" onInput={(e:any) => { document.getElementById('blur-display')!.textContent = e.target.value+'px'; (window as any).applyBgFabric(); }} /><span className="range-val" id="blur-display">10px</span></div></div>
               </div>
               <div className="upload-area" onClick={() => document.getElementById('cover-upload')?.click()} style={{marginTop:'12px'}}>
-                <input type="file" id="cover-upload" accept="image/*" onChange={(e: any) => (window as any).handleCoverUpload(e)} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer' }} />
+                <input type="file" id="cover-upload" accept="image/*" onChange={(e: any) => {
+                    const f = e.target.files[0]; if(!f) return;
+                    const r = new FileReader(); r.onload = (ev:any) => { (window as any).currentCoverSrc = ev.target.result; (window as any).renderSpotifyFabric(); }; r.readAsDataURL(f);
+                }} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer' }} />
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                <p>Click to upload image</p>
-              </div>
-            </div>
-            
-            <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>📏 Layout Settings<span className="arrow">▼</span></button>
-            <div className="accordion-content">
-              <div className="form-row">
-                <label>Content Vertical Position (%)</label>
-                <div className="range-row"><input type="range" min="20" max="80" defaultValue="50" id="content-y" onInput={(e:any)=>{e.target.nextElementSibling.textContent=e.target.value+'%'; w.updateLayout();}} /><span className="range-val" id="content-y-display">50%</span></div>
-              </div>
-              <div className="form-row">
-                <label>Content Width (%)</label>
-                <div className="range-row"><input type="range" min="40" max="95" defaultValue="71" id="content-width" onInput={(e:any)=>{e.target.nextElementSibling.textContent=e.target.value+'%'; w.updateLayout();}} /><span className="range-val">71%</span></div>
+                <p>Click to upload cover image</p>
               </div>
             </div>
         </div>
 
-        {/* VINYL ACCORDIONS */}
         <div style={{ display: posterMode === 'vinyl' ? 'block' : 'none' }}>
             <button className="accordion-btn open" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🔤 Top & Bottom Texts<span className="arrow">▼</span></button>
             <div className="accordion-content open">
-                <div className="form-row"><label>Artist Name (Top Left) Text</label><input type="text" id="v-label-input" defaultValue="ARTIST NAME" onInput={(e: any) => { w.updateFabObj('v-top-left', 'text', e.target.value); }} /></div>
-                <div className="form-row"><label>Artist Name Color</label>
-                    <div className="color-row">
-                        <input type="color" id="c-v-tl" defaultValue="#212121" onInput={(e:any)=>{ w.updateFabObj('v-top-left', 'fill', e.target.value); w.syncColor('c-v-tl', 'c-v-tl-t'); }} />
-                        <input type="text" id="c-v-tl-t" defaultValue="#212121" onInput={(e:any)=>{ w.syncColor('c-v-tl-t', 'c-v-tl'); w.updateFabObj('v-top-left', 'fill', document.getElementById('c-v-tl-t')!.value); }} />
-                    </div>
-                </div>
-
-                <div className="form-row" style={{ marginTop: '12px' }}><label>Year (Top Right) Text</label><input type="text" id="v-year-input" defaultValue="1992" onInput={(e: any) => { w.updateFabObj('v-top-right', 'text', e.target.value); }} /></div>
-                <div className="form-row"><label>Year Color</label>
-                    <div className="color-row">
-                        <input type="color" id="c-v-tr" defaultValue="#212121" onInput={(e:any)=>{ w.updateFabObj('v-top-right', 'fill', e.target.value); w.syncColor('c-v-tr', 'c-v-tr-t'); }} />
-                        <input type="text" id="c-v-tr-t" defaultValue="#212121" onInput={(e:any)=>{ w.syncColor('c-v-tr-t', 'c-v-tr'); w.updateFabObj('v-top-right', 'fill', document.getElementById('c-v-tr-t')!.value); }} />
-                    </div>
-                </div>
-
-                <div className="form-row" style={{ marginTop: '12px' }}><label>Bottom Text (Album Name / Optional)</label><input type="text" id="v-bottom-input" defaultValue="UNKNOWN ALBUM" onInput={(e: any) => { w.updateFabObj('v-bottom', 'text', e.target.value); }} /></div>
-                <div className="form-row"><label>Bottom Text Color</label>
-                    <div className="color-row">
-                        <input type="color" id="c-v-bot" defaultValue="#555555" onInput={(e:any)=>{ w.updateFabObj('v-bottom', 'fill', e.target.value); w.syncColor('c-v-bot', 'c-v-bot-t'); }} />
-                        <input type="text" id="c-v-bot-t" defaultValue="#555555" onInput={(e:any)=>{ w.syncColor('c-v-bot-t', 'c-v-bot'); w.updateFabObj('v-bottom', 'fill', document.getElementById('c-v-bot-t')!.value); }} />
-                    </div>
-                </div>
+                <div className="form-row"><label>Artist Name (Top Left) Text</label><input type="text" id="v-label-input" defaultValue="ARTIST NAME" onInput={(e: any) => { (window as any).setFabProp('v-top-left', 'text', e.target.value.toUpperCase()); }} /></div>
+                <div className="form-row"><label>Artist Name Color</label><div className="color-row"><input type="color" id="c-v-tl" defaultValue="#212121" onInput={(e:any)=>{ (window as any).setFabProp('v-top-left', 'fill', e.target.value); (window as any).syncColor('c-v-tl', 'c-v-tl-t'); }} /><input type="text" id="c-v-tl-t" defaultValue="#212121" onInput={(e:any)=>{ (window as any).syncColor('c-v-tl-t', 'c-v-tl'); (window as any).setFabProp('v-top-left', 'fill', document.getElementById('c-v-tl-t')!.value); }} /></div></div>
+                <div className="form-row" style={{ marginTop: '12px' }}><label>Year (Top Right) Text</label><input type="text" id="v-year-input" defaultValue="1992" onInput={(e: any) => { (window as any).setFabProp('v-top-right', 'text', e.target.value); }} /></div>
+                <div className="form-row"><label>Year Color</label><div className="color-row"><input type="color" id="c-v-tr" defaultValue="#212121" onInput={(e:any)=>{ (window as any).setFabProp('v-top-right', 'fill', e.target.value); (window as any).syncColor('c-v-tr', 'c-v-tr-t'); }} /><input type="text" id="c-v-tr-t" defaultValue="#212121" onInput={(e:any)=>{ (window as any).syncColor('c-v-tr-t', 'c-v-tr'); (window as any).setFabProp('v-top-right', 'fill', document.getElementById('c-v-tr-t')!.value); }} /></div></div>
+                <div className="form-row" style={{ marginTop: '12px' }}><label>Bottom Text (Album Name / Optional)</label><input type="text" id="v-bottom-input" defaultValue="UNKNOWN ALBUM" onInput={(e: any) => { (window as any).setFabProp('v-bottom', 'text', e.target.value.toUpperCase()); }} /></div>
+                <div className="form-row"><label>Bottom Text Color</label><div className="color-row"><input type="color" id="c-v-bot" defaultValue="#555555" onInput={(e:any)=>{ (window as any).setFabProp('v-bottom', 'fill', e.target.value); (window as any).syncColor('c-v-bot', 'c-v-bot-t'); }} /><input type="text" id="c-v-bot-t" defaultValue="#555555" onInput={(e:any)=>{ (window as any).syncColor('c-v-bot-t', 'c-v-bot'); (window as any).setFabProp('v-bottom', 'fill', document.getElementById('c-v-bot-t')!.value); }} /></div></div>
             </div>
 
             <button className="accordion-btn open" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🎵 Song Details<span className="arrow">▼</span></button>
             <div className="accordion-content open">
-                <div className="form-row"><label>Song Title Text</label><input type="text" id="v-song-title-input" defaultValue="SONG NAME" onInput={(e: any) => { w.updateFabObj('v-song-title', 'text', e.target.value); }} /></div>
-                <div className="form-row"><label>Song Title Color</label>
-                    <div className="color-row">
-                        <input type="color" id="c-v-st" defaultValue="#212121" onInput={(e:any)=>{ w.updateFabObj('v-song-title', 'fill', e.target.value); w.syncColor('c-v-st', 'c-v-st-t'); }} />
-                        <input type="text" id="c-v-st-t" defaultValue="#212121" onInput={(e:any)=>{ w.syncColor('c-v-st-t', 'c-v-st'); w.updateFabObj('v-song-title', 'fill', document.getElementById('c-v-st-t')!.value); }} />
-                    </div>
-                </div>
+                <div className="form-row"><label>Song Title Text</label><input type="text" id="v-song-title-input" defaultValue="SONG NAME" onInput={(e: any) => { (window as any).setFabProp('v-song-title', 'text', e.target.value.toUpperCase()); }} /></div>
+                <div className="form-row"><label>Song Title Color</label><div className="color-row"><input type="color" id="c-v-st" defaultValue="#212121" onInput={(e:any)=>{ (window as any).setFabProp('v-song-title', 'fill', e.target.value); (window as any).syncColor('c-v-st', 'c-v-st-t'); }} /><input type="text" id="c-v-st-t" defaultValue="#212121" onInput={(e:any)=>{ (window as any).syncColor('c-v-st-t', 'c-v-st'); (window as any).setFabProp('v-song-title', 'fill', document.getElementById('c-v-st-t')!.value); }} /></div></div>
             </div>
 
             <button className="accordion-btn open" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>💿 Vinyl Record & Lyrics<span className="arrow">▼</span></button>
             <div className="accordion-content open">
-                <div className="form-row"><label>Spiral Text Size</label>
-                    <div className="range-row">
-                        <input type="range" id="vinyl-text-size" min="6" max="40" defaultValue="12" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value+'px'; (window as any).vinylProps.fontSize = parseInt(e.target.value); (window as any).updateVinylSpiralFabric(); }} /><span className="range-val">12px</span>
-                    </div>
-                </div>
-                <div className="form-row"><label>Lyrics / Text Content</label>
-                    <textarea id="vinyl-lyrics-input" defaultValue="LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA" onInput={() => (window as any).updateVinylSpiralFabric()}></textarea>
-                </div>
+                <div className="form-row"><label>Spiral Text Size</label><div className="range-row"><input type="range" id="vinyl-text-size" min="6" max="40" defaultValue="12" onInput={(e:any) => { e.target.nextElementSibling.textContent = e.target.value+'px'; (window as any).vinylState.tsz = parseFloat(e.target.value); (window as any).updateVinylSpiralFabric(); }} /><span className="range-val">12px</span></div></div>
+                <div className="form-row"><label>Lyrics / Text Content</label><textarea id="vinyl-lyrics-input" defaultValue="LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA" onInput={() => (window as any).updateVinylSpiralFabric()}></textarea></div>
             </div>
 
             <button className="accordion-btn" onClick={(e) => (window as any).toggleAccordion(e.currentTarget)}>🖼️ Main Background<span className="arrow">▼</span></button>
             <div className="accordion-content">
                 <div className="form-row"><label>Background Type</label>
-                  <select id="v-bg-type" defaultValue="color" onChange={() => (window as any).updateVinylBg()}>
-                    <option value="color">Solid Color</option>
-                    <option value="blur">Blurred Image</option>
+                  <select id="v-bg-type" defaultValue="color" onChange={(e:any) => { 
+                    document.getElementById('v-bg-color-section')!.style.display = e.target.value === 'color' ? 'block' : 'none';
+                    document.getElementById('v-bg-blur-section')!.style.display = e.target.value === 'blur' ? 'block' : 'none';
+                    (window as any).applyBgFabric(); 
+                  }}>
+                    <option value="color">Solid Color</option><option value="blur">Blurred Image</option>
                   </select>
                 </div>
                 <div id="v-bg-color-section">
-                    <div className="form-row"><label>Background Color</label>
-                      <div className="color-row">
-                        <input type="color" id="v-bg-color" defaultValue="#f5f5f5" onInput={(e:any) => { (window as any).syncColor('v-bg-color', 'v-bg-color-txt'); (window as any).updateBgColor(); }} />
-                        <input type="text" id="v-bg-color-txt" defaultValue="#f5f5f5" onInput={(e:any) => { (window as any).syncColor('v-bg-color-txt', 'v-bg-color'); (window as any).updateBgColor(); }} />
-                      </div>
-                    </div>
+                    <div className="form-row"><label>Background Color</label><div className="color-row"><input type="color" id="v-bg-color" defaultValue="#f5f5f5" onInput={(e:any) => { (window as any).syncColor('v-bg-color', 'v-bg-color-txt'); (window as any).applyBgFabric(); }} /><input type="text" id="v-bg-color-txt" defaultValue="#f5f5f5" onInput={(e:any) => { (window as any).syncColor('v-bg-color-txt', 'v-bg-color'); (window as any).applyBgFabric(); }} /></div></div>
                 </div>
                 <div id="v-bg-blur-section" style={{ display: 'none' }}>
-                    <div className="form-row"><label>Blur Radius</label>
-                      <div className="range-row"><input type="range" min="0" max="40" defaultValue="10" id="v-blur-val" onInput={(e:any)=>{e.target.nextElementSibling.textContent=e.target.value+'px'; (window as any).updateBgBlur();}} /><span className="range-val" id="v-blur-display">10px</span></div>
-                    </div>
+                    <div className="form-row"><label>Blur</label><div className="range-row"><input type="range" min="0" max="40" defaultValue="10" id="v-blur-val" onInput={(e:any) => { document.getElementById('v-blur-display')!.textContent = e.target.value+'px'; (window as any).applyBgFabric(); }} /><span className="range-val" id="v-blur-display">10px</span></div></div>
                     <div className="upload-area" onClick={() => document.getElementById('v-cover-upload')?.click()} style={{marginTop:'12px'}}>
-                      <input type="file" id="v-cover-upload" accept="image/*" onChange={(e: any) => (window as any).handleVinylCoverUpload(e)} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer' }} />
+                      <input type="file" id="v-cover-upload" accept="image/*" onChange={(e: any) => {
+                        const f = e.target.files[0]; if(!f) return;
+                        const r = new FileReader(); r.onload = (ev:any) => { (window as any).vCurrentCoverSrc = ev.target.result; (window as any).applyBgFabric(); }; r.readAsDataURL(f);
+                      }} style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer' }} />
                       <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                       <p>Click to upload image</p>
                     </div>
@@ -1382,6 +1276,7 @@ export default function SpotifyPosterBuilder() {
           <button className="ed-ab-btn" title="Distribute H" onClick={() => (window as any).edDistribute('h')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="3" y2="21"/><line x1="21" y1="3" x2="21" y2="21"/><rect x="9" y="8" width="6" height="8" rx="1"/></svg></button>
           <button className="ed-ab-btn" title="Distribute V" onClick={() => (window as any).edDistribute('v')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="21" y2="3"/><line x1="3" y1="21" x2="21" y2="21"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg></button>
         </div>
+        
         <div id="poster-container">
             <canvas id="poster-canvas"></canvas>
         </div>
