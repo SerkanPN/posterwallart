@@ -48,7 +48,7 @@ export default function SpotifyPosterBuilder() {
       fabricCanvasRef.current = canvas;
 
       // ══════════════════════════════════════════════════════════════
-      // PLATFORM CONFIGURATIONS & RESIZING
+      // CONFIGURATIONS & RESIZING
       // ══════════════════════════════════════════════════════════════
 
       w.toggleAccordion = function(btn: HTMLElement) {
@@ -333,7 +333,7 @@ export default function SpotifyPosterBuilder() {
         }, { crossOrigin: 'anonymous' });
       };
 
-      w.applyAutoContrast = function(bgHex: string) {
+      w.applyAutoContrast = async function(bgHex: string) {
         if (w.POSTER_MODE !== 'vinyl') return;
         let hex = bgHex.replace('#', '');
         if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
@@ -369,7 +369,8 @@ export default function SpotifyPosterBuilder() {
         const lblInp = document.getElementById('c-v-lbl') as HTMLInputElement;
         if(lblInp) lblInp.value = labelCol;
 
-        w.updateVinylSpiral(); 
+        // Await the spiral drawing cleanly before completing contrast cycle
+        await w.updateVinylSpiral(); 
       };
 
       w.updateBgColor = function() {
@@ -401,6 +402,8 @@ export default function SpotifyPosterBuilder() {
         } else {
           if(bgColorSection) bgColorSection.style.display = 'none';
           if(bgBlurSection) bgBlurSection.style.display = 'block';
+          // Set backgroundColor as null to avoid drawing color on top of image
+          canvas.setBackgroundColor(null, canvas.renderAll.bind(canvas));
           w.updateBgBlur();
         }
       };
@@ -420,6 +423,7 @@ export default function SpotifyPosterBuilder() {
         } else {
           if(bgColorSection) bgColorSection.style.display = 'none';
           if(bgBlurSection) bgBlurSection.style.display = 'block';
+          canvas.setBackgroundColor(null, canvas.renderAll.bind(canvas));
           w.applyAutoContrast('#121212'); 
           w.updateVinylBgBlur();
         }
@@ -475,7 +479,6 @@ export default function SpotifyPosterBuilder() {
             crossOrigin: 'anonymous'
           });
 
-          // Match custom transformations of cover Art
           img.scaleToWidth(500);
 
           if (coverObj) {
@@ -567,7 +570,7 @@ export default function SpotifyPosterBuilder() {
           else r.setAttribute('fill', barColor);
         });
 
-        fetched.querySelectorAll('circle').forEach(el => el.setAttribute('fill', logoColor));
+        fetched.querySelectorAll('circle').forEach(el => r.setAttribute('fill', logoColor));
         fetched.querySelectorAll('path').forEach(el => {
           const fill = el.getAttribute('fill');
           if (fill && fill !== 'none') el.setAttribute('fill', logoColor);
@@ -698,112 +701,120 @@ export default function SpotifyPosterBuilder() {
         } else if (prop === 'labelSize') {
           (document.getElementById('vinyl-center-label-size') as HTMLInputElement).value = val;
           w.updateVinylSpiral();
+        } else if (prop === 'fontFamily') {
+          (document.getElementById('vinyl-font-family') as HTMLInputElement).value = val;
+          w.updateVinylSpiral();
         }
         canvas.requestRenderAll();
       };
 
+      // Return dynamic SVG compilation inside a robust, awaitsafe Promise hook
       w.updateVinylSpiral = function() {
-        if (w.POSTER_MODE !== 'vinyl') return;
+        return new Promise<void>((resolve) => {
+          if (w.POSTER_MODE !== 'vinyl') return resolve();
 
-        const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
-        const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
-        const textColor = (document.getElementById('c-v-st-t') as HTMLInputElement)?.value || "#212121";
-        const labelColor = (document.getElementById('c-v-lbl') as HTMLInputElement)?.value || "#e0e0e0";
-        const labelSize = parseInt((document.getElementById('vinyl-center-label-size') as HTMLInputElement)?.value || "80");
-        const spacingMultiplier = parseFloat((document.getElementById('vinyl-letter-spacing') as HTMLInputElement)?.value || "2");
+          const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
+          const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
+          const textColor = (document.getElementById('c-v-st-t') as HTMLInputElement)?.value || "#212121";
+          const labelColor = (document.getElementById('c-v-lbl') as HTMLInputElement)?.value || "#e0e0e0";
+          const labelSize = parseInt((document.getElementById('vinyl-center-label-size') as HTMLInputElement)?.value || "80");
+          const spacingMultiplier = parseFloat((document.getElementById('vinyl-letter-spacing') as HTMLInputElement)?.value || "2");
+          const selectedFont = (document.getElementById('vinyl-font-family') as HTMLInputElement)?.value || "'DM Sans', sans-serif";
 
-        const textLen = input.length * (fs * 0.6); 
-        const minR = labelSize + 20;
-        const spacing = fs * 1.2;
-        
-        const standardLoops = (380 - minR) / spacing;
-        const standardLen = Math.PI * spacing * standardLoops * standardLoops + 2 * Math.PI * minR * standardLoops;
-        
-        let loops = standardLoops;
-        let maxR = 380;
-        
-        if (textLen > standardLen) {
-            const a = Math.PI * spacing;
-            const b = 2 * Math.PI * minR;
-            const c = -textLen;
-            loops = (-b + Math.sqrt(b*b - 4*a*c)) / (2*a);
-            maxR = minR + loops * spacing;
-        }
-        
-        let svgSize = 800;
-        let cx = 400;
-        let cy = 400;
-        
-        if (maxR > 380) {
-            svgSize = (maxR + 30) * 2;
-            cx = svgSize / 2;
-            cy = svgSize / 2;
-        }
-
-        let points = [];
-        let steps = Math.ceil(loops * 100);
-        
-        for(let i=0; i<=steps; i++) {
-            let t = -Math.PI/2 + (i/steps) * loops * Math.PI * 2;
-            let r = minR + ((maxR - minR) * (i/steps));
-            let x = cx + r * Math.cos(t);
-            let y = cy + r * Math.sin(t);
-            if(i===0) points.push(`M ${x} ${y}`);
-            else points.push(`L ${x} ${y}`);
-        }
-
-        const pathD = points.join(' ');
-
-        let finalStr = input.trim();
-        if (textLen < standardLen) {
-           let repeats = Math.ceil(standardLen / (textLen + 20));
-           let arr = [];
-           for(let k=0; k<repeats; k++) arr.push(finalStr);
-           finalStr = arr.join(' • ');
-        }
-        finalStr = finalStr.toUpperCase().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-        const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize}" height="${svgSize}">
-          <defs>
-            <path id="v-spiral-path" d="${pathD}" fill="none" />
-          </defs>
-          <circle cx="${cx}" cy="${cy}" r="${maxR + 15}" fill="none" />
-          <circle cx="${cx}" cy="${cy}" r="${minR * 0.95}" fill="none" stroke="#2a2a2a" stroke-width="1" />
-          <circle cx="${cx}" cy="${cy}" r="${minR * 0.97}" fill="none" stroke="#2a2a2a" stroke-width="1" />
-          <text fill="${textColor}" font-size="${fs}" letter-spacing="${spacingMultiplier}" font-family="'DM Sans', sans-serif" font-weight="700">
-            <textPath href="#v-spiral-path" startOffset="0%">${finalStr}</textPath>
-          </text>
-          <circle cx="${cx}" cy="${cy}" r="${labelSize}" fill="${labelColor}" id="v-label-disc" />
-          <circle cx="${cx}" cy="${cy}" r="${labelSize / 10}" fill="#111111" />
-        </svg>`;
-
-        const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
-
-        fabric.Image.fromURL(svgUrl, (img: any) => {
-          const oldVinyl = canvas.getObjects().find((o: any) => o.id === 'v-vinyl');
-          let left = 400, top = 550;
-          let scaleX = oldVinyl ? oldVinyl.scaleX : 1;
-          let scaleY = oldVinyl ? oldVinyl.scaleY : 1;
-          let angle = oldVinyl ? oldVinyl.angle : 0;
-          if (oldVinyl) {
-            left = oldVinyl.left;
-            top = oldVinyl.top;
-            canvas.remove(oldVinyl);
+          const textLen = input.length * (fs * 0.6); 
+          const minR = labelSize + 20;
+          const spacing = fs * 1.2;
+          
+          const standardLoops = (380 - minR) / spacing;
+          const standardLen = Math.PI * spacing * standardLoops * standardLoops + 2 * Math.PI * minR * standardLoops;
+          
+          let loops = standardLoops;
+          let maxR = 380;
+          
+          if (textLen > standardLen) {
+              const a = Math.PI * spacing;
+              const b = 2 * Math.PI * minR;
+              const c = -textLen;
+              loops = (-b + Math.sqrt(b*b - 4*a*c)) / (2*a);
+              maxR = minR + loops * spacing;
           }
-          img.set({
-            originX: 'center',
-            originY: 'center',
-            left: left,
-            top: top,
-            scaleX: scaleX,
-            scaleY: scaleY,
-            angle: angle,
-            id: 'v-vinyl',
-            hasControls: true
-          });
-          canvas.add(img);
-          canvas.requestRenderAll();
-        }, { crossOrigin: 'anonymous' });
+          
+          let svgSize = 800;
+          let cx = 400;
+          let cy = 400;
+          
+          if (maxR > 380) {
+              svgSize = (maxR + 30) * 2;
+              cx = svgSize / 2;
+              cy = svgSize / 2;
+          }
+
+          let points = [];
+          let steps = Math.ceil(loops * 100);
+          
+          for(let i=0; i<=steps; i++) {
+              let t = -Math.PI/2 + (i/steps) * loops * Math.PI * 2;
+              let r = minR + ((maxR - minR) * (i/steps));
+              let x = cx + r * Math.cos(t);
+              let y = cy + r * Math.sin(t);
+              if(i===0) points.push(`M ${x} ${y}`);
+              else points.push(`L ${x} ${y}`);
+          }
+
+          const pathD = points.join(' ');
+
+          let finalStr = input.trim();
+          if (textLen < standardLen) {
+             let repeats = Math.ceil(standardLen / (textLen + 20));
+             let arr = [];
+             for(let k=0; k<repeats; k++) arr.push(finalStr);
+             finalStr = arr.join(' • ');
+          }
+          finalStr = finalStr.toUpperCase().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+          const svgStr = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${svgSize} ${svgSize}" width="${svgSize}" height="${svgSize}">
+            <defs>
+              <path id="v-spiral-path" d="${pathD}" fill="none" />
+            </defs>
+            <circle cx="${cx}" cy="${cy}" r="${maxR + 15}" fill="none" />
+            <circle cx="${cx}" cy="${cy}" r="${minR * 0.95}" fill="none" stroke="#2a2a2a" stroke-width="1" />
+            <circle cx="${cx}" cy="${cy}" r="${minR * 0.97}" fill="none" stroke="#2a2a2a" stroke-width="1" />
+            <text fill="${textColor}" font-size="${fs}" letter-spacing="${spacingMultiplier}" font-family="${selectedFont}" font-weight="700">
+              <textPath href="#v-spiral-path" startOffset="0%">${finalStr}</textPath>
+            </text>
+            <circle cx="${cx}" cy="${cy}" r="${labelSize}" fill="${labelColor}" id="v-label-disc" />
+            <circle cx="${cx}" cy="${cy}" r="${labelSize / 10}" fill="#111111" />
+          </svg>`;
+
+          const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
+
+          fabric.Image.fromURL(svgUrl, (img: any) => {
+            const oldVinyl = canvas.getObjects().find((o: any) => o.id === 'v-vinyl');
+            let left = 400, top = 550;
+            let scaleX = oldVinyl ? oldVinyl.scaleX : 1;
+            let scaleY = oldVinyl ? oldVinyl.scaleY : 1;
+            let angle = oldVinyl ? oldVinyl.angle : 0;
+            if (oldVinyl) {
+              left = oldVinyl.left;
+              top = oldVinyl.top;
+              canvas.remove(oldVinyl);
+            }
+            img.set({
+              originX: 'center',
+              originY: 'center',
+              left: left,
+              top: top,
+              scaleX: scaleX,
+              scaleY: scaleY,
+              angle: angle,
+              id: 'v-vinyl',
+              hasControls: true
+            });
+            canvas.add(img);
+            canvas.requestRenderAll();
+            resolve();
+          }, { crossOrigin: 'anonymous' });
+        });
       };
 
       w.fetchLyrics = async function(artist: string, title: string) {
@@ -1014,14 +1025,6 @@ export default function SpotifyPosterBuilder() {
           let targetHeightPx = Math.round(hIn * 300);
           let scaleMultiplier = targetWidthPx / BASE_WIDTH;
 
-          const MAX_DIMENSION = 16384;
-          if (targetWidthPx > MAX_DIMENSION || targetHeightPx > MAX_DIMENSION) {
-              const limitScale = Math.min(MAX_DIMENSION / targetWidthPx, MAX_DIMENSION / targetHeightPx);
-              scaleMultiplier = scaleMultiplier * limitScale;
-              targetWidthPx = Math.round(targetWidthPx * limitScale);
-              targetHeightPx = Math.round(targetHeightPx * limitScale);
-          }
-
           const zip = new (window as any).JSZip();
           const folder = zip.folder(`vinyl-posters-${format}`);
 
@@ -1029,9 +1032,11 @@ export default function SpotifyPosterBuilder() {
               const color = colorsToExport[i];
               canvas.setBackgroundColor(color, canvas.renderAll.bind(canvas));
               if(bgImg) bgImg.set('visible', false); 
-              w.applyAutoContrast(color);
               
-              await new Promise(r => setTimeout(r, 150));
+              // Dynamically wait for contrast and SVG render load cycles completely
+              await w.applyAutoContrast(color);
+              
+              await new Promise(r => setTimeout(r, 100));
 
               try {
                   let baseFilename = w.getExportFilename(format);
@@ -1102,11 +1107,6 @@ export default function SpotifyPosterBuilder() {
         
         let targetWidthPx = Math.round(wIn * 300);
         let scaleMultiplier = targetWidthPx / BASE_WIDTH;
-
-        const MAX_DIMENSION = 16384;
-        if (targetWidthPx > MAX_DIMENSION) {
-          scaleMultiplier = MAX_DIMENSION / BASE_WIDTH;
-        }
 
         try {
           const base64Data = canvas.toDataURL({
@@ -1358,9 +1358,16 @@ export default function SpotifyPosterBuilder() {
           const lblColor = (document.getElementById('c-v-lbl') as HTMLInputElement)?.value || "#e0e0e0";
           const labelSize = parseInt((document.getElementById('vinyl-center-label-size') as HTMLInputElement)?.value || "80");
           const currentScale = Math.round((obj.scaleX || 1) * 100);
+          const currentFont = (document.getElementById('vinyl-font-family') as HTMLInputElement)?.value || "'DM Sans', sans-serif";
 
           html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record Controls</div>
           <div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,currentScale, `window.setVinylProp('overallSize', this.value)`, '%')}</div>
+          <div class="pf-row"><label>Spiral Font Family</label>
+            <select onchange="window.setVinylProp('fontFamily', this.value)">
+              <option value="${currentFont}" selected>Current: ${currentFont.replace(/'/g, "")}</option>
+              ${fontOpts}
+            </select>
+          </div>
           <div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,vsTextSize, `window.setVinylProp('textSize', this.value)`)}</div>
           <div class="pf-row"><label>Spiral Letter Spacing</label>${rrow(-2,15,0.2,vsLetterSpacing, `window.setVinylProp('letterSpacing', this.value)`, '')}</div>
           <div class="pf-row"><label>Spiral Text Color</label>${cpair(vsColor, `window.setVinylProp('textColor', this.value)`)}</div>
@@ -1388,7 +1395,7 @@ export default function SpotifyPosterBuilder() {
       canvas.on('object:scaling', () => { w.edUpdatePanel(); });
 
       // ══════════════════════════════════════════════════════════════
-      // SCENE BUILDER (INITIAL OBJECT LOADERS)
+      // SCENE INITIALIZERS
       // ══════════════════════════════════════════════════════════════
 
       w.updateContentPosition = function() {
@@ -1678,86 +1685,6 @@ export default function SpotifyPosterBuilder() {
     };
   }, [posterMode]);
 
-  const vinylColors = [
-    '#f5f5f5', '#212121', '#d95c50', '#698f62', '#5c7c8c', '#e8ba4f', '#8b688f', '#d982ab',
-    '#e07a3e', '#7e9b81', '#d6c5a5', '#c96567', '#4c6470', '#997e65', '#bd826b', '#6c5673'
-  ];
-
-  if (posterMode === 'select') {
-    return (
-      <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', width: '100vw', background: '#09090b', color: '#fff', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter', sans-serif", padding: '20px' }}>
-        <h1 style={{ fontSize: '36px', marginBottom: '50px', fontWeight: 700, letterSpacing: '-0.02em' }}>Choose Poster Template</h1>
-        
-        <div style={{ display: 'flex', gap: '40px', flexWrap: 'wrap', justifyContent: 'center' }}>
-          
-          {/* SPOTIFY CARD */}
-          <div 
-            onClick={() => setPosterMode('spotify')} 
-            style={{ width: '360px', padding: '40px 30px', background: '#18181b', border: '2px solid #27272a', borderRadius: '16px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' }} 
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = '#1DB954';
-              e.currentTarget.style.transform = 'translateY(-8px)';
-              e.currentTarget.style.boxShadow = '0 12px 40px rgba(29, 185, 84, 0.15)';
-            }} 
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = '#27272a';
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
-              <svg width="160" height="200" viewBox="0 0 200 250" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 20px 30px rgba(0,0,0,0.5))' }}>
-                <rect width="200" height="250" rx="8" fill="#121212" stroke="#333" strokeWidth="2"/>
-                <rect x="20" y="20" width="160" height="160" rx="4" fill="#282828"/>
-                <rect x="20" y="195" width="100" height="12" rx="6" fill="#FFFFFF"/>
-                <rect x="20" y="215" width="60" height="8" rx="4" fill="#B3B3B3"/>
-                <circle cx="160" cy="210" r="16" fill="#1DB954"/>
-                <path d="M156 205L166 210L156 215V205Z" fill="#121212"/>
-              </svg>
-            </div>
-            <h2 style={{ fontSize: '22px', marginBottom: '12px', fontWeight: 600 }}>Spotify Poster</h2>
-            <p style={{ fontSize: '14px', color: '#a1a1aa', lineHeight: 1.6, margin: 0 }}>Modern music player interface with cover art, progress bar, and play controls.</p>
-          </div>
-          
-          {/* VINYL CARD */}
-          <div 
-            onClick={() => setPosterMode('vinyl')} 
-            style={{ width: '360px', padding: '40px 30px', background: '#18181b', border: '2px solid #27272a', borderRadius: '16px', textAlign: 'center', cursor: 'pointer', transition: 'all 0.3s ease', display: 'flex', flexDirection: 'column', alignItems: 'center' }} 
-            onMouseEnter={e => {
-              e.currentTarget.style.borderColor = '#6366f1';
-              e.currentTarget.style.transform = 'translateY(-8px)';
-              e.currentTarget.style.boxShadow = '0 12px 40px rgba(99, 102, 241, 0.15)';
-            }} 
-            onMouseLeave={e => {
-              e.currentTarget.style.borderColor = '#27272a';
-              e.currentTarget.style.transform = 'translateY(0)';
-              e.currentTarget.style.boxShadow = 'none';
-            }}
-          >
-            <div style={{ width: '100%', display: 'flex', justifyContent: 'center', marginBottom: '30px' }}>
-              <svg width="160" height="200" viewBox="0 0 200 250" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ filter: 'drop-shadow(0 20px 30px rgba(0,0,0,0.5))' }}>
-                <rect width="200" height="250" rx="8" fill="#f5f5f5" stroke="#333" strokeWidth="2"/>
-                <rect x="20" y="20" width="40" height="6" rx="3" fill="#212121"/>
-                <rect x="150" y="20" width="30" height="6" rx="3" fill="#212121"/>
-                <rect x="40" y="45" width="120" height="12" rx="6" fill="#212121"/>
-                <rect x="60" y="65" width="80" height="6" rx="3" fill="#555555"/>
-                <circle cx="100" cy="155" r="60" fill="none" stroke="#212121" strokeWidth="24"/>
-                <circle cx="100" cy="155" r="54" fill="none" stroke="#444" strokeWidth="1"/>
-                <circle cx="100" cy="155" r="48" fill="none" stroke="#444" strokeWidth="1"/>
-                <circle cx="100" cy="155" r="66" fill="none" stroke="#444" strokeWidth="1"/>
-                <circle cx="100" cy="155" r="22" fill="#e0e0e0"/>
-                <circle cx="100" cy="155" r="4" fill="#111"/>
-              </svg>
-            </div>
-            <h2 style={{ fontSize: '22px', marginBottom: '12px', fontWeight: 600 }}>Vinyl Song Poster</h2>
-            <p style={{ fontSize: '14px', color: '#a1a1aa', lineHeight: 1.6, margin: 0 }}>Retro record design with spiral lyrics forming the vinyl grooves in the center.</p>
-          </div>
-
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="spotify-poster-page">
       <style>{`
@@ -1902,10 +1829,11 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page .pf-btn.active { background: #0d2218; color: var(--accent); border-color: #1DB954; }
       `}</style>
 
-      {/* Inputs reserved to sync metadata in background thread */}
+      {/* Synchronized state values representing hidden inputs */}
       <input type="hidden" id="vinyl-text-size" defaultValue="12" />
       <input type="hidden" id="vinyl-letter-spacing" defaultValue="2" />
       <input type="hidden" id="vinyl-center-label-size" defaultValue="80" />
+      <input type="hidden" id="vinyl-font-family" defaultValue="'DM Sans', sans-serif" />
 
       <div id="panel">
         <div className="panel-header">
