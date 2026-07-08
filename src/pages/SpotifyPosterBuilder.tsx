@@ -63,12 +63,12 @@ export default function SpotifyPosterBuilder() {
         '23.39x33.11': [23.39, 33.11], '5x7': [5,7], '6x8': [6,8],
         '8x10': [8,10], '9x11': [9,11], '11x14': [11,14], '11x17': [11,17],
         '11.7x16.5': [11.7,16.5], '12x16': [12,16], '12x18':[12,18],
-        '16x20': [16,20], '16x24': [16,24], '16.5x23.4':[16.5,23.4],
-        '18x24': [18,24], '20x30': [20,30], '22x34':[22,34],
-        '23.4x33.1':[23.4,33.1], '24x32': [24,32], '24x36': [24,36],
-        '26x36': [26,36], '28x40': [28,40], '30x40':[30,40],
-        '40x50': [40, 50], '50x60': [50,60], '60x80': [60,80], 
-        '68x80': [68,80], '88x104': [88,104]
+        '16x20': [16,20], '16x24': [16,24], '16.5x23.4': [16.5,23.4],
+        '18x24': [18, 24], '20x30': [20, 30], '22x34': [22, 34],
+        '23.4x33.1': [23.4, 33.1], '24x32': [24, 32], '24x36': [24, 36],
+        '26x36': [26, 36], '28x40': [28, 40], '30x40': [30, 40],
+        '40x50': [40, 50], '50x60': [50, 60], '60x80': [60, 80], 
+        '68x80': [68, 80], '88x104': [88, 104]
       };
 
       const BASE_WIDTH = 800;
@@ -369,7 +369,6 @@ export default function SpotifyPosterBuilder() {
         const lblInp = document.getElementById('c-v-lbl') as HTMLInputElement;
         if(lblInp) lblInp.value = labelCol;
 
-        // Await the spiral drawing cleanly before completing contrast cycle
         await w.updateVinylSpiral(); 
       };
 
@@ -402,7 +401,6 @@ export default function SpotifyPosterBuilder() {
         } else {
           if(bgColorSection) bgColorSection.style.display = 'none';
           if(bgBlurSection) bgBlurSection.style.display = 'block';
-          // Set backgroundColor as null to avoid drawing color on top of image
           canvas.setBackgroundColor(null, canvas.renderAll.bind(canvas));
           w.updateBgBlur();
         }
@@ -462,7 +460,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       // ══════════════════════════════════════════════════════════════
-      // INTERACTIVE CANVAS ELEMENT UPDATES (SPOTIFY)
+      // COVER LOADING ENGINES (SPOTIFY / VINYL)
       // ══════════════════════════════════════════════════════════════
 
       w.setCoverImage = function(src: string) {
@@ -570,7 +568,7 @@ export default function SpotifyPosterBuilder() {
           else r.setAttribute('fill', barColor);
         });
 
-        fetched.querySelectorAll('circle').forEach(el => r.setAttribute('fill', logoColor));
+        fetched.querySelectorAll('circle').forEach(el => el.setAttribute('fill', logoColor));
         fetched.querySelectorAll('path').forEach(el => {
           const fill = el.getAttribute('fill');
           if (fill && fill !== 'none') el.setAttribute('fill', logoColor);
@@ -673,7 +671,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       // ══════════════════════════════════════════════════════════════
-      // VINYL POSTER - SPIRAL SVG LOGIC IN FABRIC
+      // VINYL POSTER - SPIRAL SVG LOGIC IN FABRIC (AWAITSAFE PROMISE)
       // ══════════════════════════════════════════════════════════════
 
       w.setVinylProp = function(prop: string, val: any) {
@@ -708,7 +706,6 @@ export default function SpotifyPosterBuilder() {
         canvas.requestRenderAll();
       };
 
-      // Return dynamic SVG compilation inside a robust, awaitsafe Promise hook
       w.updateVinylSpiral = function() {
         return new Promise<void>((resolve) => {
           if (w.POSTER_MODE !== 'vinyl') return resolve();
@@ -1349,35 +1346,35 @@ export default function SpotifyPosterBuilder() {
             <div class="pf-row"><label>Shadow Blur</label>${rrow(0, 80, 1, shadowBlur, `window.setCoverBorderProp('shadow', this.value)`)}</div>
             <div class="pf-row"><label>Image Scale</label>${rrow(10, 200, 1, imgScale, `window.setCoverBorderProp('imageScale', this.value)`, '%')}</div>
           </div>`;
-        }
+      }
 
-        if (id === 'v-vinyl') {
-          const vsTextSize = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
-          const vsLetterSpacing = parseFloat((document.getElementById('vinyl-letter-spacing') as HTMLInputElement)?.value || "2");
-          const vsColor = (document.getElementById('c-v-st-t') as HTMLInputElement)?.value || "#212121";
-          const lblColor = (document.getElementById('c-v-lbl') as HTMLInputElement)?.value || "#e0e0e0";
-          const labelSize = parseInt((document.getElementById('vinyl-center-label-size') as HTMLInputElement)?.value || "80");
-          const currentScale = Math.round((obj.scaleX || 1) * 100);
-          const currentFont = (document.getElementById('vinyl-font-family') as HTMLInputElement)?.value || "'DM Sans', sans-serif";
+      if (id === 'v-vinyl') {
+        const vsTextSize = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
+        const vsLetterSpacing = parseFloat((document.getElementById('vinyl-letter-spacing') as HTMLInputElement)?.value || "2");
+        const vsColor = (document.getElementById('c-v-st-t') as HTMLInputElement)?.value || "#212121";
+        const lblColor = (document.getElementById('c-v-lbl') as HTMLInputElement)?.value || "#e0e0e0";
+        const labelSize = parseInt((document.getElementById('vinyl-center-label-size') as HTMLInputElement)?.value || "80");
+        const currentScale = Math.round((obj.scaleX || 1) * 100);
+        const currentFont = (document.getElementById('vinyl-font-family') as HTMLInputElement)?.value || "'DM Sans', sans-serif";
 
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record Controls</div>
-          <div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,currentScale, `window.setVinylProp('overallSize', this.value)`, '%')}</div>
-          <div class="pf-row"><label>Spiral Font Family</label>
-            <select onchange="window.setVinylProp('fontFamily', this.value)">
-              <option value="${currentFont}" selected>Current: ${currentFont.replace(/'/g, "")}</option>
-              ${fontOpts}
-            </select>
-          </div>
-          <div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,vsTextSize, `window.setVinylProp('textSize', this.value)`)}</div>
-          <div class="pf-row"><label>Spiral Letter Spacing</label>${rrow(-2,15,0.2,vsLetterSpacing, `window.setVinylProp('letterSpacing', this.value)`, '')}</div>
-          <div class="pf-row"><label>Spiral Text Color</label>${cpair(vsColor, `window.setVinylProp('textColor', this.value)`)}</div>
-          <div class="pf-row"><label>Center Label Color</label>${cpair(lblColor, `window.setVinylProp('labelColor', this.value)`)}</div>
-          <div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,labelSize, `window.setVinylProp('labelSize', this.value)`)}</div>
-          </div>`;
-        }
+        html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record Controls</div>
+        <div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,currentScale, `window.setVinylProp('overallSize', this.value)`, '%')}</div>
+        <div class="pf-row"><label>Spiral Font Family</label>
+          <select onchange="window.setVinylProp('fontFamily', this.value)">
+            <option value="${currentFont}" selected>Current: ${currentFont.replace(/'/g, "")}</option>
+            ${fontOpts}
+          </select>
+        </div>
+        <div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,vsTextSize, `window.setVinylProp('textSize', this.value)`)}</div>
+        <div class="pf-row"><label>Spiral Letter Spacing</label>${rrow(-2,15,0.2,vsLetterSpacing, `window.setVinylProp('letterSpacing', this.value)`, '')}</div>
+        <div class="pf-row"><label>Spiral Text Color</label>${cpair(vsColor, `window.setVinylProp('textColor', this.value)`)}</div>
+        <div class="pf-row"><label>Center Label Color</label>${cpair(lblColor, `window.setVinylProp('labelColor', this.value)`)}</div>
+        <div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,labelSize, `window.setVinylProp('labelSize', this.value)`)}</div>
+        </div>`;
+      }
 
-        return html;
-      };
+      return html;
+    };
 
       w.edBuildMulti = function() {
         const fontOpts = `<option value="'DM Sans', sans-serif">DM Sans</option><option value="'Inter', sans-serif">Inter</option><option value="'Montserrat', sans-serif">Montserrat</option><option value="'Oswald', sans-serif">Oswald</option><option value="'Poppins', sans-serif">Poppins</option><option value="'Playfair Display', serif">Playfair Display</option><option value="'Anton', sans-serif">Anton</option><option value="'Bebas Neue', sans-serif">Bebas Neue</option><option value="'Lora', serif">Lora</option><option value="'Merriweather', serif">Merriweather</option>`;
@@ -1829,7 +1826,7 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page .pf-btn.active { background: #0d2218; color: var(--accent); border-color: #1DB954; }
       `}</style>
 
-      {/* Synchronized state values representing hidden inputs */}
+      {/* States dynamically updated and read on main renderer */}
       <input type="hidden" id="vinyl-text-size" defaultValue="12" />
       <input type="hidden" id="vinyl-letter-spacing" defaultValue="2" />
       <input type="hidden" id="vinyl-center-label-size" defaultValue="80" />
