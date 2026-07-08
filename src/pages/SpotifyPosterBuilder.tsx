@@ -12,7 +12,6 @@ export default function SpotifyPosterBuilder() {
     let active = true;
     let canvas: any = null;
 
-    // Load External Scripts (Fabric.js, jsPDF, JSZip)
     const loadScript = (src: string) => {
       return new Promise((resolve, reject) => {
         if (document.querySelector(`script[src="${src}"]`)) return resolve(true);
@@ -36,13 +35,11 @@ export default function SpotifyPosterBuilder() {
       const fabric = w.fabric;
       w.POSTER_MODE = posterMode;
 
-      // Clean up previous instance if exists
       if (fabricCanvasRef.current) {
         fabricCanvasRef.current.dispose();
         fabricCanvasRef.current = null;
       }
 
-      // Initialize Fabric Canvas on direct DOM Ref
       canvas = new fabric.Canvas(canvasElRef.current, {
         preserveObjectStacking: true,
         backgroundColor: posterMode === 'vinyl' ? '#f5f5f5' : '#121212',
@@ -51,7 +48,7 @@ export default function SpotifyPosterBuilder() {
       fabricCanvasRef.current = canvas;
 
       // ══════════════════════════════════════════════════════════════
-      // ORIGINAL JAVASCRIPT LOGIC + FABRIC EXTENSIONS
+      // PLATFORM CONFIGURATIONS & RESIZING
       // ══════════════════════════════════════════════════════════════
 
       w.toggleAccordion = function(btn: HTMLElement) {
@@ -139,7 +136,6 @@ export default function SpotifyPosterBuilder() {
       };
 
       w.handleEndTimeChange = function() {
-        const endStr = (document.getElementById('time-end') as HTMLInputElement).value;
         w.handleStartTimeChange(); 
       };
 
@@ -170,6 +166,53 @@ export default function SpotifyPosterBuilder() {
         }
         if (tStart) tStart.set('text', startText);
         if (tEnd) tEnd.set('text', endText);
+        canvas.requestRenderAll();
+      };
+
+      // ══════════════════════════════════════════════════════════════
+      // REAL-TIME COVER ART TRANSFORMS & STYLING
+      // ══════════════════════════════════════════════════════════════
+
+      w.setCoverBorderProp = function(prop: string, val: any) {
+        const cover = canvas.getObjects().find((o: any) => o.id === 'cover');
+        if (!cover) return;
+
+        if (prop === 'borderRadius') {
+          let clipPath = cover.clipPath;
+          if (!clipPath) {
+            clipPath = new fabric.Rect({
+              originX: 'center',
+              originY: 'center',
+              width: cover.width,
+              height: cover.height
+            });
+            cover.set('clipPath', clipPath);
+          }
+          clipPath.set({ rx: parseFloat(val), ry: parseFloat(val) });
+        } else if (prop === 'borderWidth') {
+          cover.set('strokeWidth', parseFloat(val));
+        } else if (prop === 'borderColor') {
+          cover.set('stroke', val);
+        } else if (prop === 'borderStyle') {
+          if (val === 'dashed') cover.set('strokeDashArray', [10, 5]);
+          else if (val === 'dotted') cover.set('strokeDashArray', [2, 2]);
+          else if (val === 'none') { cover.set('strokeWidth', 0); }
+          else cover.set('strokeDashArray', null);
+        } else if (prop === 'shadow') {
+          cover.set('shadow', new fabric.Shadow({
+            color: 'rgba(0,0,0,0.8)',
+            blur: parseFloat(val) * 2,
+            offsetX: 0,
+            offsetY: parseFloat(val)
+          }));
+        } else if (prop === 'imageX') {
+          cover.set('left', 150 + parseFloat(val));
+        } else if (prop === 'imageY') {
+          cover.set('top', 180 + parseFloat(val));
+        } else if (prop === 'imageScale') {
+          cover.set('scaleX', (parseFloat(val) / 100));
+          cover.set('scaleY', (parseFloat(val) / 100));
+        }
         canvas.requestRenderAll();
       };
 
@@ -302,6 +345,7 @@ export default function SpotifyPosterBuilder() {
 
         const mainTextCol = isDark ? '#ffffff' : '#212121';
         const subTextCol  = isDark ? '#cccccc' : '#555555';
+        const labelCol    = isDark ? '#eeeeee' : '#e0e0e0';
 
         const updateFill = (id: string, col: string) => {
           const obj = canvas.getObjects().find((o: any) => o.id === id);
@@ -321,6 +365,9 @@ export default function SpotifyPosterBuilder() {
         setInp('c-v-tr', mainTextCol);
         setInp('c-v-st', mainTextCol);
         setInp('c-v-bot', subTextCol);
+
+        const lblInp = document.getElementById('c-v-lbl') as HTMLInputElement;
+        if(lblInp) lblInp.value = labelCol;
 
         w.updateVinylSpiral(); 
       };
@@ -418,22 +465,24 @@ export default function SpotifyPosterBuilder() {
         w.currentCoverSrc = src;
         fabric.Image.fromURL(src, (img: any) => {
           const coverObj = canvas.getObjects().find((o: any) => o.id === 'cover');
+          
+          img.set({
+            left: coverObj ? coverObj.left : 150,
+            top: coverObj ? coverObj.top : 180,
+            id: 'cover',
+            hasControls: true,
+            lockScalingFlip: true,
+            crossOrigin: 'anonymous'
+          });
+
+          // Match custom transformations of cover Art
+          img.scaleToWidth(500);
+
           if (coverObj) {
-            coverObj.setSrc(src, () => {
-              canvas.requestRenderAll();
-            }, { crossOrigin: 'anonymous' });
-          } else {
-            img.set({
-              left: 150,
-              top: 180,
-              width: 500,
-              height: 500,
-              id: 'cover',
-              hasControls: true,
-              lockScalingFlip: true
-            });
-            canvas.add(img);
+            canvas.remove(coverObj);
           }
+          canvas.add(img);
+          canvas.requestRenderAll();
           w.updateBg();
         }, { crossOrigin: 'anonymous' });
       };
@@ -624,6 +673,35 @@ export default function SpotifyPosterBuilder() {
       // VINYL POSTER - SPIRAL SVG LOGIC IN FABRIC
       // ══════════════════════════════════════════════════════════════
 
+      w.setVinylProp = function(prop: string, val: any) {
+        if (prop === 'overallSize') {
+          const vinyl = canvas.getObjects().find((o: any) => o.id === 'v-vinyl');
+          if (vinyl) {
+            vinyl.set({
+              scaleX: parseFloat(val) / 100,
+              scaleY: parseFloat(val) / 100
+            });
+          }
+        } else if (prop === 'letterSpacing') {
+          (document.getElementById('vinyl-letter-spacing') as HTMLInputElement).value = val;
+          w.updateVinylSpiral();
+        } else if (prop === 'textSize') {
+          (document.getElementById('vinyl-text-size') as HTMLInputElement).value = val;
+          w.updateVinylSpiral();
+        } else if (prop === 'textColor') {
+          (document.getElementById('c-v-st-t') as HTMLInputElement).value = val;
+          (document.getElementById('c-v-st') as HTMLInputElement).value = val;
+          w.updateVinylSpiral();
+        } else if (prop === 'labelColor') {
+          (document.getElementById('c-v-lbl') as HTMLInputElement).value = val;
+          w.updateVinylSpiral();
+        } else if (prop === 'labelSize') {
+          (document.getElementById('vinyl-center-label-size') as HTMLInputElement).value = val;
+          w.updateVinylSpiral();
+        }
+        canvas.requestRenderAll();
+      };
+
       w.updateVinylSpiral = function() {
         if (w.POSTER_MODE !== 'vinyl') return;
 
@@ -631,9 +709,11 @@ export default function SpotifyPosterBuilder() {
         const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
         const textColor = (document.getElementById('c-v-st-t') as HTMLInputElement)?.value || "#212121";
         const labelColor = (document.getElementById('c-v-lbl') as HTMLInputElement)?.value || "#e0e0e0";
+        const labelSize = parseInt((document.getElementById('vinyl-center-label-size') as HTMLInputElement)?.value || "80");
+        const spacingMultiplier = parseFloat((document.getElementById('vinyl-letter-spacing') as HTMLInputElement)?.value || "2");
 
         const textLen = input.length * (fs * 0.6); 
-        const minR = 100;
+        const minR = labelSize + 20;
         const spacing = fs * 1.2;
         
         const standardLoops = (380 - minR) / spacing;
@@ -688,13 +768,13 @@ export default function SpotifyPosterBuilder() {
             <path id="v-spiral-path" d="${pathD}" fill="none" />
           </defs>
           <circle cx="${cx}" cy="${cy}" r="${maxR + 15}" fill="none" />
-          <circle cx="${cx}" cy="${cy}" r="${minR * 1.1}" fill="none" stroke="#2a2a2a" stroke-width="1" />
-          <circle cx="${cx}" cy="${cy}" r="${minR * 1.15}" fill="none" stroke="#2a2a2a" stroke-width="1" />
-          <text fill="${textColor}" font-size="${fs}" letter-spacing="2" font-family="'DM Sans', sans-serif" font-weight="700">
+          <circle cx="${cx}" cy="${cy}" r="${minR * 0.95}" fill="none" stroke="#2a2a2a" stroke-width="1" />
+          <circle cx="${cx}" cy="${cy}" r="${minR * 0.97}" fill="none" stroke="#2a2a2a" stroke-width="1" />
+          <text fill="${textColor}" font-size="${fs}" letter-spacing="${spacingMultiplier}" font-family="'DM Sans', sans-serif" font-weight="700">
             <textPath href="#v-spiral-path" startOffset="0%">${finalStr}</textPath>
           </text>
-          <circle cx="${cx}" cy="${cy}" r="80" fill="${labelColor}" id="v-label-disc" />
-          <circle cx="${cx}" cy="${cy}" r="8" fill="#111111" />
+          <circle cx="${cx}" cy="${cy}" r="${labelSize}" fill="${labelColor}" id="v-label-disc" />
+          <circle cx="${cx}" cy="${cy}" r="${labelSize / 10}" fill="#111111" />
         </svg>`;
 
         const svgUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgStr);
@@ -702,13 +782,12 @@ export default function SpotifyPosterBuilder() {
         fabric.Image.fromURL(svgUrl, (img: any) => {
           const oldVinyl = canvas.getObjects().find((o: any) => o.id === 'v-vinyl');
           let left = 400, top = 550;
-          let scaleX = 1, scaleY = 1, angle = 0;
+          let scaleX = oldVinyl ? oldVinyl.scaleX : 1;
+          let scaleY = oldVinyl ? oldVinyl.scaleY : 1;
+          let angle = oldVinyl ? oldVinyl.angle : 0;
           if (oldVinyl) {
             left = oldVinyl.left;
             top = oldVinyl.top;
-            scaleX = oldVinyl.scaleX;
-            scaleY = oldVinyl.scaleY;
-            angle = oldVinyl.angle;
             canvas.remove(oldVinyl);
           }
           img.set({
@@ -1247,15 +1326,46 @@ export default function SpotifyPosterBuilder() {
           html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text properties</div><div class="pf-row"><label>Content</label><input type="text" value="${txt}" oninput="window.edSetFabricProp('text', this.value)"></div><div class="pf-row"><label>Font Family</label><select onchange="window.edSetFabricProp('fontFamily', this.value)"><option value="${ff}" selected>${ff}</option>${fontOpts}</select></div><div class="pf-2col"><div class="pf-row"><label>Font Size</label><input type="number" value="${fs}" min="6" max="200" oninput="window.edSetFabricProp('fontSize', parseFloat(this.value))"></div><div class="pf-row"><label>Weight</label><select onchange="window.edSetFabricProp('fontWeight', this.value)"><option value="300" ${fw==='300'?'selected':''}>Light</option><option value="400" ${fw==='400'||fw==='normal'?'selected':''}>Regular</option><option value="500" ${fw==='500'?'selected':''}>Medium</option><option value="600" ${fw==='600'?'selected':''}>SemiBold</option><option value="700" ${fw==='700'||fw==='bold'?'selected':''}>Bold</option><option value="900" ${fw==='900'?'selected':''}>Black</option></select></div></div><div class="pf-row"><label>Letter Spacing</label>${rrow(-200,800,10,ls, `window.edSetFabricProp('charSpacing', parseFloat(this.value))`)}</div><div class="pf-row"><label>Line Height</label>${rrow(0.8,4,0.05,lh, `window.edSetFabricProp('lineHeight', parseFloat(this.value))`, '')}</div><div class="pf-row"><label>Alignment</label><div class="pf-3col"><button class="pf-btn" onclick="window.edSetFabricProp('textAlign', 'left')">Left</button><button class="pf-btn" onclick="window.edSetFabricProp('textAlign', 'center')">Center</button><button class="pf-btn" onclick="window.edSetFabricProp('textAlign', 'right')">Right</button></div></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Text Color</div><div class="pf-row">${cpair(col, `window.edSetFabricProp('fill', this.value)`)}</div></div>`;
         }
 
+        if (id === 'cover') {
+          const br = obj.clipPath ? (obj.clipPath.rx || 0) : 0;
+          const bw = obj.strokeWidth || 0;
+          const bc = obj.stroke || '#ffffff';
+          const shadowBlur = obj.shadow ? (obj.shadow.blur / 2) : 0;
+          const imgScale = Math.round((obj.scaleX || 1) * 100);
+
+          html += `<hr class="pf-divider"><div class="pf-section">
+            <div class="pf-section-title">Cover Art Controls</div>
+            <div class="pf-row"><label>Border Radius</label>${rrow(0, 150, 1, br, `window.setCoverBorderProp('borderRadius', this.value)`)}</div>
+            <div class="pf-row"><label>Border Width</label>${rrow(0, 40, 1, bw, `window.setCoverBorderProp('borderWidth', this.value)`)}</div>
+            <div class="pf-row"><label>Border Color</label>${cpair(bc, `window.setCoverBorderProp('borderColor', this.value)`)}</div>
+            <div class="pf-row"><label>Border Style</label>
+              <select onchange="window.setCoverBorderProp('borderStyle', this.value)">
+                <option value="solid" ${obj.strokeDashArray===null?'selected':''}>Solid</option>
+                <option value="dashed" ${obj.strokeDashArray&&obj.strokeDashArray[0]===10?'selected':''}>Dashed</option>
+                <option value="dotted" ${obj.strokeDashArray&&obj.strokeDashArray[0]===2?'selected':''}>Dotted</option>
+                <option value="none" ${obj.strokeWidth===0?'selected':''}>None</option>
+              </select>
+            </div>
+            <div class="pf-row"><label>Shadow Blur</label>${rrow(0, 80, 1, shadowBlur, `window.setCoverBorderProp('shadow', this.value)`)}</div>
+            <div class="pf-row"><label>Image Scale</label>${rrow(10, 200, 1, imgScale, `window.setCoverBorderProp('imageScale', this.value)`, '%')}</div>
+          </div>`;
+        }
+
         if (id === 'v-vinyl') {
           const vsTextSize = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
+          const vsLetterSpacing = parseFloat((document.getElementById('vinyl-letter-spacing') as HTMLInputElement)?.value || "2");
           const vsColor = (document.getElementById('c-v-st-t') as HTMLInputElement)?.value || "#212121";
           const lblColor = (document.getElementById('c-v-lbl') as HTMLInputElement)?.value || "#e0e0e0";
+          const labelSize = parseInt((document.getElementById('vinyl-center-label-size') as HTMLInputElement)?.value || "80");
+          const currentScale = Math.round((obj.scaleX || 1) * 100);
 
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record Attributes</div>
-          <div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,vsTextSize, `document.getElementById('vinyl-text-size').value=this.value; window.updateVinylSpiral();`)}</div>
-          <div class="pf-row"><label>Spiral Text Color</label>${cpair(vsColor, `document.getElementById('c-v-st-t').value=this.value; document.getElementById('c-v-st').value=this.value; window.updateVinylSpiral();`)}</div>
-          <div class="pf-row"><label>Center Label Color</label>${cpair(lblColor, `document.getElementById('c-v-lbl').value=this.value; window.updateVinylSpiral();`)}</div>
+          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record Controls</div>
+          <div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,currentScale, `window.setVinylProp('overallSize', this.value)`, '%')}</div>
+          <div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,vsTextSize, `window.setVinylProp('textSize', this.value)`)}</div>
+          <div class="pf-row"><label>Spiral Letter Spacing</label>${rrow(-2,15,0.2,vsLetterSpacing, `window.setVinylProp('letterSpacing', this.value)`, '')}</div>
+          <div class="pf-row"><label>Spiral Text Color</label>${cpair(vsColor, `window.setVinylProp('textColor', this.value)`)}</div>
+          <div class="pf-row"><label>Center Label Color</label>${cpair(lblColor, `window.setVinylProp('labelColor', this.value)`)}</div>
+          <div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,labelSize, `window.setVinylProp('labelSize', this.value)`)}</div>
           </div>`;
         }
 
@@ -1430,7 +1540,6 @@ export default function SpotifyPosterBuilder() {
           id: 'time-end-el'
         });
 
-        // Add Playback Control Buttons (Vector Paths)
         const btnShuffle = new fabric.Path("M16 3h5v5M4 20L21 3M21 16v5h-5M15 15l6 6", {
           left: 170,
           top: centerY + 420,
@@ -1546,7 +1655,6 @@ export default function SpotifyPosterBuilder() {
         w.updateCanvasSize();
       };
 
-      // Scene Selector Trigger
       setTimeout(() => {
         if(w.POSTER_MODE === 'vinyl') {
           w.initVinylScene();
@@ -1793,6 +1901,11 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page .pf-btn:hover { background: #252525; color: var(--spotify-text); }
         .spotify-poster-page .pf-btn.active { background: #0d2218; color: var(--accent); border-color: #1DB954; }
       `}</style>
+
+      {/* Inputs reserved to sync metadata in background thread */}
+      <input type="hidden" id="vinyl-text-size" defaultValue="12" />
+      <input type="hidden" id="vinyl-letter-spacing" defaultValue="2" />
+      <input type="hidden" id="vinyl-center-label-size" defaultValue="80" />
 
       <div id="panel">
         <div className="panel-header">
