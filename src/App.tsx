@@ -1,10 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-
-// Layout & Components
 import { Layout } from './components/Layout';
-
-// Pages
 import { Home } from './pages/Home';
 import { Shop } from './pages/Shop';
 import { Cart } from './pages/Cart';
@@ -13,19 +9,15 @@ import { Profile } from './pages/Profile';
 import { SellerDashboard } from './pages/SellerDashboard';
 import { Wishlist } from './pages/Wishlist';
 import { ProductDetail } from './pages/ProductDetail';
-
-// AI Services & Tools
 import { SpecialForRoom } from './pages/SpecialForRoom'; 
-import { HDTools } from './pages/HDTools';              
-
-// Poster Builders
+import { HDTools } from './pages/HDTools';
 import { MusicPosterSelection } from './pages/MusicPosterSelection';
 import SongPosterSelection from './pages/SongPosterSelection';
 import AlbumPosterBuilder from './pages/AlbumPosterBuilder';
 import SpotifyPosterBuilder from './pages/SpotifyPosterBuilder'; 
 import VinylPosterBuilder from './pages/VinylPosterBuilder';
-
-// State Management
+import TrendPostersSelection from './pages/TrendPostersSelection';
+import SoundwavePosterPage from './pages/SoundwavePosterPage';
 import { useStore } from './store/useStore';
 
 export default function App() {
@@ -54,19 +46,16 @@ export default function App() {
           <Route path="special" element={<SpecialForRoom />} />
           <Route path="lab" element={<HDTools />} />
 
-          {/* POSTER BUILDERS HIERARCHY */}
-          {/* 1. Main Selection (Album Cover Poster vs Song Poster) */}
+          {/* POSTER BUILDERS HIERARCHY (MUSIC) */}
           <Route path="music-posters" element={<MusicPosterSelection />} />
-          
-          {/* 2. Album Cover Builder */}
           <Route path="custom-album" element={<AlbumPosterBuilder />} />
-          
-          {/* 3. Song Poster Sub-Selection (Spotify vs Vinyl) */}
           <Route path="song-poster" element={<SongPosterSelection />} />
-          
-          {/* 4. Song Poster Editors */}
           <Route path="song-poster/spotify" element={<SpotifyPosterBuilder />} />
           <Route path="song-poster/vinyl" element={<VinylPosterBuilder />} />
+
+          {/* POSTER BUILDERS HIERARCHY (TRENDS) */}
+          <Route path="trend-posters" element={<TrendPostersSelection />} />
+          <Route path="trend-posters/soundwave" element={<SoundwavePosterPage navigate={(path) => window.location.href = path} />} />
           
           {/* USER SYSTEM */}
           <Route path="cart" element={<Cart />} />
