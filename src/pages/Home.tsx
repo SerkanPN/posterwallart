@@ -233,8 +233,128 @@ export function Home() {
               advanced architectural tools to design art specifically for your walls.
             </p>
 
-            {/* THREE MAIN SERVICE CARDS */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-32 max-w-6xl mx-auto">
+            {/* FOUR MAIN SERVICE CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-32 max-w-7xl mx-auto">
+              
+              {/* CARD 1: AI ROOM DESIGNER */}
+              <Link to="/special" className="group relative bg-zinc-900/40 border border-zinc-800 p-6 lg:p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
+                <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative z-10 text-left flex flex-col gap-4">
+                  <div className="w-10 h-10 lg:w-12 lg:h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20">
+                    <Camera className="w-5 h-5 lg:w-6 lg:h-6 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl lg:text-2xl font-black tracking-tight mb-2 uppercase text-zinc-100">AI Room Designer</h2>
+                    <p className="text-zinc-500 text-[10px] lg:text-xs font-bold leading-normal">
+                      Upload a photo of your space. Our AI analyzes lighting and perspective to visualize the perfect posters on your walls.
+                    </p>
+                  </div>
+                </div>
+                
+                {/* Visual Preview */}
+                <div className="relative z-10">
+                  <RoomVisualizerPreview />
+                </div>
+
+                <div className="relative z-10 text-left mt-auto">
+                  <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-[10px] lg:text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
+                    Design For Room <ArrowRight className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+                  </span>
+                </div>
+              </Link>
+
+              {/* CARD 2: HD CREATOR LAB */}
+              <Link to="/lab" className="group relative bg-zinc-900/40 border border-zinc-800 p-6 lg:p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
+                <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative z-10 text-left flex flex-col gap-4">
+                  <div className="w-10 h-10 lg:w-12 lg:h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20">
+                    <Sparkles className="w-5 h-5 lg:w-6 lg:h-6 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl lg:text-2xl font-black tracking-tight mb-2 uppercase text-zinc-100">HD Creator Lab</h2>
+                    <p className="text-zinc-500 text-[10px] lg:text-xs font-bold leading-normal">
+                      Generate premium posters using prompts. Upscale your designs to ultra-high resolution and convert them to vector files.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Visual Preview */}
+                <div className="relative z-10">
+                  <PromptTyper />
+                </div>
+
+                <div className="relative z-10 text-left mt-auto">
+                  <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-[10px] lg:text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
+                    Open Creator Lab <ArrowRight className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+                  </span>
+                </div>
+              </Link>
+
+              {/* CARD 3: CUSTOM MUSIC POSTERS */}
+              <Link to="/music-posters" className="group relative bg-zinc-900/40 border border-zinc-800 p-6 lg:p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
+                <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative z-10 text-left flex flex-col gap-4">
+                  <div className="w-10 h-10 lg:w-12 lg:h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20">
+                    <Music className="w-5 h-5 lg:w-6 lg:h-6 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl lg:text-2xl font-black tracking-tight mb-2 uppercase text-zinc-100">Music Posters</h2>
+                    <p className="text-zinc-500 text-[10px] lg:text-xs font-bold leading-normal">
+                      Design stunning Album Cover layouts or Spotify-style Song posters. Personalize colors, layouts, and barcodes.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Visual Preview */}
+                <div className="relative z-10">
+                  <MusicPosterPreview />
+                </div>
+
+                <div className="relative z-10 text-left mt-auto">
+                  <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-[10px] lg:text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
+                    Start Designing <ArrowRight className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+                  </span>
+                </div>
+              </Link>
+
+              {/* CARD 4: TREND POSTERS (NEW) */}
+              <Link to="/trend-posters" className="group relative bg-zinc-900/40 border border-zinc-800 p-6 lg:p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
+                <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                <div className="relative z-10 text-left flex flex-col gap-4">
+                  <div className="w-10 h-10 lg:w-12 lg:h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20">
+                    <Star className="w-5 h-5 lg:w-6 lg:h-6 text-indigo-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl lg:text-2xl font-black tracking-tight mb-2 uppercase text-zinc-100">Trend Posters</h2>
+                    <p className="text-zinc-500 text-[10px] lg:text-xs font-bold leading-normal">
+                      Create unique Soundwave posters, modern typographic prints, map coordinates, and personalized quote designs.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Visual Preview */}
+                <div className="relative z-10 w-full h-28 rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950/80 p-4 flex items-center justify-center gap-1.5 shadow-inner">
+                  {/* Soundwave animation preview */}
+                  {[...Array(12)].map((_, i) => (
+                    <div 
+                      key={i} 
+                      className="w-1.5 bg-indigo-500 rounded-full" 
+                      style={{ 
+                        height: `${20 + Math.random() * 80}%`,
+                        animation: `pulse ${1 + Math.random() * 2}s infinite alternate`
+                      }} 
+                    />
+                  ))}
+                </div>
+
+                <div className="relative z-10 text-left mt-auto">
+                  <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-[10px] lg:text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
+                    Explore Trends <ArrowRight className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
+                  </span>
+                </div>
+              </Link>
+
+            </div>
               
               {/* CARD 1: AI ROOM DESIGNER */}
               <Link to="/special" className="group relative bg-zinc-900/40 border border-zinc-800 p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
