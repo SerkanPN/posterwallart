@@ -26,6 +26,7 @@ export default function VinylPosterBuilder() {
       await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js');
 
       const w = window as any;
+      w.POSTER_MODE = 'vinyl';
 
       w.toggleAccordion = function(btn: HTMLElement) {
         btn.classList.toggle('open');
@@ -56,10 +57,24 @@ export default function VinylPosterBuilder() {
         const areaH = area.clientHeight - 80;
 
         let pw, ph;
-        if (areaW / ratio <= areaH) { pw = areaW; ph = areaW / ratio; } else { ph = areaH; pw = areaH * ratio; }
+        if (areaW / ratio <= areaH) {
+          pw = areaW;
+          ph = areaW / ratio;
+        } else {
+          ph = areaH;
+          pw = areaH * ratio;
+        }
+
+        pw = Math.floor(pw);
+        ph = Math.floor(ph);
+
         const container = document.getElementById('poster-container');
-        if(container) { container.style.width = Math.floor(pw) + 'px'; container.style.height = Math.floor(ph) + 'px'; }
+        if(container) {
+            container.style.width = pw + 'px';
+            container.style.height = ph + 'px';
+        }
       };
+
       window.addEventListener('resize', w.updateCanvasSize);
 
       w.itemPositions = {};
@@ -212,6 +227,14 @@ export default function VinylPosterBuilder() {
           colEl.dispatchEvent(new Event('input', { bubbles: true }));
           colEl.dispatchEvent(new Event('change', { bubbles: true }));
         }
+      };
+
+      w.showToast = function(msg: string) {
+        const toast = document.getElementById('toast');
+        if(!toast) return;
+        toast.textContent = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), 3500);
       };
 
       w.searchSong = async function() {
@@ -511,6 +534,10 @@ export default function VinylPosterBuilder() {
       w.downloadPDF = async function() { await w.exportVinylLoop('pdf'); };
       w.downloadSVG = async function() { await w.exportVinylLoop('svg'); };
 
+      // ══════════════════════════════════════════════════════════════
+      // EDITOR ENGINE
+      // ══════════════════════════════════════════════════════════════
+
       w.ED_LABELS = { 'v-top-left': 'Artist Name', 'v-top-right': 'Year', 'v-song-title': 'Vinyl Song Title', 'v-vinyl': 'Vinyl Record Graphic', 'v-bottom': 'Bottom Text' };
       w.edSel =[]; w.edDragState = null; w.edMarqState = null; w.edOffsets = {}; w.edEl = function(id: string) { return document.querySelector(`[data-ed="${id}"]`) as HTMLElement; };
 
@@ -597,7 +624,7 @@ export default function VinylPosterBuilder() {
 
       w.edBuildMulti = function() {
         const fontOpts = `<option value="'DM Sans', sans-serif">DM Sans</option><option value="'Inter', sans-serif">Inter</option><option value="'Montserrat', sans-serif">Montserrat</option><option value="'Oswald', sans-serif">Oswald</option><option value="'Poppins', sans-serif">Poppins</option><option value="'Playfair Display', serif">Playfair Display</option><option value="'Anton', sans-serif">Anton</option><option value="'Bebas Neue', sans-serif">Bebas Neue</option><option value="'Lora', serif">Lora</option><option value="'Merriweather', serif">Merriweather</option>`;
-        return `<div class="pf-section"><div class="pf-section-title">Align to Canvas</div><div class="pf-2col" style="margin-bottom:6px;"><button class="pf-btn" onclick="window.edAlign('left')">← Left</button><button class="pf-btn" onclick="window.edAlign('right')">Right →</button><button class="pf-btn" onclick="window.edAlign('cx')">↔ Center H</button><button class="pf-btn" onclick="window.edAlign('cy')">↕ Center V</button><button class="pf-btn" onclick="window.edAlign('top')">↑ Top</button><button class="pf-btn" onclick="window.edAlign('bottom')">↓ Bottom</button></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Distribute</div><div class="pf-2col"><button class="pf-btn" onclick="window.edDistribute('h')">↔ Horizontal</button><button class="pf-btn" onclick="window.edDistribute('v')">↕ Vertical</button></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Batch Formatting</div>
+        return `<div class="pf-section"><div class="pf-section-title">Align to Canvas</div><div class="pf-2col" style="margin-bottom:6px;"><button class="pf-btn" onclick="window.edAlign('left')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="3" y2="21" strokeWidth="2.5"/><rect x="5" y="8" width="8" height="3" rx="1"/><rect x="5" y="13" width="13" height="3" rx="1"/></svg></button><button class="pf-btn" onclick="window.edAlign('right')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="3" x2="21" y2="21" strokeWidth="2.5"/><rect x="11" y="8" width="8" height="3" rx="1"/><rect x="6" y="13" width="13" height="3" rx="1"/></svg></button><button class="pf-btn" onclick="window.edAlign('cx')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="3" x2="12" y2="21" strokeWidth="2.5"/><rect x="6" y="8" width="12" height="3" rx="1"/><rect x="4" y="13" width="16" height="3" rx="1"/></svg></button><button class="pf-btn" onclick="window.edAlign('cy')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12" strokeWidth="2.5"/><rect x="8" y="4" width="3" height="16" rx="1"/><rect x="13" y="6" width="3" height="12" rx="1"/></svg></button><button class="pf-btn" onclick="window.edAlign('top')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="21" y2="3" strokeWidth="2.5"/><rect x="8" y="5" width="3" height="8" rx="1"/><rect x="13" y="5" width="3" height="13" rx="1"/></svg></button><button class="pf-btn" onclick="window.edAlign('bottom')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="21" x2="21" y2="21" strokeWidth="2.5"/><rect x="8" y="11" width="3" height="8" rx="1"/><rect x="13" y="6" width="3" height="13" rx="1"/></svg></button></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Distribute</div><div class="pf-2col"><button class="pf-btn" onclick="window.edDistribute('h')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="3" y2="21"/><line x1="21" y1="3" x2="21" y2="21"/><rect x="9" y="8" width="6" height="8" rx="1"/></svg></button><button class="pf-btn" onclick="window.edDistribute('v')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="21" y2="3"/><line x1="3" y1="21" x2="21" y2="21"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg></button></div></div><hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Batch Formatting</div>
         <div class="pf-row"><label>Font Family (selected texts)</label><select onchange="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.fontFamily=this.value;})"><option value="" disabled selected>Change Font...</option>${fontOpts}</select></div>
         <div class="pf-row"><label>Color (all selected)</label><div class="pf-color-row"><input type="color" value="#ffffff" oninput="const v=this.value; window.edSel.forEach(id=>{const el=window.edEl(id);if(el){el.style.color=v; el.querySelectorAll('path,circle,rect').forEach(p=>{if(p.getAttribute('fill')!=='none')p.setAttribute('fill',v);});}}); this.nextElementSibling.value=v;" /><input type="text" value="#ffffff" oninput="let v=this.value; if(/^#[0-9a-fA-F]{3}$/i.test(v)){v='#'+v[1]+v[1]+v[2]+v[2]+v[3]+v[3];} if(/^#[0-9a-fA-F]{6}$/i.test(v)){this.previousElementSibling.value=v; this.previousElementSibling.dispatchEvent(new Event('input'));}" /></div></div>
         <div class="pf-row"><label>Opacity</label><div class="pf-range-row"><input type="range" min="0" max="100" value="100" oninput="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.opacity=this.value/100});this.nextElementSibling.textContent=this.value+'%'"><span class="pf-range-val">100%</span></div></div><div class="pf-row"><label>Visibility</label><div class="pf-2col"><button class="pf-btn" onclick="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.display=''})">Show All</button><button class="pf-btn" onclick="window.edSel.forEach(id=>{const el=window.edEl(id);if(el)el.style.display='none'})">Hide All</button></div></div></div>`;
@@ -730,7 +757,7 @@ export default function VinylPosterBuilder() {
         .spotify-poster-page #props-body { flex: 1; overflow-y: auto; padding: 12px 14px; } .spotify-poster-page #props-body::-webkit-scrollbar { width: 3px; } .spotify-poster-page #props-body::-webkit-scrollbar-thumb { background: #333; }
         .spotify-poster-page #props-empty-state { padding: 32px 16px; text-align: center; color: #444; font-size: 11px; line-height: 1.7; } .spotify-poster-page #props-empty-state svg { margin-bottom: 12px; }
         .spotify-poster-page .ed-el { outline: 1.5px solid transparent; cursor: pointer; transition: outline-color 0.1s; position: relative; transform-origin: top left; } .spotify-poster-page .ed-el:hover { outline-color: rgba(29,185,84,0.45) !important; } .spotify-poster-page .ed-el.ed-selected { outline-color: #1DB954 !important; } .spotify-poster-page .ed-el.ed-selected::before { content: ''; position: absolute; inset: 0; background: rgba(29,185,84,0.04); pointer-events: none; z-index: 0; }
-        .spotify-poster-page #ed-marquee { absolute; border: 1px dashed #1DB954; background: rgba(29,185,84,0.05); pointer-events: none; display: none; z-index: 9999; }
+        .spotify-poster-page #ed-marquee { position: absolute; border: 1px dashed #1DB954; background: rgba(29,185,84,0.05); pointer-events: none; display: none; z-index: 9999; }
         .spotify-poster-page #ed-align-bar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #111; border: 1px solid var(--panel-border); border-radius: 8px; display: none; align-items: center; gap: 2px; padding: 4px 6px; z-index: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.6); } .spotify-poster-page #ed-align-bar.ed-bar-visible { display: flex; }
         .spotify-poster-page .ed-ab-btn { width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; background: none; border: none; color: var(--spotify-subtext); border-radius: 5px; cursor: pointer; transition: all 0.15s; } .spotify-poster-page .ed-ab-btn:hover { background: #1a1a1a; color: var(--spotify-text); }
         .spotify-poster-page .ed-ab-sep { width: 1px; height: 18px; background: var(--panel-border); margin: 0 3px; }
@@ -920,9 +947,16 @@ export default function VinylPosterBuilder() {
       <div id="canvas-area">
         <div id="ed-marquee"></div>
         <div id="ed-align-bar">
-          <button className="ed-ab-btn" title="Align Left" onClick={() => (window as any).edAlign('left')}>L</button>
-          <button className="ed-ab-btn" title="Center X" onClick={() => (window as any).edAlign('cx')}>C</button>
-          <button className="ed-ab-btn" title="Align Right" onClick={() => (window as any).edAlign('right')}>R</button>
+          <button className="ed-ab-btn" title="Align Left" onClick={() => (window as any).edAlign('left')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="3" y2="21" strokeWidth="2.5"/><rect x="5" y="8" width="8" height="3" rx="1"/><rect x="5" y="13" width="13" height="3" rx="1"/></svg></button>
+          <button className="ed-ab-btn" title="Center X" onClick={() => (window as any).edAlign('cx')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="3" x2="12" y2="21" strokeWidth="2.5"/><rect x="6" y="8" width="12" height="3" rx="1"/><rect x="4" y="13" width="16" height="3" rx="1"/></svg></button>
+          <button className="ed-ab-btn" title="Align Right" onClick={() => (window as any).edAlign('right')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="3" x2="21" y2="21" strokeWidth="2.5"/><rect x="11" y="8" width="8" height="3" rx="1"/><rect x="6" y="13" width="13" height="3" rx="1"/></svg></button>
+          <div className="ed-ab-sep"></div>
+          <button className="ed-ab-btn" title="Align Top" onClick={() => (window as any).edAlign('top')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="21" y2="3" strokeWidth="2.5"/><rect x="8" y="5" width="3" height="8" rx="1"/><rect x="13" y="5" width="3" height="13" rx="1"/></svg></button>
+          <button className="ed-ab-btn" title="Center Y" onClick={() => (window as any).edAlign('cy')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12" strokeWidth="2.5"/><rect x="8" y="4" width="3" height="16" rx="1"/><rect x="13" y="6" width="3" height="12" rx="1"/></svg></button>
+          <button className="ed-ab-btn" title="Align Bottom" onClick={() => (window as any).edAlign('bottom')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="21" x2="21" y2="21" strokeWidth="2.5"/><rect x="8" y="11" width="3" height="8" rx="1"/><rect x="13" y="6" width="3" height="13" rx="1"/></svg></button>
+          <div className="ed-ab-sep"></div>
+          <button className="ed-ab-btn" title="Distribute H" onClick={() => (window as any).edDistribute('h')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="3" y2="21"/><line x1="21" y1="3" x2="21" y2="21"/><rect x="9" y="8" width="6" height="8" rx="1"/></svg></button>
+          <button className="ed-ab-btn" title="Distribute V" onClick={() => (window as any).edDistribute('v')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="21" y2="3"/><line x1="3" y1="21" x2="21" y2="21"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg></button>
         </div>
         
         <div id="poster-wrapper">
