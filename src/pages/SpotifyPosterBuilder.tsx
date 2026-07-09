@@ -1280,12 +1280,31 @@ export default function SpotifyPosterBuilder() {
               <option value="16.54x23.39">A2 (16.54" x 23.39")</option>
               <option value="23.39x33.11">A1 (23.39" x 33.11")</option>
               <option value="5x7">5" x 7"</option>
+              <option value="6x8">6" x 8"</option>
               <option value="8x10">8" x 10"</option>
+              <option value="9x11">9" x 11"</option>
               <option value="11x14">11" x 14"</option>
+              <option value="11x17">11" x 17"</option>
+              <option value="11.7x16.5">11.7" x 16.5"</option>
+              <option value="12x16">12" x 16"</option>
+              <option value="12x18">12" x 18"</option>
               <option value="16x20">16" x 20"</option>
+              <option value="16x24">16" x 24"</option>
+              <option value="16.5x23.4">16.5" x 23.4"</option>
               <option value="18x24">18" x 24"</option>
+              <option value="20x30">20" x 30"</option>
+              <option value="22x34">22" x 34"</option>
+              <option value="23.4x33.1">23.4" x 33.1"</option>
+              <option value="24x32">24" x 32"</option>
               <option value="24x36">24" x 36"</option>
+              <option value="26x36">26" x 36"</option>
+              <option value="28x40">28" x 40"</option>
+              <option value="30x40">30" x 40"</option>
               <option value="40x50">40" x 50" (Default)</option>
+              <option value="50x60">50" x 60"</option>
+              <option value="60x80">60" x 80"</option>
+              <option value="68x80">68" x 80"</option>
+              <option value="88x104">88" x 104"</option>
             </select>
           </div>
         </div>
