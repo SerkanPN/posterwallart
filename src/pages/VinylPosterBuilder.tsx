@@ -156,14 +156,37 @@ export default function VinylPosterPage({ navigate }) {
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
 
+  // Top Left (Artist Name) State
   const [topLeftText, setTopLeftText] = useState('ARTIST NAME');
   const [topLeftColor, setTopLeftColor] = useState('#212121');
+  const [topLeftFontFamily, setTopLeftFontFamily] = useState('DM Sans, sans-serif');
+  const [topLeftFontSize, setTopLeftFontSize] = useState(18);
+  const [topLeftCharSpacing, setTopLeftCharSpacing] = useState(100);
+  const [topLeftFontWeight, setTopLeftFontWeight] = useState('700');
+
+  // Top Right (Year) State
   const [topRightText, setTopRightText] = useState('1992');
   const [topRightColor, setTopRightColor] = useState('#212121');
+  const [topRightFontFamily, setTopRightFontFamily] = useState('DM Sans, sans-serif');
+  const [topRightFontSize, setTopRightFontSize] = useState(18);
+  const [topRightCharSpacing, setTopRightCharSpacing] = useState(100);
+  const [topRightFontWeight, setTopRightFontWeight] = useState('700');
+
+  // Bottom Text State
   const [bottomText, setBottomText] = useState('UNKNOWN ALBUM');
   const [bottomColor, setBottomColor] = useState('#555555');
+  const [bottomFontFamily, setBottomFontFamily] = useState('DM Sans, sans-serif');
+  const [bottomFontSize, setBottomFontSize] = useState(14);
+  const [bottomCharSpacing, setBottomCharSpacing] = useState(50);
+  const [bottomFontWeight, setBottomFontWeight] = useState('600');
+
+  // Song Title State
   const [songTitleText, setSongTitleText] = useState('SONG NAME');
   const [songTitleColor, setSongTitleColor] = useState('#212121');
+  const [songTitleFontFamily, setSongTitleFontFamily] = useState('Josefin Sans, sans-serif');
+  const [songTitleFontSize, setSongTitleFontSize] = useState(36);
+  const [songTitleCharSpacing, setSongTitleCharSpacing] = useState(100);
+  const [songTitleFontWeight, setSongTitleFontWeight] = useState('800');
 
   // Extended Vinyl Properties
   const [vinylScale, setVinylScale] = useState(78); 
@@ -238,11 +261,11 @@ export default function VinylPosterPage({ navigate }) {
     const topLeft = new fabric.IText(topLeftText, {
       left: containerDims.width * 0.08,
       top: containerDims.height * 0.08,
-      fontSize: 18,
-      fontFamily: 'DM Sans, sans-serif',
-      fontWeight: 700,
+      fontSize: topLeftFontSize,
+      fontFamily: topLeftFontFamily,
+      fontWeight: topLeftFontWeight,
       fill: topLeftColor,
-      charSpacing: 100,
+      charSpacing: topLeftCharSpacing,
       data: { edType: EDIT_TYPES.TOP_LEFT },
     });
     canvas.add(topLeft);
@@ -251,11 +274,11 @@ export default function VinylPosterPage({ navigate }) {
       left: containerDims.width * 0.92,
       top: containerDims.height * 0.08,
       originX: 'right',
-      fontSize: 18,
-      fontFamily: 'DM Sans, sans-serif',
-      fontWeight: 700,
+      fontSize: topRightFontSize,
+      fontFamily: topRightFontFamily,
+      fontWeight: topRightFontWeight,
       fill: topRightColor,
-      charSpacing: 100,
+      charSpacing: topRightCharSpacing,
       data: { edType: EDIT_TYPES.TOP_RIGHT },
     });
     canvas.add(topRight);
@@ -266,11 +289,11 @@ export default function VinylPosterPage({ navigate }) {
       width: containerDims.width * 0.84,
       originX: 'center',
       textAlign: 'center',
-      fontSize: 36,
-      fontFamily: 'Josefin Sans, sans-serif',
-      fontWeight: 800,
+      fontSize: songTitleFontSize,
+      fontFamily: songTitleFontFamily,
+      fontWeight: songTitleFontWeight,
       fill: songTitleColor,
-      charSpacing: 100,
+      charSpacing: songTitleCharSpacing,
       data: { edType: EDIT_TYPES.SONG_TITLE },
     });
     canvas.add(songTitle);
@@ -279,11 +302,11 @@ export default function VinylPosterPage({ navigate }) {
       left: containerDims.width / 2,
       top: containerDims.height * 0.92,
       originX: 'center',
-      fontSize: 14,
-      fontFamily: 'DM Sans, sans-serif',
-      fontWeight: 600,
+      fontSize: bottomFontSize,
+      fontFamily: bottomFontFamily,
+      fontWeight: bottomFontWeight,
       fill: bottomColor,
-      charSpacing: 50,
+      charSpacing: bottomCharSpacing,
       data: { edType: EDIT_TYPES.BOTTOM },
     });
     canvas.add(bottom);
@@ -315,7 +338,6 @@ export default function VinylPosterPage({ navigate }) {
       }
     });
 
-    // Font pre-loading setup
     const link = document.createElement('link');
     link.href = `https://fonts.googleapis.com/css?family=${GOOGLE_FONTS.map(f => f.replace(/ /g, '+')).join('|')}&display=swap`;
     link.rel = 'stylesheet';
@@ -351,6 +373,32 @@ export default function VinylPosterPage({ navigate }) {
     const labelR = outerR * (labelPct / 100);
     const holeR = outerR * 0.015;
 
+    // Şarkı sözünün tamamını sarmala sığdırmak için font boyutunu otomatik küçülten algoritma
+    let adjustedTextSize = textSize;
+    const cleanText = (lyrics || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    if (cleanText.length > 0) {
+      let iter = 0;
+      while (adjustedTextSize > 4 && iter < 100) {
+        const testInner = labelR + adjustedTextSize * 0.6;
+        const testOuter = outerR - adjustedTextSize * 0.3;
+        if (testOuter <= testInner) {
+          adjustedTextSize -= 0.5;
+          iter++;
+          continue;
+        }
+        const pitch = adjustedTextSize * 1.05;
+        const charWidth = (adjustedTextSize * 0.62) + letterSpc;
+        const approxPathLen = (Math.PI * (testOuter * testOuter - testInner * testInner)) / pitch;
+        const maxCharsFit = approxPathLen / charWidth;
+
+        if (maxCharsFit >= cleanText.length) {
+          break;
+        }
+        adjustedTextSize -= 0.2;
+        iter++;
+      }
+    }
+
     const edge = new fabric.Circle({
       left: cx, top: cy, radius: outerR, fill: '', stroke: '#d8d8d8', strokeWidth: 1,
       originX: 'center', originY: 'center', selectable: false, evented: false,
@@ -364,11 +412,12 @@ export default function VinylPosterPage({ navigate }) {
       originX: 'center', originY: 'center', selectable: false, evented: false,
     });
 
-    const spiralChars = buildGrooveSpiralChars(lyrics, {
-      cx, cy,
-      innerRadius: labelR + textSize * 0.6,
-      outerRadius: outerR - textSize * 0.3,
-      fontSize: textSize,
+    const spiralChars = buildGrooveSpiralChars(cleanText, {
+      cx,
+      cy,
+      innerRadius: labelR + adjustedTextSize * 0.6,
+      outerRadius: outerR - adjustedTextSize * 0.3,
+      fontSize: adjustedTextSize,
       color: textCol,
       fontFamily: fontFam,
       letterSpacing: letterSpc
@@ -415,42 +464,72 @@ export default function VinylPosterPage({ navigate }) {
     canvas.renderAll();
   };
 
-  // ---- Text + color updates ----
-  const updateTextColor = (ref, setter, hex) => {
-    setter(hex);
-    ref.set({ fill: hex });
-    fabricRef.current && fabricRef.current.renderAll();
-  };
-
   const updateTextContent = (ref, setter, value) => {
     setter(value);
     ref.set({ text: value });
     fabricRef.current && fabricRef.current.renderAll();
   };
 
+  // React state değişikliklerinin canvas metinlerine yansıtılması
   useEffect(() => {
     const canvas = fabricRef.current;
-    if (canvas && canvas.textLeftRef) canvas.textLeftRef.set({ text: topLeftText, fill: topLeftColor });
-    canvas && canvas.renderAll();
-  }, [topLeftText, topLeftColor]);
+    if (canvas && canvas.textLeftRef) {
+      canvas.textLeftRef.set({
+        text: topLeftText,
+        fill: topLeftColor,
+        fontFamily: topLeftFontFamily,
+        fontSize: topLeftFontSize,
+        charSpacing: topLeftCharSpacing,
+        fontWeight: topLeftFontWeight
+      });
+      canvas.renderAll();
+    }
+  }, [topLeftText, topLeftColor, topLeftFontFamily, topLeftFontSize, topLeftCharSpacing, topLeftFontWeight]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
-    if (canvas && canvas.textRightRef) canvas.textRightRef.set({ text: topRightText, fill: topRightColor });
-    canvas && canvas.renderAll();
-  }, [topRightText, topRightColor]);
+    if (canvas && canvas.textRightRef) {
+      canvas.textRightRef.set({
+        text: topRightText,
+        fill: topRightColor,
+        fontFamily: topRightFontFamily,
+        fontSize: topRightFontSize,
+        charSpacing: topRightCharSpacing,
+        fontWeight: topRightFontWeight
+      });
+      canvas.renderAll();
+    }
+  }, [topRightText, topRightColor, topRightFontFamily, topRightFontSize, topRightCharSpacing, topRightFontWeight]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
-    if (canvas && canvas.textSongRef) canvas.textSongRef.set({ text: songTitleText, fill: songTitleColor });
-    canvas && canvas.renderAll();
-  }, [songTitleText, songTitleColor]);
+    if (canvas && canvas.textSongRef) {
+      canvas.textSongRef.set({
+        text: songTitleText,
+        fill: songTitleColor,
+        fontFamily: songTitleFontFamily,
+        fontSize: songTitleFontSize,
+        charSpacing: songTitleCharSpacing,
+        fontWeight: songTitleFontWeight
+      });
+      canvas.renderAll();
+    }
+  }, [songTitleText, songTitleColor, songTitleFontFamily, songTitleFontSize, songTitleCharSpacing, songTitleFontWeight]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
-    if (canvas && canvas.textBottomRef) canvas.textBottomRef.set({ text: bottomText, fill: bottomColor });
-    canvas && canvas.renderAll();
-  }, [bottomText, bottomColor]);
+    if (canvas && canvas.textBottomRef) {
+      canvas.textBottomRef.set({
+        text: bottomText,
+        fill: bottomColor,
+        fontFamily: bottomFontFamily,
+        fontSize: bottomFontSize,
+        charSpacing: bottomCharSpacing,
+        fontWeight: bottomFontWeight
+      });
+      canvas.renderAll();
+    }
+  }, [bottomText, bottomColor, bottomFontFamily, bottomFontSize, bottomCharSpacing, bottomFontWeight]);
 
   useEffect(() => {
     rebuildVinyl();
@@ -1017,9 +1096,9 @@ export default function VinylPosterPage({ navigate }) {
             <label>Artist Name (Top Left) Color</label>
             <div className="color-row">
               <input type="color" id="c-v-tl" value={topLeftColor}
-                onChange={(e) => updateTextColor(fabricRef.current.textLeftRef, setTopLeftColor, e.target.value)} />
+                onChange={(e) => setTopLeftColor(e.target.value)} />
               <input type="text" id="c-v-tl-t" value={topLeftColor}
-                onChange={(e) => updateTextColor(fabricRef.current.textLeftRef, setTopLeftColor, e.target.value)} />
+                onChange={(e) => setTopLeftColor(e.target.value)} />
             </div>
           </div>
 
@@ -1032,9 +1111,9 @@ export default function VinylPosterPage({ navigate }) {
             <label>Year Color</label>
             <div className="color-row">
               <input type="color" id="c-v-tr" value={topRightColor}
-                onChange={(e) => updateTextColor(fabricRef.current.textRightRef, setTopRightColor, e.target.value)} />
+                onChange={(e) => setTopRightColor(e.target.value)} />
               <input type="text" id="c-v-tr-t" value={topRightColor}
-                onChange={(e) => updateTextColor(fabricRef.current.textRightRef, setTopRightColor, e.target.value)} />
+                onChange={(e) => setTopRightColor(e.target.value)} />
             </div>
           </div>
 
@@ -1047,9 +1126,9 @@ export default function VinylPosterPage({ navigate }) {
             <label>Bottom Text Color</label>
             <div className="color-row">
               <input type="color" id="c-v-bot" value={bottomColor}
-                onChange={(e) => updateTextColor(fabricRef.current.textBottomRef, setBottomColor, e.target.value)} />
+                onChange={(e) => setBottomColor(e.target.value)} />
               <input type="text" id="c-v-bot-t" value={bottomColor}
-                onChange={(e) => updateTextColor(fabricRef.current.textBottomRef, setBottomColor, e.target.value)} />
+                onChange={(e) => setBottomColor(e.target.value)} />
             </div>
           </div>
         </div>
@@ -1067,9 +1146,9 @@ export default function VinylPosterPage({ navigate }) {
             <label>Song Title Color</label>
             <div className="color-row">
               <input type="color" id="c-v-st" value={songTitleColor}
-                onChange={(e) => updateTextColor(fabricRef.current.textSongRef, setSongTitleColor, e.target.value)} />
+                onChange={(e) => setSongTitleColor(e.target.value)} />
               <input type="text" id="c-v-st-t" value={songTitleColor}
-                onChange={(e) => updateTextColor(fabricRef.current.textSongRef, setSongTitleColor, e.target.value)} />
+                onChange={(e) => setSongTitleColor(e.target.value)} />
             </div>
           </div>
         </div>
@@ -1229,6 +1308,8 @@ export default function VinylPosterPage({ navigate }) {
               <p>Click an element on the canvas</p>
             </div>
           )}
+
+          {/* Artist Name - Properties */}
           {selectedType === EDIT_TYPES.TOP_LEFT && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1236,20 +1317,53 @@ export default function VinylPosterPage({ navigate }) {
                 <div className="pf-row">
                   <label>Text</label>
                   <input type="text" value={topLeftText}
-                    onChange={(e) => updateTextContent(fabricRef.current.textLeftRef, setTopLeftText, e.target.value)} />
+                    onChange={(e) => setTopLeftText(e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Family</label>
+                  <select value={topLeftFontFamily} onChange={(e) => setTopLeftFontFamily(e.target.value)}>
+                    <option value="DM Sans, sans-serif">DM Sans</option>
+                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+                <div className="pf-row">
+                  <label>Font Size</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="8" max="72" value={topLeftFontSize} onChange={(e) => setTopLeftFontSize(Number(e.target.value))} />
+                    <span className="pf-range-val">{topLeftFontSize}px</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Letter Spacing</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="0" max="400" step="10" value={topLeftCharSpacing} onChange={(e) => setTopLeftCharSpacing(Number(e.target.value))} />
+                    <span className="pf-range-val">{topLeftCharSpacing}</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Font Weight</label>
+                  <select value={topLeftFontWeight} onChange={(e) => setTopLeftFontWeight(e.target.value)}>
+                    <option value="300">Light (300)</option>
+                    <option value="400">Regular (400)</option>
+                    <option value="600">Semi-Bold (600)</option>
+                    <option value="700">Bold (700)</option>
+                    <option value="800">Extra-Bold (800)</option>
+                  </select>
                 </div>
                 <div className="pf-row">
                   <label>Color</label>
                   <div className="pf-color-row">
                     <input type="color" value={topLeftColor}
-                      onChange={(e) => updateTextColor(fabricRef.current.textLeftRef, setTopLeftColor, e.target.value)} />
+                      onChange={(e) => setTopLeftColor(e.target.value)} />
                     <input type="text" value={topLeftColor}
-                      onChange={(e) => updateTextColor(fabricRef.current.textLeftRef, setTopLeftColor, e.target.value)} />
+                      onChange={(e) => setTopLeftColor(e.target.value)} />
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Year - Properties */}
           {selectedType === EDIT_TYPES.TOP_RIGHT && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1257,20 +1371,53 @@ export default function VinylPosterPage({ navigate }) {
                 <div className="pf-row">
                   <label>Text</label>
                   <input type="text" value={topRightText}
-                    onChange={(e) => updateTextContent(fabricRef.current.textRightRef, setTopRightText, e.target.value)} />
+                    onChange={(e) => setTopRightText(e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Family</label>
+                  <select value={topRightFontFamily} onChange={(e) => setTopRightFontFamily(e.target.value)}>
+                    <option value="DM Sans, sans-serif">DM Sans</option>
+                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+                <div className="pf-row">
+                  <label>Font Size</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setTopRightFontSize(Number(e.target.value))} />
+                    <span className="pf-range-val">{topRightFontSize}px</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Letter Spacing</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="0" max="400" step="10" value={topRightCharSpacing} onChange={(e) => setTopRightCharSpacing(Number(e.target.value))} />
+                    <span className="pf-range-val">{topRightCharSpacing}</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Font Weight</label>
+                  <select value={topRightFontWeight} onChange={(e) => setTopRightFontWeight(e.target.value)}>
+                    <option value="300">Light (300)</option>
+                    <option value="400">Regular (400)</option>
+                    <option value="600">Semi-Bold (600)</option>
+                    <option value="700">Bold (700)</option>
+                    <option value="800">Extra-Bold (800)</option>
+                  </select>
                 </div>
                 <div className="pf-row">
                   <label>Color</label>
                   <div className="pf-color-row">
                     <input type="color" value={topRightColor}
-                      onChange={(e) => updateTextColor(fabricRef.current.textRightRef, setTopRightColor, e.target.value)} />
+                      onChange={(e) => setTopRightColor(e.target.value)} />
                     <input type="text" value={topRightColor}
-                      onChange={(e) => updateTextColor(fabricRef.current.textRightRef, setTopRightColor, e.target.value)} />
+                      onChange={(e) => setTopRightColor(e.target.value)} />
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Song Title - Properties */}
           {selectedType === EDIT_TYPES.SONG_TITLE && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1278,20 +1425,53 @@ export default function VinylPosterPage({ navigate }) {
                 <div className="pf-row">
                   <label>Text</label>
                   <input type="text" value={songTitleText}
-                    onChange={(e) => updateTextContent(fabricRef.current.textSongRef, setSongTitleText, e.target.value)} />
+                    onChange={(e) => setSongTitleText(e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Family</label>
+                  <select value={songTitleFontFamily} onChange={(e) => setSongTitleFontFamily(e.target.value)}>
+                    <option value="Josefin Sans, sans-serif">Josefin Sans</option>
+                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+                <div className="pf-row">
+                  <label>Font Size</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="12" max="100" value={songTitleFontSize} onChange={(e) => setSongTitleFontSize(Number(e.target.value))} />
+                    <span className="pf-range-val">{songTitleFontSize}px</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Letter Spacing</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="0" max="400" step="10" value={songTitleCharSpacing} onChange={(e) => setSongTitleCharSpacing(Number(e.target.value))} />
+                    <span className="pf-range-val">{songTitleCharSpacing}</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Font Weight</label>
+                  <select value={songTitleFontWeight} onChange={(e) => setSongTitleFontWeight(e.target.value)}>
+                    <option value="300">Light (300)</option>
+                    <option value="400">Regular (400)</option>
+                    <option value="600">Semi-Bold (600)</option>
+                    <option value="700">Bold (700)</option>
+                    <option value="800">Extra-Bold (800)</option>
+                  </select>
                 </div>
                 <div className="pf-row">
                   <label>Color</label>
                   <div className="pf-color-row">
                     <input type="color" value={songTitleColor}
-                      onChange={(e) => updateTextColor(fabricRef.current.textSongRef, setSongTitleColor, e.target.value)} />
+                      onChange={(e) => setSongTitleColor(e.target.value)} />
                     <input type="text" value={songTitleColor}
-                      onChange={(e) => updateTextColor(fabricRef.current.textSongRef, setSongTitleColor, e.target.value)} />
+                      onChange={(e) => setSongTitleColor(e.target.value)} />
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Bottom Text - Properties */}
           {selectedType === EDIT_TYPES.BOTTOM && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1299,20 +1479,53 @@ export default function VinylPosterPage({ navigate }) {
                 <div className="pf-row">
                   <label>Text</label>
                   <input type="text" value={bottomText}
-                    onChange={(e) => updateTextContent(fabricRef.current.textBottomRef, setBottomText, e.target.value)} />
+                    onChange={(e) => setBottomText(e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Family</label>
+                  <select value={bottomFontFamily} onChange={(e) => setBottomFontFamily(e.target.value)}>
+                    <option value="DM Sans, sans-serif">DM Sans</option>
+                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+                <div className="pf-row">
+                  <label>Font Size</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="8" max="72" value={bottomFontSize} onChange={(e) => setBottomFontSize(Number(e.target.value))} />
+                    <span className="pf-range-val">{bottomFontSize}px</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Letter Spacing</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="0" max="400" step="10" value={bottomCharSpacing} onChange={(e) => setBottomCharSpacing(Number(e.target.value))} />
+                    <span className="pf-range-val">{bottomCharSpacing}</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Font Weight</label>
+                  <select value={bottomFontWeight} onChange={(e) => setBottomFontWeight(e.target.value)}>
+                    <option value="300">Light (300)</option>
+                    <option value="400">Regular (400)</option>
+                    <option value="600">Semi-Bold (600)</option>
+                    <option value="700">Bold (700)</option>
+                    <option value="800">Extra-Bold (800)</option>
+                  </select>
                 </div>
                 <div className="pf-row">
                   <label>Color</label>
                   <div className="pf-color-row">
                     <input type="color" value={bottomColor}
-                      onChange={(e) => updateTextColor(fabricRef.current.textBottomRef, setBottomColor, e.target.value)} />
+                      onChange={(e) => setBottomColor(e.target.value)} />
                     <input type="text" value={bottomColor}
-                      onChange={(e) => updateTextColor(fabricRef.current.textBottomRef, setBottomColor, e.target.value)} />
+                      onChange={(e) => setBottomColor(e.target.value)} />
                   </div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Vinyl Record & Lyrics - Properties */}
           {selectedType === EDIT_TYPES.VINYL && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1343,11 +1556,14 @@ export default function VinylPosterPage({ navigate }) {
                 </div>
 
                 <div className="pf-row">
-                  <label>Spiral Text Size</label>
+                  <label>Spiral Text Size (Max)</label>
                   <div className="range-row">
                     <input type="range" min="6" max="40" value={vinylTextSize} onChange={(e) => setVinylTextSize(Number(e.target.value))} />
                     <span className="range-val">{vinylTextSize}px</span>
                   </div>
+                  <p style={{ fontSize: '9px', color: 'var(--accent)', marginTop: '2px', lineHeight: '1.2' }}>
+                    * Lyrics are automatically downscaled if they exceed the record bounds.
+                  </p>
                 </div>
 
                 <div className="pf-row">
@@ -1389,6 +1605,7 @@ export default function VinylPosterPage({ navigate }) {
               </div>
             </div>
           )}
+
           {selectedType === 'multi' && (
             <div id="props-fields">
               <div className="pf-section">
