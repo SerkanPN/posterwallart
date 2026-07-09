@@ -1273,7 +1273,7 @@ export default function SpotifyPosterBuilder() {
         <div className="accordion-content open">
           <div className="form-row">
             <label>Print Size</label>
-            <select id="canvas-size" defaultValue="40x50" onChange={() => (window as any).updateCanvasSize()}>
+            <select id="canvas-size" defaultValue="30x40" onChange={() => (window as any).updateCanvasSize()}>
               <option value="5.83x8.27">A5 (5.83" x 8.27")</option>
               <option value="8.27x11.69">A4 (8.27" x 11.69")</option>
               <option value="11.69x16.54">A3 (11.69" x 16.54")</option>
@@ -1300,7 +1300,7 @@ export default function SpotifyPosterBuilder() {
               <option value="26x36">26" x 36"</option>
               <option value="28x40">28" x 40"</option>
               <option value="30x40">30" x 40"</option>
-              <option value="40x50">40" x 50" (Default)</option>
+              <option value="40x50">40" x 50"</option>
               <option value="50x60">50" x 60"</option>
               <option value="60x80">60" x 80"</option>
               <option value="68x80">68" x 80"</option>
