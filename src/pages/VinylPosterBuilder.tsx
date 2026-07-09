@@ -3,6 +3,17 @@ import * as fabric from 'fabric';
 import JSZip from 'jszip';
 import jsPDF from 'jspdf';
 
+const GOOGLE_FONTS = [
+  "Inter", "Montserrat", "Roboto", "Open Sans", "Oswald", "Lato", "Poppins", 
+  "Playfair Display", "Raleway", "Ubuntu", "Merriweather", "Nunito", "Cinzel", 
+  "Dancing Script", "Pacifico", "Caveat", "Bebas Neue", "Anton", "Josefin Sans", 
+  "Lobster", "Righteous", "Permanent Marker", "Abril Fatface", "Vampiro One", 
+  "Alfa Slab One", "Syncopate", "Bangers", "Creepster", "Sacramento", "Satisfy",
+  "Amatic SC", "Kalam", "Courgette", "Great Vibes", "Teko", "Russo One",
+  "Prata", "Vollkorn", "Lora", "Crimson Text", "Zilla Slab", "Bungee", 
+  "Fredoka One", "Carter One", "Patua One", "Chewy", "Shrikhand"
+];
+
 const PRINT_SIZES = [
   { value: '5.83x8.27', label: 'A5 (5.83" x 8.27")' },
   { value: '8.27x11.69', label: 'A4 (8.27" x 11.69")' },
@@ -72,13 +83,13 @@ function fitContain(wIn, hIn, maxW, maxH) {
 }
 
 function buildGrooveSpiralChars(text, opts) {
-  const { cx, cy, innerRadius, outerRadius, fontSize, color, fontFamily } = opts;
+  const { cx, cy, innerRadius, outerRadius, fontSize, color, fontFamily, letterSpacing } = opts;
   const clean = (text || '').replace(/\s+/g, ' ').trim().toUpperCase();
   const source = clean.length ? clean + '   ' : '   ';
 
-  const pitch = fontSize * 1.05; // radial distance per full revolution -> groove spacing
+  const pitch = fontSize * 1.05; 
   const radialPerAngle = pitch / (Math.PI * 2);
-  const charWidth = fontSize * 0.62; // approx glyph advance including tracking
+  const charWidth = (fontSize * 0.62) + letterSpacing; 
 
   const chars = [];
   let angle = 0;
@@ -154,7 +165,14 @@ export default function VinylPosterPage({ navigate }) {
   const [songTitleText, setSongTitleText] = useState('SONG NAME');
   const [songTitleColor, setSongTitleColor] = useState('#212121');
 
+  // Extended Vinyl Properties
+  const [vinylScale, setVinylScale] = useState(78); 
+  const [vinylFontFamily, setVinylFontFamily] = useState('DM Sans, sans-serif');
+  const [vinylTextColor, setVinylTextColor] = useState('#181818');
   const [vinylTextSize, setVinylTextSize] = useState(12);
+  const [vinylLetterSpacing, setVinylLetterSpacing] = useState(0);
+  const [vinylLabelColor, setVinylLabelColor] = useState('#e8e8e8');
+  const [vinylLabelSize, setVinylLabelSize] = useState(12.5);
   const [vinylLyrics, setVinylLyrics] = useState(
     'LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA'
   );
@@ -179,10 +197,6 @@ export default function VinylPosterPage({ navigate }) {
 
   const toggleAccordion = (key) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
-  };
-
-  const syncColor = (hexSetter, val) => {
-    hexSetter(val);
   };
 
   // ---- Canvas init ----
@@ -279,7 +293,7 @@ export default function VinylPosterPage({ navigate }) {
     canvas.textSongRef = songTitle;
     canvas.textBottomRef = bottom;
 
-    buildVinylGroup(canvas, containerDims, vinylTextSize, vinylLyrics);
+    buildVinylGroup(canvas, containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing);
 
     canvas.on('selection:created', onSelectionChange);
     canvas.on('selection:updated', onSelectionChange);
@@ -301,6 +315,12 @@ export default function VinylPosterPage({ navigate }) {
       }
     });
 
+    // Font pre-loading setup
+    const link = document.createElement('link');
+    link.href = `https://fonts.googleapis.com/css?family=${GOOGLE_FONTS.map(f => f.replace(/ /g, '+')).join('|')}&display=swap`;
+    link.rel = 'stylesheet';
+    document.head.appendChild(link);
+
     canvas.renderAll();
 
     return () => {
@@ -319,16 +339,16 @@ export default function VinylPosterPage({ navigate }) {
     setAlignBarVisible(true);
   }
 
-  function buildVinylGroup(canvas, dims, textSize, lyrics) {
+  function buildVinylGroup(canvas, dims, textSize, lyrics, scalePct, fontFam, textCol, labelCol, labelPct, letterSpc) {
     if (vinylGroupRef.current) {
       canvas.remove(vinylGroupRef.current);
     }
-    const size = dims.width * 0.78;
+    const size = dims.width * (scalePct / 100);
     const cx = size / 2;
     const cy = size / 2;
     const outerR = size / 2 - 2;
 
-    const labelR = outerR * 0.125;
+    const labelR = outerR * (labelPct / 100);
     const holeR = outerR * 0.015;
 
     const edge = new fabric.Circle({
@@ -336,7 +356,7 @@ export default function VinylPosterPage({ navigate }) {
       originX: 'center', originY: 'center', selectable: false, evented: false,
     });
     const label = new fabric.Circle({
-      left: cx, top: cy, radius: labelR, fill: '#e8e8e8', stroke: '#c9c9c9', strokeWidth: 1,
+      left: cx, top: cy, radius: labelR, fill: labelCol, stroke: '#c9c9c9', strokeWidth: 1,
       originX: 'center', originY: 'center', selectable: false, evented: false,
     });
     const hole = new fabric.Circle({
@@ -349,8 +369,9 @@ export default function VinylPosterPage({ navigate }) {
       innerRadius: labelR + textSize * 0.6,
       outerRadius: outerR - textSize * 0.3,
       fontSize: textSize,
-      color: '#181818',
-      fontFamily: 'DM Sans, sans-serif',
+      color: textCol,
+      fontFamily: fontFam,
+      letterSpacing: letterSpc
     });
 
     const group = new fabric.Group(
@@ -368,11 +389,11 @@ export default function VinylPosterPage({ navigate }) {
     canvas.renderAll();
   }
 
-  const rebuildVinyl = useCallback((textSize, lyrics) => {
+  const rebuildVinyl = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    buildVinylGroup(canvas, containerDims, textSize, lyrics);
-  }, [containerDims]);
+    buildVinylGroup(canvas, containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing);
+  }, [containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing]);
 
   // ---- Canvas size change ----
   const updateCanvasSize = (value) => {
@@ -390,7 +411,7 @@ export default function VinylPosterPage({ navigate }) {
     canvas.textRightRef.set({ left: dims.width * 0.92, top: dims.height * 0.08 });
     canvas.textSongRef.set({ left: dims.width / 2, top: dims.height * 0.12, width: dims.width * 0.84 });
     canvas.textBottomRef.set({ left: dims.width / 2, top: dims.height * 0.92 });
-    buildVinylGroup(canvas, dims, vinylTextSize, vinylLyrics);
+    buildVinylGroup(canvas, dims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing);
     canvas.renderAll();
   };
 
@@ -411,34 +432,29 @@ export default function VinylPosterPage({ navigate }) {
     const canvas = fabricRef.current;
     if (canvas && canvas.textLeftRef) canvas.textLeftRef.set({ text: topLeftText, fill: topLeftColor });
     canvas && canvas.renderAll();
-    // eslint-disable-next-line
   }, [topLeftText, topLeftColor]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
     if (canvas && canvas.textRightRef) canvas.textRightRef.set({ text: topRightText, fill: topRightColor });
     canvas && canvas.renderAll();
-    // eslint-disable-next-line
   }, [topRightText, topRightColor]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
     if (canvas && canvas.textSongRef) canvas.textSongRef.set({ text: songTitleText, fill: songTitleColor });
     canvas && canvas.renderAll();
-    // eslint-disable-next-line
   }, [songTitleText, songTitleColor]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
     if (canvas && canvas.textBottomRef) canvas.textBottomRef.set({ text: bottomText, fill: bottomColor });
     canvas && canvas.renderAll();
-    // eslint-disable-next-line
   }, [bottomText, bottomColor]);
 
   useEffect(() => {
-    rebuildVinyl(vinylTextSize, vinylLyrics);
-    // eslint-disable-next-line
-  }, [vinylTextSize, vinylLyrics]);
+    rebuildVinyl();
+  }, [rebuildVinyl]);
 
   // ---- Background ----
   useEffect(() => {
@@ -456,7 +472,6 @@ export default function VinylPosterPage({ navigate }) {
       }
     }
     canvas.renderAll();
-    // eslint-disable-next-line
   }, [bgType, bgColor]);
 
   const updateBgColor = (hex) => {
@@ -963,7 +978,7 @@ export default function VinylPosterPage({ navigate }) {
           </div>
           {searching && <div className="loading-spinner" id="search-spinner" style={{ margin: '8px auto' }} />}
           <div className="search-results" id="search-results">
-            {searchResults.map((track) => (
+            {searchResults.map((track: any) => (
               <div key={track.trackId} className="search-result-item" onClick={() => applySearchResult(track)} style={{ cursor: 'pointer', display: 'flex', gap: '8px', alignItems: 'center', padding: '6px 0' }}>
                 {track.artworkUrl60 && <img src={track.artworkUrl60} alt="" width={36} height={36} />}
                 <div>
@@ -1059,30 +1074,8 @@ export default function VinylPosterPage({ navigate }) {
           </div>
         </div>
 
-        <button className={`accordion-btn${openSections.vinyl ? ' open' : ''}`} onClick={() => toggleAccordion('vinyl')}>
-          &#128191; Vinyl Record &amp; Lyrics<span className="arrow">&#9660;</span>
-        </button>
-        <div className={`accordion-content${openSections.vinyl ? ' open' : ''}`}>
-          <div className="form-row">
-            <label>Spiral Text Size</label>
-            <div className="range-row">
-              <input type="range" id="vinyl-text-size" min="6" max="40" value={vinylTextSize}
-                onChange={(e) => setVinylTextSize(Number(e.target.value))} />
-              <span className="range-val">{vinylTextSize}px</span>
-            </div>
-          </div>
-          <div className="form-row">
-            <label>Lyrics / Text Content</label>
-            <textarea id="vinyl-lyrics-input" value={vinylLyrics}
-              onChange={(e) => setVinylLyrics(e.target.value)} />
-            <p style={{ fontSize: '10px', color: '#777', marginTop: '4px' }}>
-              Lyrics are fetched automatically when available from search. If not found, paste them here manually.
-            </p>
-          </div>
-        </div>
-
         <button className={`accordion-btn${openSections.background ? ' open' : ''}`} onClick={() => toggleAccordion('background')}>
-          &#128444;&#65039; Main Background (Current View)<span className="arrow">&#9660;</span>
+          &#128444;&#65039; Main Background<span className="arrow">&#9660;</span>
         </button>
         <div className={`accordion-content${openSections.background ? ' open' : ''}`}>
           <div className="form-row">
@@ -1324,21 +1317,70 @@ export default function VinylPosterPage({ navigate }) {
             <div id="props-fields">
               <div className="pf-section">
                 <div className="pf-section-title">Vinyl Record &amp; Lyrics</div>
+                
                 <div className="pf-row">
-                  <label>Spiral Text Size</label>
+                  <label>Overall Size (%)</label>
                   <div className="pf-range-row">
-                    <input type="range" min="6" max="40" value={vinylTextSize}
-                      onChange={(e) => setVinylTextSize(Number(e.target.value))} />
-                    <span className="pf-range-val">{vinylTextSize}px</span>
+                    <input type="range" min="10" max="150" value={vinylScale} onChange={(e) => setVinylScale(Number(e.target.value))} />
+                    <span className="pf-range-val">{vinylScale}%</span>
                   </div>
                 </div>
+
+                <div className="pf-row">
+                  <label>Spiral Font Family</label>
+                  <select className="sidebar-control" value={vinylFontFamily} onChange={(e) => setVinylFontFamily(e.target.value)}>
+                    <option value="DM Sans, sans-serif">DM Sans</option>
+                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+
+                <div className="pf-row">
+                  <label>Spiral Text Color</label>
+                  <div className="color-row">
+                    <input type="color" value={vinylTextColor} onChange={(e) => setVinylTextColor(e.target.value)} />
+                    <input type="text" value={vinylTextColor} onChange={(e) => setVinylTextColor(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="pf-row">
+                  <label>Spiral Text Size</label>
+                  <div className="range-row">
+                    <input type="range" min="6" max="40" value={vinylTextSize} onChange={(e) => setVinylTextSize(Number(e.target.value))} />
+                    <span className="range-val">{vinylTextSize}px</span>
+                  </div>
+                </div>
+
+                <div className="pf-row">
+                  <label>Letter Spacing</label>
+                  <div className="range-row">
+                    <input type="range" min="0" max="10" step="0.5" value={vinylLetterSpacing} onChange={(e) => setVinylLetterSpacing(Number(e.target.value))} />
+                    <span className="range-val">{vinylLetterSpacing}px</span>
+                  </div>
+                </div>
+
+                <div className="pf-row">
+                  <label>Center Label Color</label>
+                  <div className="color-row">
+                    <input type="color" value={vinylLabelColor} onChange={(e) => setVinylLabelColor(e.target.value)} />
+                    <input type="text" value={vinylLabelColor} onChange={(e) => setVinylLabelColor(e.target.value)} />
+                  </div>
+                </div>
+
+                <div className="pf-row">
+                  <label>Center Label Size (%)</label>
+                  <div className="range-row">
+                    <input type="range" min="5" max="50" value={vinylLabelSize} onChange={(e) => setVinylLabelSize(Number(e.target.value))} />
+                    <span className="range-val">{vinylLabelSize}%</span>
+                  </div>
+                </div>
+
                 <div className="pf-row">
                   <label>Lyrics / Text Content</label>
                   <textarea
                     style={{
                       width: '100%', background: 'var(--input-bg)', border: '1px solid var(--input-border)',
                       borderRadius: '5px', color: 'var(--spotify-text)', padding: '6px 8px', fontSize: '11px',
-                      fontFamily: 'DM Sans, sans-serif', minHeight: '90px', resize: 'vertical',
+                      fontFamily: 'inherit', minHeight: '90px', resize: 'vertical',
                     }}
                     value={vinylLyrics}
                     onChange={(e) => setVinylLyrics(e.target.value)}
