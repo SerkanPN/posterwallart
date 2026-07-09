@@ -1,6 +1,10 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+
+// Layout & Components
 import { Layout } from './components/Layout';
+
+// Pages
 import { Home } from './pages/Home';
 import { Shop } from './pages/Shop';
 import { Cart } from './pages/Cart';
@@ -9,12 +13,20 @@ import { Profile } from './pages/Profile';
 import { SellerDashboard } from './pages/SellerDashboard';
 import { Wishlist } from './pages/Wishlist';
 import { ProductDetail } from './pages/ProductDetail';
-import { SpecialForRoom } from './pages/SpecialForRoom'; // Added missing import
-import { HDTools } from './pages/HDTools';              // Added missing import
-import AlbumPosterBuilder from './pages/AlbumPosterBuilder';
-import { useStore } from './store/useStore';
+
+// AI Services & Tools
+import { SpecialForRoom } from './pages/SpecialForRoom'; 
+import { HDTools } from './pages/HDTools';              
+
+// Poster Builders
 import { MusicPosterSelection } from './pages/MusicPosterSelection';
-import SpotifyPosterBuilder from './pages/SpotifyPosterBuilder'; // Dosya ismini nasıl kaydettiysen o şekilde yaz
+import SongPosterSelection from './pages/SongPosterSelection';
+import AlbumPosterBuilder from './pages/AlbumPosterBuilder';
+import SpotifyPosterBuilder from './pages/SpotifyPosterBuilder'; 
+import VinylPosterBuilder from './pages/VinylPosterBuilder';
+
+// State Management
+import { useStore } from './store/useStore';
 
 export default function App() {
   const { checkUser } = useStore();
@@ -38,12 +50,23 @@ export default function App() {
           <Route path="shop" element={<Shop />} />
           <Route path="product/:slug" element={<ProductDetail />} />
           
-          {/* AI SERVICES */}
+          {/* AI SERVICES & TOOLS */}
           <Route path="special" element={<SpecialForRoom />} />
           <Route path="lab" element={<HDTools />} />
+
+          {/* POSTER BUILDERS HIERARCHY */}
+          {/* 1. Main Selection (Album Cover Poster vs Song Poster) */}
           <Route path="music-posters" element={<MusicPosterSelection />} />
+          
+          {/* 2. Album Cover Builder */}
           <Route path="custom-album" element={<AlbumPosterBuilder />} />
-          <Route path="song-poster" element={<SpotifyPosterBuilder />} />
+          
+          {/* 3. Song Poster Sub-Selection (Spotify vs Vinyl) */}
+          <Route path="song-poster" element={<SongPosterSelection />} />
+          
+          {/* 4. Song Poster Editors */}
+          <Route path="song-poster/spotify" element={<SpotifyPosterBuilder />} />
+          <Route path="song-poster/vinyl" element={<VinylPosterBuilder />} />
           
           {/* USER SYSTEM */}
           <Route path="cart" element={<Cart />} />
