@@ -48,21 +48,30 @@ const PRINT_SIZES = [
   { value: '88x104', label: '88" x 104"' },
 ];
 
-const DEFAULT_POSTER_COLORS = [
-  '#f5f5f5', '#e8dcc8', '#d9cfc1', '#c9b8a3',
-  '#111111', '#2b2b2b', '#8fae94', '#c98a7d',
-  '#e0c36c', '#a3b8d9', '#d9a3c9', '#9dd9c9',
+const EXTENDED_PALETTE = [
+  { name: 'Dove', hex: '#e5e5e5' }, { name: 'Smoke', hex: '#b3b3b3' }, { name: 'Grey', hex: '#808080' },
+  { name: 'Coal', hex: '#333333' }, { name: 'Black', hex: '#000000' }, { name: 'Sun', hex: '#ffdb58' },
+  { name: 'Yellow', hex: '#ffc107' }, { name: 'Orange', hex: '#ff8c00' }, { name: 'Red', hex: '#cc0000' },
+  { name: 'Mocha', hex: '#654321' }, { name: 'Lav', hex: '#b399ff' }, { name: 'Purple', hex: '#660066' },
+  { name: 'Pink', hex: '#ff99cc' }, { name: 'Peach', hex: '#ff9980' }, { name: 'Plum', hex: '#990033' },
+  { name: 'Sky', hex: '#66ccff' }, { name: 'Blue', hex: '#0066cc' }, { name: 'Navy', hex: '#000066' },
+  { name: 'Denim', hex: '#336699' }, { name: 'Petrol', hex: '#003333' }, { name: 'Mint', hex: '#66ffcc' },
+  { name: 'Teal', hex: '#009999' }, { name: 'Lime', hex: '#33cc33' }, { name: 'Green', hex: '#008000' },
+  { name: 'Forest', hex: '#003300' }
 ];
 
+const DEFAULT_POSTER_COLORS = EXTENDED_PALETTE.slice(0, 12).map(c => c.hex);
+
 const DPI = 300;
-const BASE_MAX_W = 420;
-const BASE_MAX_H = 560;
+const BASE_MAX_W = 600;
+const BASE_MAX_H = 800;
 
 const EDIT_TYPES = {
-  TOP_LEFT: 'sw-top-left',
-  TOP_RIGHT: 'sw-top-right',
   MAIN_TITLE: 'sw-main-title',
-  BOTTOM: 'sw-bottom',
+  SUB_TITLE: 'sw-sub-title',
+  DIVIDER: 'sw-divider',
+  BOTTOM_1: 'sw-bottom-1',
+  BOTTOM_2: 'sw-bottom-2',
   SOUNDWAVE: 'sw-soundwave',
 };
 
@@ -93,9 +102,17 @@ function fitContain(wIn: number, hIn: number, maxW: number, maxH: number) {
 function generateAestheticPeaks(count: number): number[] {
   const peaks: number[] = [];
   for (let i = 0; i < count; i++) {
-    const envelope = Math.sin((i / (count - 1)) * Math.PI);
-    const noise = 0.2 + 0.8 * Math.random();
-    peaks.push(envelope * noise);
+    const x = i / (count - 1);
+    let envelope = Math.sin(x * Math.PI); 
+    envelope = Math.pow(envelope, 0.6); 
+    
+    const noise1 = Math.random();
+    const noise2 = Math.random() * Math.random(); 
+    const spike = Math.random() > 0.92 ? Math.random() : 0;
+    
+    let val = (noise1 * 0.3 + noise2 * 0.6 + spike * 0.4) * envelope;
+    val = Math.max(0.02, Math.min(1, val));
+    peaks.push(val);
   }
   return peaks;
 }
@@ -139,9 +156,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const fabricRef = useRef<fabric.Canvas | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const bgRectRef = useRef<fabric.Rect | null>(null);
-  const bgImageRef = useRef<fabric.Image | null>(null);
-  const bgOverlayRef = useRef<fabric.Rect | null>(null);
-  const waveGroupRef = useRef<fabric.Group | null>(null);
+  const wavePathRef = useRef<fabric.Path | null>(null);
 
   const isRebuildingRef = useRef<boolean>(false);
   const rawAudioDataRef = useRef<Float32Array | null>(null);
@@ -156,57 +171,63 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   });
 
   const [canvasSize, setCanvasSize] = useState<string>('30x40');
-  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape');
   const [containerDims, setContainerDims] = useState(() => {
-    const { w, h } = parseAndOrientSize('30x40', 'portrait');
+    const { w, h } = parseAndOrientSize('30x40', 'landscape');
     return fitContain(w, h, BASE_MAX_W, BASE_MAX_H);
   });
   const [zoom, setZoom] = useState<number>(1); 
 
-  const [topLeftText, setTopLeftText] = useState('I LOVE YOU');
-  const [topLeftColor, setTopLeftColor] = useState('#212121');
-  const [topLeftFontFamily, setTopLeftFontFamily] = useState('Montserrat, sans-serif');
-  const [topLeftFontSize, setTopLeftFontSize] = useState(18);
-  const [topLeftCharSpacing, setTopLeftCharSpacing] = useState(100);
-  const [topLeftFontWeight, setTopLeftFontWeight] = useState('700');
-  const [topLeftFontStyle, setTopLeftFontStyle] = useState('normal');
-
-  const [topRightText, setTopRightText] = useState('00:00:00');
-  const [topRightColor, setTopRightColor] = useState('#212121');
-  const [topRightFontFamily, setTopRightFontFamily] = useState('Montserrat, sans-serif');
-  const [topRightFontSize, setTopRightFontSize] = useState(18);
-  const [topRightCharSpacing, setTopRightCharSpacing] = useState(100);
-  const [topRightFontWeight, setTopRightFontWeight] = useState('700');
-  const [topRightFontStyle, setTopRightFontStyle] = useState('normal');
-
-  const [bottomText, setBottomText] = useState('OUR SPECIAL MOMENT');
-  const [bottomColor, setBottomColor] = useState('#555555');
-  const [bottomFontFamily, setBottomFontFamily] = useState('Montserrat, sans-serif');
-  const [bottomFontSize, setBottomFontSize] = useState(14);
-  const [bottomCharSpacing, setBottomCharSpacing] = useState(50);
-  const [bottomFontWeight, setBottomFontWeight] = useState('700');
-  const [bottomFontStyle, setBottomFontStyle] = useState('normal');
-
-  const [mainTitleText, setMainTitleText] = useState('SOUNDWAVE');
-  const [mainTitleColor, setMainTitleColor] = useState('#212121');
-  const [mainTitleFontFamily, setMainTitleFontFamily] = useState('Josefin Sans, sans-serif');
-  const [mainTitleFontSize, setMainTitleFontSize] = useState(36);
-  const [mainTitleCharSpacing, setMainTitleCharSpacing] = useState(100);
-  const [mainTitleFontWeight, setMainTitleFontWeight] = useState('800');
+  // Typographic State matching the Reference
+  const [mainTitleText, setMainTitleText] = useState('ELECTRIC HEARTBEAT');
+  const [mainTitleColor, setMainTitleColor] = useState('#000000');
+  const [mainTitleFontFamily, setMainTitleFontFamily] = useState('Montserrat, sans-serif');
+  const [mainTitleFontSize, setMainTitleFontSize] = useState(24);
+  const [mainTitleCharSpacing, setMainTitleCharSpacing] = useState(150);
+  const [mainTitleFontWeight, setMainTitleFontWeight] = useState('700');
   const [mainTitleFontStyle, setMainTitleFontStyle] = useState('normal');
 
-  const [waveMode, setWaveMode] = useState<'random' | 'audio'>('random'); 
-  const [waveColor, setWaveColor] = useState('#181818');
-  const [waveBarCount, setWaveBarCount] = useState(60);
-  const [waveBarWidth, setWaveBarWidth] = useState(3);
-  const [waveBarGap, setWaveBarGap] = useState(2);
-  const [waveBarRadius, setWaveBarRadius] = useState(2);
-  const [waveHeightScale, setWaveHeightScale] = useState(120);
+  const [subTitleText, setSubTitleText] = useState('THE COAST');
+  const [subTitleColor, setSubTitleColor] = useState('#333333');
+  const [subTitleFontFamily, setSubTitleFontFamily] = useState('Montserrat, sans-serif');
+  const [subTitleFontSize, setSubTitleFontSize] = useState(12);
+  const [subTitleCharSpacing, setSubTitleCharSpacing] = useState(200);
+  const [subTitleFontWeight, setSubTitleFontWeight] = useState('400');
+  const [subTitleFontStyle, setSubTitleFontStyle] = useState('normal');
 
-  const [bgType, setBgType] = useState<'color' | 'blur'>('color');
-  const [bgColor, setBgColor] = useState('#f5f5f5');
-  const [bgBlur, setBgBlur] = useState(10);
-  const [bgImageUrl, setBgImageUrl] = useState<string | null>(null);
+  const [dividerColor, setDividerColor] = useState('#999999');
+
+  const [bottom1Text, setBottom1Text] = useState('OUR SONG');
+  const [bottom1Color, setBottom1Color] = useState('#333333');
+  const [bottom1FontFamily, setBottom1FontFamily] = useState('Montserrat, sans-serif');
+  const [bottom1FontSize, setBottom1FontSize] = useState(9);
+  const [bottom1CharSpacing, setBottom1CharSpacing] = useState(100);
+  const [bottom1FontWeight, setBottom1FontWeight] = useState('600');
+  const [bottom1FontStyle, setBottom1FontStyle] = useState('normal');
+
+  const [bottom2Text, setBottom2Text] = useState('2026');
+  const [bottom2Color, setBottom2Color] = useState('#333333');
+  const [bottom2FontFamily, setBottom2FontFamily] = useState('Montserrat, sans-serif');
+  const [bottom2FontSize, setBottom2FontSize] = useState(9);
+  const [bottom2CharSpacing, setBottom2CharSpacing] = useState(100);
+  const [bottom2FontWeight, setBottom2FontWeight] = useState('600');
+  const [bottom2FontStyle, setBottom2FontStyle] = useState('normal');
+
+  // Advanced Soundwave Properties
+  const [waveMode, setWaveMode] = useState<'random' | 'audio'>('random'); 
+  const [waveFillType, setWaveFillType] = useState<'solid' | 'gradient'>('gradient');
+  const [waveSolidColor, setWaveSolidColor] = useState('#008000');
+  
+  const [waveGradientStops, setWaveGradientStops] = useState<number>(3);
+  const [waveGradientColors, setWaveGradientColors] = useState<string[]>(['#66ffcc', '#008000', '#003300', '#000000', '#000000']);
+  const [waveGradientAngle, setWaveGradientAngle] = useState<number>(0);
+
+  const [waveDensity, setWaveDensity] = useState(300); // Lines count
+  const [waveThickness, setWaveThickness] = useState(1.5);
+  const [waveHeightScale, setWaveHeightScale] = useState(150); // Height of the wave
+  const [waveWidthScale, setWaveWidthScale] = useState(80); // Width % of the canvas
+
+  const [bgColor, setBgColor] = useState('#fbfbfb');
 
   const [exportColors, setExportColors] = useState(
     DEFAULT_POSTER_COLORS.map((c) => ({ color: c, checked: true }))
@@ -230,7 +251,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     const canvas = new fabric.Canvas(canvasElRef.current, {
       width: containerDims.width,
       height: containerDims.height,
-      backgroundColor: '#f5f5f5',
+      backgroundColor: bgColor,
       preserveObjectStacking: true,
       selection: true,
     });
@@ -248,50 +269,13 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     canvas.add(bgRect);
     bgRectRef.current = bgRect;
 
-    const overlay = new fabric.Rect({
-      left: 0,
-      top: 0,
-      width: containerDims.width,
-      height: containerDims.height,
-      fill: 'rgba(0,0,0,0.5)',
-      selectable: false,
-      evented: false,
-      visible: false,
-    });
-    canvas.add(overlay);
-    bgOverlayRef.current = overlay;
-
-    const topLeft = new fabric.IText(topLeftText, {
-      left: containerDims.width * 0.08,
-      top: containerDims.height * 0.08,
-      fontSize: topLeftFontSize,
-      fontFamily: topLeftFontFamily,
-      fontWeight: topLeftFontWeight,
-      fontStyle: topLeftFontStyle,
-      fill: topLeftColor,
-      charSpacing: topLeftCharSpacing,
-      data: { edType: EDIT_TYPES.TOP_LEFT },
-    });
-    canvas.add(topLeft);
-
-    const topRight = new fabric.IText(topRightText, {
-      left: containerDims.width * 0.92,
-      top: containerDims.height * 0.08,
-      originX: 'right',
-      fontSize: topRightFontSize,
-      fontFamily: topRightFontFamily,
-      fontWeight: topRightFontWeight,
-      fontStyle: topRightFontStyle,
-      fill: topRightColor,
-      charSpacing: topRightCharSpacing,
-      data: { edType: EDIT_TYPES.TOP_RIGHT },
-    });
-    canvas.add(topRight);
+    const cy = containerDims.height / 2;
+    const cw = containerDims.width;
 
     const mainTitle = new fabric.Textbox(mainTitleText, {
-      left: containerDims.width / 2,
-      top: containerDims.height * 0.12,
-      width: containerDims.width * 0.84,
+      left: cw / 2,
+      top: cy + 100,
+      width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
       fontSize: mainTitleFontSize,
@@ -304,26 +288,69 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     });
     canvas.add(mainTitle);
 
-    const bottom = new fabric.IText(bottomText, {
-      left: containerDims.width / 2,
-      top: containerDims.height * 0.92,
+    const subTitle = new fabric.Textbox(subTitleText, {
+      left: cw / 2,
+      top: cy + 130,
+      width: cw * 0.8,
       originX: 'center',
-      fontSize: bottomFontSize,
-      fontFamily: bottomFontFamily,
-      fontWeight: bottomFontWeight,
-      fontStyle: bottomFontStyle,
-      fill: bottomColor,
-      charSpacing: bottomCharSpacing,
-      data: { edType: EDIT_TYPES.BOTTOM },
+      textAlign: 'center',
+      fontSize: subTitleFontSize,
+      fontFamily: subTitleFontFamily,
+      fontWeight: subTitleFontWeight,
+      fontStyle: subTitleFontStyle,
+      fill: subTitleColor,
+      charSpacing: subTitleCharSpacing,
+      data: { edType: EDIT_TYPES.SUB_TITLE },
     });
-    canvas.add(bottom);
+    canvas.add(subTitle);
 
-    (canvas as any).textLeftRef = topLeft;
-    (canvas as any).textRightRef = topRight;
+    const divider = new fabric.Line([cw * 0.35, cy + 155, cw * 0.65, cy + 155], {
+      stroke: dividerColor,
+      strokeWidth: 1,
+      selectable: true,
+      data: { edType: EDIT_TYPES.DIVIDER },
+    });
+    canvas.add(divider);
+
+    const bottom1 = new fabric.Textbox(bottom1Text, {
+      left: cw / 2,
+      top: cy + 175,
+      width: cw * 0.8,
+      originX: 'center',
+      textAlign: 'center',
+      fontSize: bottom1FontSize,
+      fontFamily: bottom1FontFamily,
+      fontWeight: bottom1FontWeight,
+      fontStyle: bottom1FontStyle,
+      fill: bottom1Color,
+      charSpacing: bottom1CharSpacing,
+      data: { edType: EDIT_TYPES.BOTTOM_1 },
+    });
+    canvas.add(bottom1);
+
+    const bottom2 = new fabric.Textbox(bottom2Text, {
+      left: cw / 2,
+      top: cy + 195,
+      width: cw * 0.8,
+      originX: 'center',
+      textAlign: 'center',
+      fontSize: bottom2FontSize,
+      fontFamily: bottom2FontFamily,
+      fontWeight: bottom2FontWeight,
+      fontStyle: bottom2FontStyle,
+      fill: bottom2Color,
+      charSpacing: bottom2CharSpacing,
+      data: { edType: EDIT_TYPES.BOTTOM_2 },
+    });
+    canvas.add(bottom2);
+
     (canvas as any).textTitleRef = mainTitle;
-    (canvas as any).textBottomRef = bottom;
+    (canvas as any).textSubRef = subTitle;
+    (canvas as any).dividerRef = divider;
+    (canvas as any).textBottom1Ref = bottom1;
+    (canvas as any).textBottom2Ref = bottom2;
 
-    buildSoundwaveGroup(canvas, containerDims, waveBarCount, waveBarWidth, waveBarGap, waveBarRadius, waveColor, waveHeightScale);
+    buildSoundwavePath(canvas, containerDims);
 
     canvas.on('selection:created', onSelectionChange);
     canvas.on('selection:updated', onSelectionChange);
@@ -340,10 +367,10 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       if (!t || !t.data) return;
       const v = t.text;
       switch (t.data.edType) {
-        case EDIT_TYPES.TOP_LEFT: setTopLeftText(v); break;
-        case EDIT_TYPES.TOP_RIGHT: setTopRightText(v); break;
         case EDIT_TYPES.MAIN_TITLE: setMainTitleText(v); break;
-        case EDIT_TYPES.BOTTOM: setBottomText(v); break;
+        case EDIT_TYPES.SUB_TITLE: setSubTitleText(v); break;
+        case EDIT_TYPES.BOTTOM_1: setBottom1Text(v); break;
+        case EDIT_TYPES.BOTTOM_2: setBottom2Text(v); break;
         default: break;
       }
     });
@@ -423,66 +450,81 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     }
   };
 
-  function buildSoundwaveGroup(
-    canvas: fabric.Canvas, 
-    dims: { width: number; height: number }, 
-    count: number, 
-    barWidth: number, 
-    barGap: number, 
-    barRadius: number, 
-    color: string, 
-    heightScale: number
-  ) {
+  const getGradient = (width: number, height: number) => {
+    const rad = (waveGradientAngle * Math.PI) / 180;
+    
+    const x1 = (width / 2) - Math.cos(rad) * (width / 2);
+    const y1 = (height / 2) - Math.sin(rad) * (height / 2);
+    const x2 = (width / 2) + Math.cos(rad) * (width / 2);
+    const y2 = (height / 2) + Math.sin(rad) * (height / 2);
+
+    const activeColors = waveGradientColors.slice(0, waveGradientStops);
+    const colorStops = activeColors.map((color, i) => ({
+      offset: i / (activeColors.length - 1),
+      color: color
+    }));
+
+    return new fabric.Gradient({
+      type: 'linear',
+      coords: { x1, y1, x2, y2 },
+      colorStops
+    });
+  };
+
+  function buildSoundwavePath(canvas: fabric.Canvas, dims: { width: number; height: number }) {
     isRebuildingRef.current = true;
     
-    const wasSelected = waveGroupRef.current && canvas.getActiveObject() === waveGroupRef.current;
+    const wasSelected = wavePathRef.current && canvas.getActiveObject() === wavePathRef.current;
 
-    if (waveGroupRef.current) {
-      canvas.remove(waveGroupRef.current);
+    if (wavePathRef.current) {
+      canvas.remove(wavePathRef.current);
     }
 
     let peaks: number[] = [];
     if (waveMode === 'audio' && rawAudioDataRef.current) {
-      peaks = extractPeaksFromAudio(rawAudioDataRef.current, count);
+      peaks = extractPeaksFromAudio(rawAudioDataRef.current, waveDensity);
     } else {
-      peaks = generateAestheticPeaks(count);
+      peaks = generateAestheticPeaks(waveDensity);
     }
 
-    const totalWidth = (barWidth * count) + (barGap * (count - 1));
-    const startX = -totalWidth / 2;
-    const maxHeight = dims.height * (heightScale / 100);
+    const totalWidth = dims.width * (waveWidthScale / 100);
+    const step = totalWidth / waveDensity;
+    const startX = 0; 
+    const maxHeight = dims.height * (waveHeightScale / 100);
 
-    const bars = peaks.map((p, index) => {
-      const h = Math.max(p * maxHeight, barWidth);
-      return new fabric.Rect({
-        left: startX + (index * (barWidth + barGap)),
-        top: -h / 2,
-        width: barWidth,
-        height: h,
-        fill: color,
-        rx: barRadius,
-        ry: barRadius,
-        originX: 'left',
-        originY: 'top',
-        selectable: false,
-        evented: false,
-      });
-    });
-
-    const group = new fabric.Group(bars, {
-      left: dims.width / 2,
-      top: dims.height * 0.55,
-      originX: 'center',
-      originY: 'center',
-      objectCaching: true,
-      data: { edType: EDIT_TYPES.SOUNDWAVE },
-    });
+    let pathString = '';
     
-    canvas.add(group);
-    waveGroupRef.current = group;
+    for(let i=0; i<waveDensity; i++) {
+        const x = startX + i * step;
+        const h = peaks[i] * maxHeight;
+        pathString += `M ${x} ${-h/2} L ${x} ${h/2} `;
+    }
+
+    const wavePath = new fabric.Path(pathString, {
+        strokeWidth: waveThickness,
+        fill: '',
+        strokeLineCap: 'round',
+        strokeLineJoin: 'round',
+        originX: 'center',
+        originY: 'center',
+        left: dims.width / 2,
+        top: dims.height * 0.4, 
+        objectCaching: false,
+        data: { edType: EDIT_TYPES.SOUNDWAVE },
+    });
+
+    if (waveFillType === 'solid') {
+      wavePath.set({ stroke: waveSolidColor });
+    } else {
+      const bound = wavePath.getBoundingRect();
+      wavePath.set({ stroke: getGradient(bound.width, bound.height) });
+    }
+    
+    canvas.add(wavePath);
+    wavePathRef.current = wavePath;
 
     if (wasSelected) {
-      canvas.setActiveObject(group);
+      canvas.setActiveObject(wavePath);
     }
     
     canvas.requestRenderAll();
@@ -492,8 +534,8 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const rebuildSoundwave = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    buildSoundwaveGroup(canvas, containerDims, waveBarCount, waveBarWidth, waveBarGap, waveBarRadius, waveColor, waveHeightScale);
-  }, [containerDims, waveMode, waveBarCount, waveBarWidth, waveBarGap, waveBarRadius, waveColor, waveHeightScale]);
+    buildSoundwavePath(canvas, containerDims);
+  }, [containerDims, waveMode, waveDensity, waveThickness, waveWidthScale, waveHeightScale, waveFillType, waveSolidColor, waveGradientColors, waveGradientStops, waveGradientAngle]);
 
   const handleSizeOrOrientationChange = (newSize: string, newOrient: 'portrait' | 'landscape') => {
     setCanvasSize(newSize);
@@ -509,59 +551,32 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     canvas.setWidth(dims.width * zoom);
     canvas.setHeight(dims.height * zoom);
     if (bgRectRef.current) bgRectRef.current.set({ width: dims.width, height: dims.height });
-    if (bgOverlayRef.current) bgOverlayRef.current.set({ width: dims.width, height: dims.height });
     
+    const cw = dims.width;
+    const cy = dims.height / 2;
+
     const anyCanvas = canvas as any;
-    if (anyCanvas.textLeftRef) anyCanvas.textLeftRef.set({ left: dims.width * 0.08, top: dims.height * 0.08 });
-    if (anyCanvas.textRightRef) anyCanvas.textRightRef.set({ left: dims.width * 0.92, top: dims.height * 0.08 });
-    if (anyCanvas.textTitleRef) anyCanvas.textTitleRef.set({ left: dims.width / 2, top: dims.height * 0.12, width: dims.width * 0.84 });
-    if (anyCanvas.textBottomRef) anyCanvas.textBottomRef.set({ left: dims.width / 2, top: dims.height * 0.92 });
+    if (anyCanvas.textTitleRef) anyCanvas.textTitleRef.set({ left: cw / 2, top: cy + 100, width: cw * 0.8 });
+    if (anyCanvas.textSubRef) anyCanvas.textSubRef.set({ left: cw / 2, top: cy + 130, width: cw * 0.8 });
     
-    buildSoundwaveGroup(canvas, dims, waveBarCount, waveBarWidth, waveBarGap, waveBarRadius, waveColor, waveHeightScale);
+    if (anyCanvas.dividerRef) {
+      anyCanvas.dividerRef.set({ x1: cw * 0.35, y1: cy + 155, x2: cw * 0.65, y2: cy + 155 });
+    }
+    
+    if (anyCanvas.textBottom1Ref) anyCanvas.textBottom1Ref.set({ left: cw / 2, top: cy + 175, width: cw * 0.8 });
+    if (anyCanvas.textBottom2Ref) anyCanvas.textBottom2Ref.set({ left: cw / 2, top: cy + 195, width: cw * 0.8 });
+    
+    buildSoundwavePath(canvas, dims);
     canvas.requestRenderAll();
   };
 
   const updateTextContent = (ref: any, setter: (val: string) => void, value: string) => {
     setter(value);
-    ref.set({ text: value });
-    fabricRef.current && fabricRef.current.requestRenderAll();
+    if(ref) {
+      ref.set({ text: value });
+      fabricRef.current?.requestRenderAll();
+    }
   };
-
-  useEffect(() => {
-    const canvas = fabricRef.current as any;
-    if (canvas && canvas.textLeftRef) {
-      isRebuildingRef.current = true;
-      canvas.textLeftRef.set({
-        text: topLeftText,
-        fill: topLeftColor,
-        fontFamily: topLeftFontFamily,
-        fontSize: topLeftFontSize,
-        charSpacing: topLeftCharSpacing,
-        fontWeight: topLeftFontWeight,
-        fontStyle: topLeftFontStyle
-      });
-      canvas.requestRenderAll();
-      isRebuildingRef.current = false;
-    }
-  }, [topLeftText, topLeftColor, topLeftFontFamily, topLeftFontSize, topLeftCharSpacing, topLeftFontWeight, topLeftFontStyle]);
-
-  useEffect(() => {
-    const canvas = fabricRef.current as any;
-    if (canvas && canvas.textRightRef) {
-      isRebuildingRef.current = true;
-      canvas.textRightRef.set({
-        text: topRightText,
-        fill: topRightColor,
-        fontFamily: topRightFontFamily,
-        fontSize: topRightFontSize,
-        charSpacing: topRightCharSpacing,
-        fontWeight: topRightFontWeight,
-        fontStyle: topRightFontStyle
-      });
-      canvas.requestRenderAll();
-      isRebuildingRef.current = false;
-    }
-  }, [topRightText, topRightColor, topRightFontFamily, topRightFontSize, topRightCharSpacing, topRightFontWeight, topRightFontStyle]);
 
   useEffect(() => {
     const canvas = fabricRef.current as any;
@@ -583,21 +598,67 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
   useEffect(() => {
     const canvas = fabricRef.current as any;
-    if (canvas && canvas.textBottomRef) {
+    if (canvas && canvas.textSubRef) {
       isRebuildingRef.current = true;
-      canvas.textBottomRef.set({
-        text: bottomText,
-        fill: bottomColor,
-        fontFamily: bottomFontFamily,
-        fontSize: bottomFontSize,
-        charSpacing: bottomCharSpacing,
-        fontWeight: bottomFontWeight,
-        fontStyle: bottomFontStyle
+      canvas.textSubRef.set({
+        text: subTitleText,
+        fill: subTitleColor,
+        fontFamily: subTitleFontFamily,
+        fontSize: subTitleFontSize,
+        charSpacing: subTitleCharSpacing,
+        fontWeight: subTitleFontWeight,
+        fontStyle: subTitleFontStyle
       });
       canvas.requestRenderAll();
       isRebuildingRef.current = false;
     }
-  }, [bottomText, bottomColor, bottomFontFamily, bottomFontSize, bottomCharSpacing, bottomFontWeight, bottomFontStyle]);
+  }, [subTitleText, subTitleColor, subTitleFontFamily, subTitleFontSize, subTitleCharSpacing, subTitleFontWeight, subTitleFontStyle]);
+
+  useEffect(() => {
+    const canvas = fabricRef.current as any;
+    if (canvas && canvas.dividerRef) {
+      isRebuildingRef.current = true;
+      canvas.dividerRef.set({ stroke: dividerColor });
+      canvas.requestRenderAll();
+      isRebuildingRef.current = false;
+    }
+  }, [dividerColor]);
+
+  useEffect(() => {
+    const canvas = fabricRef.current as any;
+    if (canvas && canvas.textBottom1Ref) {
+      isRebuildingRef.current = true;
+      canvas.textBottom1Ref.set({
+        text: bottom1Text,
+        fill: bottom1Color,
+        fontFamily: bottom1FontFamily,
+        fontSize: bottom1FontSize,
+        charSpacing: bottom1CharSpacing,
+        fontWeight: bottom1FontWeight,
+        fontStyle: bottom1FontStyle
+      });
+      canvas.requestRenderAll();
+      isRebuildingRef.current = false;
+    }
+  }, [bottom1Text, bottom1Color, bottom1FontFamily, bottom1FontSize, bottom1CharSpacing, bottom1FontWeight, bottom1FontStyle]);
+
+  useEffect(() => {
+    const canvas = fabricRef.current as any;
+    if (canvas && canvas.textBottom2Ref) {
+      isRebuildingRef.current = true;
+      canvas.textBottom2Ref.set({
+        text: bottom2Text,
+        fill: bottom2Color,
+        fontFamily: bottom2FontFamily,
+        fontSize: bottom2FontSize,
+        charSpacing: bottom2CharSpacing,
+        fontWeight: bottom2FontWeight,
+        fontStyle: bottom2FontStyle
+      });
+      canvas.requestRenderAll();
+      isRebuildingRef.current = false;
+    }
+  }, [bottom2Text, bottom2Color, bottom2FontFamily, bottom2FontSize, bottom2CharSpacing, bottom2FontWeight, bottom2FontStyle]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -609,68 +670,14 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas || !bgRectRef.current) return;
-    if (bgType === 'color') {
-      bgRectRef.current.set({ fill: bgColor, visible: true });
-      if (bgImageRef.current) bgImageRef.current.set({ visible: false });
-      if (bgOverlayRef.current) bgOverlayRef.current.set({ visible: false });
-    } else {
-      bgRectRef.current.set({ visible: false });
-      if (bgImageRef.current) {
-        bgImageRef.current.set({ visible: true });
-        if (bgOverlayRef.current) bgOverlayRef.current.set({ visible: true });
-      }
-    }
+    bgRectRef.current.set({ fill: bgColor });
     canvas.requestRenderAll();
-  }, [bgType, bgColor]);
+  }, [bgColor]);
 
-  const updateBgColor = (hex: string) => {
-    setBgColor(hex);
-  };
-
-  const updateBgBlur = (val: number) => {
-    setBgBlur(val);
-    if (bgImageRef.current) {
-      bgImageRef.current.filters = [new fabric.Image.filters.Blur({ blur: val / 100 })];
-      bgImageRef.current.applyFilters();
-      fabricRef.current?.requestRenderAll();
-    }
-  };
-
-  const handleBgCoverUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      const url = ev.target?.result as string;
-      setBgImageUrl(url);
-      fabric.Image.fromURL(url).then((img) => {
-        const canvas = fabricRef.current;
-        if (!canvas) return;
-        if (bgImageRef.current) canvas.remove(bgImageRef.current);
-        const scale = Math.max(
-          containerDims.width / img.width!,
-          containerDims.height / img.height!
-        ) * 1.15;
-        img.set({
-          left: containerDims.width / 2,
-          top: containerDims.height / 2,
-          originX: 'center',
-          originY: 'center',
-          scaleX: scale,
-          scaleY: scale,
-          selectable: false,
-          evented: false,
-          visible: bgType === 'blur',
-        });
-        img.filters = [new fabric.Image.filters.Blur({ blur: bgBlur / 100 })];
-        img.applyFilters();
-        canvas.insertAt(0, img); 
-        bgImageRef.current = img;
-        if (bgOverlayRef.current) canvas.bringObjectToFront(bgOverlayRef.current);
-        canvas.requestRenderAll();
-      });
-    };
-    reader.readAsDataURL(file);
+  const updateGradientColor = (index: number, val: string) => {
+    const newColors = [...waveGradientColors];
+    newColors[index] = val;
+    setWaveGradientColors(newColors);
   };
 
   const handleAlign = (mode: string) => {
@@ -688,14 +695,12 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     if (activeObj.type !== 'activeSelection') {
       const bound = activeObj.getBoundingRect();
-      
       const lLeft = bound.left / zoomFactor;
       const lTop = bound.top / zoomFactor;
       const lWidth = bound.width / zoomFactor;
       const lHeight = bound.height / zoomFactor;
 
       let dx = 0, dy = 0;
-
       if (mode === 'left') dx = -lLeft;
       else if (mode === 'cx') dx = (cw / 2) - (lLeft + lWidth / 2);
       else if (mode === 'right') dx = cw - (lLeft + lWidth);
@@ -703,7 +708,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       else if (mode === 'cy') dy = (ch / 2) - (lTop + lHeight / 2);
       else if (mode === 'bottom') dy = ch - (lTop + lHeight);
 
-      activeObj.set({ left: activeObj.left + dx, top: activeObj.top + dy });
+      activeObj.set({ left: activeObj.left! + dx, top: activeObj.top! + dy });
       activeObj.setCoords();
       canvas.requestRenderAll();
     } else {
@@ -731,7 +736,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         else if (mode === 'cy') dy = (groupT + groupH / 2) - (olT + olH / 2);
         else if (mode === 'bottom') dy = (groupT + groupH) - (olT + olH);
 
-        obj.set({ left: obj.left + dx, top: obj.top + dy });
+        obj.set({ left: obj.left! + dx, top: obj.top! + dy });
         obj.setCoords();
       });
 
@@ -761,7 +766,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       
       objs.forEach((o, i) => { 
         const obL = o.getBoundingRect().left / zoomFactor;
-        o.set({ left: o.left + ((firstL + step * i) - obL) }); 
+        o.set({ left: o.left! + ((firstL + step * i) - obL) }); 
         o.setCoords(); 
       });
     } else {
@@ -773,7 +778,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
       objs.forEach((o, i) => { 
         const obT = o.getBoundingRect().top / zoomFactor;
-        o.set({ top: o.top + ((firstT + step * i) - obT) }); 
+        o.set({ top: o.top! + ((firstT + step * i) - obT) }); 
         o.setCoords(); 
       });
     }
@@ -827,23 +832,18 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
   const getCheckedColors = () => {
     const checked = exportColors.filter((c) => c.checked).map((c) => c.color);
-    return checked.length ? checked : [bgType === 'color' ? bgColor : '#ffffff'];
+    return checked.length ? checked : [bgColor];
   };
 
   const withSwappedColor = async (color: string, fn: () => Promise<void>) => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const prevType = bgType;
     const prevColor = bgColor;
     if (bgRectRef.current) bgRectRef.current.set({ fill: color, visible: true });
-    if (bgImageRef.current) bgImageRef.current.set({ visible: false });
-    if (bgOverlayRef.current) bgOverlayRef.current.set({ visible: false });
     canvas.discardActiveObject();
     canvas.renderAll();
     await fn();
-    if (bgRectRef.current) bgRectRef.current.set({ fill: prevColor, visible: prevType === 'color' });
-    if (bgImageRef.current) bgImageRef.current.set({ visible: prevType === 'blur' });
-    if (bgOverlayRef.current) bgOverlayRef.current.set({ visible: prevType === 'blur' });
+    if (bgRectRef.current) bgRectRef.current.set({ fill: prevColor, visible: true });
     canvas.renderAll();
   };
 
@@ -1215,7 +1215,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
             </svg>
             <h1>Soundwave Poster</h1>
           </div>
-          <button className="back-btn" onClick={() => navigate('/song-poster')}>&#10229; Back</button>
+          <button className="back-btn" onClick={() => navigate('/trend-posters')}>&#10229; Back</button>
         </div>
 
         <button className={`accordion-btn${openSections.size ? ' open' : ''}`} onClick={() => toggleAccordion('size')}>
@@ -1246,67 +1246,15 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           </div>
         </div>
 
-        <button className={`accordion-btn${openSections.texts ? ' open' : ''}`} onClick={() => toggleAccordion('texts')}>
-          &#128294; Typographic Details<span className="arrow">&#9660;</span>
+        <button className={`accordion-btn${openSections.background ? ' open' : ''}`} onClick={() => toggleAccordion('background')}>
+          &#128444;&#65039; Main Background<span className="arrow">&#9660;</span>
         </button>
-        <div className={`accordion-content${openSections.texts ? ' open' : ''}`}>
+        <div className={`accordion-content${openSections.background ? ' open' : ''}`}>
           <div className="form-row">
-            <label>Top Left Text</label>
-            <input type="text" value={topLeftText}
-              onChange={(e) => updateTextContent(fabricRef.current?.textLeftRef, setTopLeftText, e.target.value)} />
-          </div>
-          <div className="form-row">
-            <label>Top Left Color</label>
+            <label>Background Color</label>
             <div className="color-row">
-              <input type="color" value={topLeftColor}
-                onChange={(e) => setTopLeftColor(e.target.value)} />
-              <input type="text" value={topLeftColor}
-                onChange={(e) => setTopLeftColor(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-row" style={{ marginTop: '12px' }}>
-            <label>Top Right Text</label>
-            <input type="text" value={topRightText}
-              onChange={(e) => updateTextContent(fabricRef.current?.textRightRef, setTopRightText, e.target.value)} />
-          </div>
-          <div className="form-row">
-            <label>Top Right Color</label>
-            <div className="color-row">
-              <input type="color" value={topRightColor}
-                onChange={(e) => setTopRightColor(e.target.value)} />
-              <input type="text" value={topRightColor}
-                onChange={(e) => setTopRightColor(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-row" style={{ marginTop: '12px' }}>
-            <label>Main Title</label>
-            <input type="text" value={mainTitleText}
-              onChange={(e) => updateTextContent(fabricRef.current?.textTitleRef, setMainTitleText, e.target.value)} />
-          </div>
-          <div className="form-row">
-            <label>Main Title Color</label>
-            <div className="color-row">
-              <input type="color" value={mainTitleColor}
-                onChange={(e) => setMainTitleColor(e.target.value)} />
-              <input type="text" value={mainTitleColor}
-                onChange={(e) => setMainTitleColor(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-row" style={{ marginTop: '12px' }}>
-            <label>Bottom Text</label>
-            <input type="text" value={bottomText}
-              onChange={(e) => updateTextContent(fabricRef.current?.textBottomRef, setBottomText, e.target.value)} />
-          </div>
-          <div className="form-row">
-            <label>Bottom Text Color</label>
-            <div className="color-row">
-              <input type="color" value={bottomColor}
-                onChange={(e) => setBottomColor(e.target.value)} />
-              <input type="text" value={bottomColor}
-                onChange={(e) => setBottomColor(e.target.value)} />
+              <input type="color" value={bgColor} onChange={(e) => updateBgColor(e.target.value)} />
+              <input type="text" value={bgColor} onChange={(e) => updateBgColor(e.target.value)} />
             </div>
           </div>
         </div>
@@ -1335,54 +1283,82 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           )}
 
           <div className="form-row">
-            <label>Wave Color</label>
-            <div className="color-row">
-              <input type="color" value={waveColor} onChange={(e) => setWaveColor(e.target.value)} />
-              <input type="text" value={waveColor} onChange={(e) => setWaveColor(e.target.value)} />
-            </div>
-          </div>
-        </div>
-
-        <button className={`accordion-btn${openSections.background ? ' open' : ''}`} onClick={() => toggleAccordion('background')}>
-          &#128444;&#65039; Main Background<span className="arrow">&#9660;</span>
-        </button>
-        <div className={`accordion-content${openSections.background ? ' open' : ''}`}>
-          <div className="form-row">
-            <label>Background Type</label>
-            <select value={bgType} onChange={(e) => setBgType(e.target.value as 'color' | 'blur')}>
-              <option value="color">Solid Color</option>
-              <option value="blur">Blurred Image</option>
+            <label>Fill Type</label>
+            <select value={waveFillType} onChange={(e) => setWaveFillType(e.target.value as 'solid' | 'gradient')}>
+              <option value="solid">Solid Color</option>
+              <option value="gradient">Gradient</option>
             </select>
           </div>
 
-          {bgType === 'color' && (
-            <div id="v-bg-color-section">
-              <div className="form-row">
-                <label>Background Color</label>
-                <div className="color-row">
-                  <input type="color" value={bgColor} onChange={(e) => updateBgColor(e.target.value)} />
-                  <input type="text" value={bgColor} onChange={(e) => updateBgColor(e.target.value)} />
-                </div>
-              </div>
-            </div>
+          {waveFillType === 'solid' && (
+             <div className="form-row">
+             <label>Solid Color</label>
+             <div className="color-row">
+               <input type="color" value={waveSolidColor} onChange={(e) => setWaveSolidColor(e.target.value)} />
+               <input type="text" value={waveSolidColor} onChange={(e) => setWaveSolidColor(e.target.value)} />
+             </div>
+           </div>
           )}
 
-          {bgType === 'blur' && (
-            <div id="v-bg-blur-section">
+          {waveFillType === 'gradient' && (
+            <>
               <div className="form-row">
-                <label>Blur</label>
-                <div className="range-row">
-                  <input type="range" min="0" max="40" value={bgBlur} onChange={(e) => updateBgBlur(Number(e.target.value))} />
-                  <span className="range-val">{bgBlur}px</span>
+                <label>Number of Colors</label>
+                <div className="pf-range-row">
+                  <input type="range" min="2" max="5" value={waveGradientStops} onChange={(e) => setWaveGradientStops(Number(e.target.value))} />
+                  <span className="pf-range-val">{waveGradientStops}</span>
                 </div>
               </div>
-              <div className="upload-area" onClick={() => document.getElementById('bg-cover-upload')?.click()} style={{ marginTop: '12px' }}>
-                <input type="file" id="bg-cover-upload" accept="image/*" onChange={handleBgCoverUpload}
-                  style={{ opacity: 0, position: 'absolute', inset: 0, cursor: 'pointer' }} />
-                <p>Click to upload image</p>
+              <div className="form-row">
+                <label>Gradient Angle</label>
+                <div className="pf-range-row">
+                  <input type="range" min="0" max="360" value={waveGradientAngle} onChange={(e) => setWaveGradientAngle(Number(e.target.value))} />
+                  <span className="pf-range-val">{waveGradientAngle}°</span>
+                </div>
               </div>
-            </div>
+              {[...Array(waveGradientStops)].map((_, i) => (
+                <div className="form-row" key={`grad-stop-${i}`}>
+                  <label>Color {i + 1}</label>
+                  <div className="color-row">
+                    <input type="color" value={waveGradientColors[i]} onChange={(e) => updateGradientColor(i, e.target.value)} />
+                    <input type="text" value={waveGradientColors[i]} onChange={(e) => updateGradientColor(i, e.target.value)} />
+                  </div>
+                </div>
+              ))}
+            </>
           )}
+
+          <div className="form-row">
+            <label>Line Density</label>
+            <div className="pf-range-row">
+              <input type="range" min="50" max="800" step="10" value={waveDensity} onChange={(e) => setWaveDensity(Number(e.target.value))} />
+              <span className="pf-range-val">{waveDensity}</span>
+            </div>
+          </div>
+          
+          <div className="form-row">
+            <label>Line Thickness</label>
+            <div className="pf-range-row">
+              <input type="range" min="0.5" max="10" step="0.5" value={waveThickness} onChange={(e) => setWaveThickness(Number(e.target.value))} />
+              <span className="pf-range-val">{waveThickness}px</span>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <label>Wave Height Scale (%)</label>
+            <div className="pf-range-row">
+              <input type="range" min="10" max="250" value={waveHeightScale} onChange={(e) => setWaveHeightScale(Number(e.target.value))} />
+              <span className="pf-range-val">{waveHeightScale}%</span>
+            </div>
+          </div>
+
+          <div className="form-row">
+            <label>Wave Width Scale (%)</label>
+            <div className="pf-range-row">
+              <input type="range" min="10" max="100" value={waveWidthScale} onChange={(e) => setWaveWidthScale(Number(e.target.value))} />
+              <span className="pf-range-val">{waveWidthScale}%</span>
+            </div>
+          </div>
         </div>
 
         <button className={`accordion-btn${openSections.multiExport ? ' open' : ''}`} onClick={() => toggleAccordion('multiExport')}>
@@ -1438,7 +1414,10 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
             {selectedType === EDIT_TYPES.TOP_LEFT && 'Top Left Text'}
             {selectedType === EDIT_TYPES.TOP_RIGHT && 'Top Right Text'}
             {selectedType === EDIT_TYPES.MAIN_TITLE && 'Main Title'}
-            {selectedType === EDIT_TYPES.BOTTOM && 'Bottom Text'}
+            {selectedType === EDIT_TYPES.SUB_TITLE && 'Subtitle'}
+            {selectedType === EDIT_TYPES.DIVIDER && 'Divider Line'}
+            {selectedType === EDIT_TYPES.BOTTOM_1 && 'Bottom Text 1'}
+            {selectedType === EDIT_TYPES.BOTTOM_2 && 'Bottom Text 2'}
             {selectedType === EDIT_TYPES.SOUNDWAVE && 'Soundwave'}
             {selectedType === 'group' && 'Group'}
             {selectedType === 'multi' && 'Multiple'}
@@ -1662,47 +1641,158 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
             </div>
           )}
 
-          {selectedType === EDIT_TYPES.BOTTOM && (
+          {selectedType === EDIT_TYPES.SUB_TITLE && (
             <div id="props-fields">
               <div className="pf-section">
-                <div className="pf-section-title">Bottom Text</div>
+                <div className="pf-section-title">Subtitle</div>
                 <div className="pf-row">
                   <label>Text</label>
-                  <input type="text" value={bottomText}
-                    onChange={(e) => setBottomText(e.target.value)} />
+                  <input type="text" value={subTitleText}
+                    onChange={(e) => setSubTitleText(e.target.value)} />
                 </div>
                 <div className="pf-row">
                   <label>Font Family</label>
-                  <select value={bottomFontFamily} onChange={(e) => setBottomFontFamily(e.target.value)}>
+                  <select value={subTitleFontFamily} onChange={(e) => setSubTitleFontFamily(e.target.value)}>
                     <option value="DM Sans, sans-serif">DM Sans</option>
                     {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
                   </select>
                 </div>
                 <div className="pf-row">
                   <label>Font Style</label>
-                  <FontStyleSelector weight={bottomFontWeight} style={bottomFontStyle} onChange={(w, s) => { setBottomFontWeight(w); setBottomFontStyle(s); }} />
+                  <FontStyleSelector weight={subTitleFontWeight} style={subTitleFontStyle} onChange={(w, s) => { setSubTitleFontWeight(w); setSubTitleFontStyle(s); }} />
                 </div>
                 <div className="pf-row">
                   <label>Font Size</label>
                   <div className="pf-range-row">
-                    <input type="range" min="8" max="72" value={bottomFontSize} onChange={(e) => setBottomFontSize(Number(e.target.value))} />
-                    <span className="pf-range-val">{bottomFontSize}px</span>
+                    <input type="range" min="8" max="72" value={subTitleFontSize} onChange={(e) => setSubTitleFontSize(Number(e.target.value))} />
+                    <span className="pf-range-val">{subTitleFontSize}px</span>
                   </div>
                 </div>
                 <div className="pf-row">
                   <label>Letter Spacing</label>
                   <div className="pf-range-row">
-                    <input type="range" min="0" max="400" step="10" value={bottomCharSpacing} onChange={(e) => setBottomCharSpacing(Number(e.target.value))} />
-                    <span className="pf-range-val">{bottomCharSpacing}</span>
+                    <input type="range" min="0" max="400" step="10" value={subTitleCharSpacing} onChange={(e) => setSubTitleCharSpacing(Number(e.target.value))} />
+                    <span className="pf-range-val">{subTitleCharSpacing}</span>
                   </div>
                 </div>
                 <div className="pf-row">
                   <label>Color</label>
                   <div className="pf-color-row">
-                    <input type="color" value={bottomColor}
-                      onChange={(e) => setBottomColor(e.target.value)} />
-                    <input type="text" value={bottomColor}
-                      onChange={(e) => setBottomColor(e.target.value)} />
+                    <input type="color" value={subTitleColor}
+                      onChange={(e) => setSubTitleColor(e.target.value)} />
+                    <input type="text" value={subTitleColor}
+                      onChange={(e) => setSubTitleColor(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedType === EDIT_TYPES.DIVIDER && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Divider Line</div>
+                <div className="pf-row">
+                  <label>Color</label>
+                  <div className="pf-color-row">
+                    <input type="color" value={dividerColor}
+                      onChange={(e) => setDividerColor(e.target.value)} />
+                    <input type="text" value={dividerColor}
+                      onChange={(e) => setDividerColor(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedType === EDIT_TYPES.BOTTOM_1 && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Bottom Text 1</div>
+                <div className="pf-row">
+                  <label>Text</label>
+                  <input type="text" value={bottom1Text}
+                    onChange={(e) => setBottom1Text(e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Family</label>
+                  <select value={bottom1FontFamily} onChange={(e) => setBottom1FontFamily(e.target.value)}>
+                    <option value="DM Sans, sans-serif">DM Sans</option>
+                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+                <div className="pf-row">
+                  <label>Font Style</label>
+                  <FontStyleSelector weight={bottom1FontWeight} style={bottom1FontStyle} onChange={(w, s) => { setBottom1FontWeight(w); setBottom1FontStyle(s); }} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Size</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="6" max="72" value={bottom1FontSize} onChange={(e) => setBottom1FontSize(Number(e.target.value))} />
+                    <span className="pf-range-val">{bottom1FontSize}px</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Letter Spacing</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="0" max="400" step="10" value={bottom1CharSpacing} onChange={(e) => setBottom1CharSpacing(Number(e.target.value))} />
+                    <span className="pf-range-val">{bottom1CharSpacing}</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Color</label>
+                  <div className="pf-color-row">
+                    <input type="color" value={bottom1Color}
+                      onChange={(e) => setBottom1Color(e.target.value)} />
+                    <input type="text" value={bottom1Color}
+                      onChange={(e) => setBottom1Color(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedType === EDIT_TYPES.BOTTOM_2 && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Bottom Text 2</div>
+                <div className="pf-row">
+                  <label>Text</label>
+                  <input type="text" value={bottom2Text}
+                    onChange={(e) => setBottom2Text(e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Family</label>
+                  <select value={bottom2FontFamily} onChange={(e) => setBottom2FontFamily(e.target.value)}>
+                    <option value="DM Sans, sans-serif">DM Sans</option>
+                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+                <div className="pf-row">
+                  <label>Font Style</label>
+                  <FontStyleSelector weight={bottom2FontWeight} style={bottom2FontStyle} onChange={(w, s) => { setBottom2FontWeight(w); setBottom2FontStyle(s); }} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Size</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="6" max="72" value={bottom2FontSize} onChange={(e) => setBottom2FontSize(Number(e.target.value))} />
+                    <span className="pf-range-val">{bottom2FontSize}px</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Letter Spacing</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="0" max="400" step="10" value={bottom2CharSpacing} onChange={(e) => setBottom2CharSpacing(Number(e.target.value))} />
+                    <span className="pf-range-val">{bottom2CharSpacing}</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Color</label>
+                  <div className="pf-color-row">
+                    <input type="color" value={bottom2Color}
+                      onChange={(e) => setBottom2Color(e.target.value)} />
+                    <input type="text" value={bottom2Color}
+                      onChange={(e) => setBottom2Color(e.target.value)} />
                   </div>
                 </div>
               </div>
@@ -1715,53 +1805,36 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
                 <div className="pf-section-title">Soundwave Styling</div>
                 
                 <div className="pf-row">
-                  <label>Bar Count</label>
+                  <label>Line Density (Details)</label>
                   <div className="pf-range-row">
-                    <input type="range" min="10" max="200" value={waveBarCount} onChange={(e) => setWaveBarCount(Number(e.target.value))} />
-                    <span className="pf-range-val">{waveBarCount}</span>
+                    <input type="range" min="50" max="800" step="10" value={waveDensity} onChange={(e) => setWaveDensity(Number(e.target.value))} />
+                    <span className="pf-range-val">{waveDensity}</span>
                   </div>
                 </div>
 
                 <div className="pf-row">
-                  <label>Bar Width</label>
+                  <label>Line Thickness</label>
                   <div className="pf-range-row">
-                    <input type="range" min="1" max="20" step="0.5" value={waveBarWidth} onChange={(e) => setWaveBarWidth(Number(e.target.value))} />
-                    <span className="pf-range-val">{waveBarWidth}px</span>
-                  </div>
-                </div>
-
-                <div className="pf-row">
-                  <label>Bar Gap</label>
-                  <div className="pf-range-row">
-                    <input type="range" min="0" max="10" step="0.5" value={waveBarGap} onChange={(e) => setWaveBarGap(Number(e.target.value))} />
-                    <span className="pf-range-val">{waveBarGap}px</span>
-                  </div>
-                </div>
-
-                <div className="pf-row">
-                  <label>Corner Radius</label>
-                  <div className="pf-range-row">
-                    <input type="range" min="0" max="10" value={waveBarRadius} onChange={(e) => setWaveBarRadius(Number(e.target.value))} />
-                    <span className="pf-range-val">{waveBarRadius}px</span>
+                    <input type="range" min="0.5" max="10" step="0.5" value={waveThickness} onChange={(e) => setWaveThickness(Number(e.target.value))} />
+                    <span className="pf-range-val">{waveThickness}px</span>
                   </div>
                 </div>
 
                 <div className="pf-row">
                   <label>Max Height Scale (%)</label>
                   <div className="pf-range-row">
-                    <input type="range" min="10" max="200" value={waveHeightScale} onChange={(e) => setWaveHeightScale(Number(e.target.value))} />
+                    <input type="range" min="10" max="250" value={waveHeightScale} onChange={(e) => setWaveHeightScale(Number(e.target.value))} />
                     <span className="pf-range-val">{waveHeightScale}%</span>
                   </div>
                 </div>
 
                 <div className="pf-row">
-                  <label>Wave Color</label>
-                  <div className="color-row">
-                    <input type="color" value={waveColor} onChange={(e) => setWaveColor(e.target.value)} />
-                    <input type="text" value={waveColor} onChange={(e) => setWaveColor(e.target.value)} />
+                  <label>Wave Width Scale (%)</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="10" max="100" value={waveWidthScale} onChange={(e) => setWaveWidthScale(Number(e.target.value))} />
+                    <span className="pf-range-val">{waveWidthScale}%</span>
                   </div>
                 </div>
-
               </div>
             </div>
           )}
