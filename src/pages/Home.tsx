@@ -15,12 +15,11 @@ interface Product {
 
 const CATEGORIES = ["ALL", "ABSTRACT", "CYBERPUNK", "MINIMALIST", "NATURE"];
 
-// CARD 1: ROOM VISUALIZER SIMULATOR
 function RoomVisualizerPreview() {
   const [activeFrame, setActiveFrame] = useState(0);
   const frames = [
-    "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=400&q=80", // Living room
-    "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=80", // Bedroom
+    "https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?auto=format&fit=crop&w=400&q=80",
+    "https://images.unsplash.com/photo-1616486338812-3dadae4b4ace?auto=format&fit=crop&w=400&q=80",
   ];
 
   useEffect(() => {
@@ -49,7 +48,6 @@ function RoomVisualizerPreview() {
   );
 }
 
-// CARD 2: AI PROMPT TYPEWRITER SIMULATOR
 function PromptTyper() {
   const prompts = [
     "A futuristic cyberpunk street in neon purple and indigo...",
@@ -136,11 +134,9 @@ function PromptTyper() {
   );
 }
 
-// CARD 3: MUSIC POSTERS ROTATING VINYL SIMULATOR
 function MusicPosterPreview() {
   return (
     <div className="relative w-full h-28 rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950/80 p-4 flex items-center justify-between gap-4">
-      {/* Mini Poster layout */}
       <div className="w-16 h-20 rounded bg-zinc-900 border border-zinc-800 p-1 flex flex-col justify-between shrink-0 relative shadow-md">
         <div className="aspect-square bg-gradient-to-br from-indigo-500 via-zinc-800 to-purple-600 rounded relative overflow-hidden border border-zinc-800">
           <div className="absolute inset-0 flex items-center justify-center text-[7px] font-black text-white uppercase tracking-tighter">BEAT</div>
@@ -153,8 +149,6 @@ function MusicPosterPreview() {
           <span>||||| | ||||</span>
         </div>
       </div>
-
-      {/* Rotating Vinyl Disc */}
       <div className="relative w-20 h-20 flex items-center justify-center shrink-0">
         <div className="w-20 h-20 rounded-full bg-zinc-950 border border-zinc-800 shadow-2xl flex items-center justify-center relative overflow-hidden animate-spin-slow">
           <div className="absolute inset-1 rounded-full border border-zinc-900" />
@@ -176,15 +170,13 @@ export function Home() {
   const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
-    console.log("[LOG] Home: Fetching global marketplace collection...");
     const fetchProducts = async () => {
       try {
         const res = await fetch('https://api.posterwallart.shop/api.php?action=get_products');
         const data = await res.json();
         setProducts(data.products || []);
-        console.log("[LOG] Home: Marketplace data received", data.products?.length);
       } catch (error) {
-        console.error("[ERROR] Home: Failed to fetch products", error);
+        console.error("Failed to fetch products", error);
       } finally {
         setLoading(false);
       }
@@ -202,7 +194,6 @@ export function Home() {
   return (
     <div className="min-h-screen bg-zinc-950 text-zinc-50 font-sans relative overflow-x-hidden">
       
-      {/* AMBIENT GLOWING ORBS */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
         <div className="absolute top-[10%] left-[10%] w-[350px] h-[350px] bg-indigo-500/10 blur-[100px] rounded-full animate-pulse-glow" />
         <div className="absolute top-[30%] right-[5%] w-[450px] h-[450px] bg-purple-500/5 blur-[120px] rounded-full animate-float" />
@@ -210,11 +201,9 @@ export function Home() {
       </div>
 
       <div className="relative z-10">
-        {/* HERO SECTION */}
         <section className="pt-24 pb-20 px-6 max-w-7xl mx-auto">
           <div className="text-center">
             
-            {/* Redesign Live Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-zinc-900/60 border border-zinc-800 backdrop-blur-md mb-8 shadow-2xl animate-float">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
@@ -223,7 +212,6 @@ export function Home() {
               <span className="text-[10px] font-black uppercase tracking-[0.25em] text-zinc-300">Elite AI Art Marketplace v2.0</span>
             </div>
             
-            {/* Premium Headline */}
             <h1 className="text-5xl md:text-8xl font-black tracking-tighter mb-8 leading-[0.9] uppercase text-zinc-50">
               Art Redefined <br /> By <span className="text-transparent bg-clip-text bg-gradient-to-r from-indigo-300 via-purple-400 to-indigo-500">Intelligence</span>
             </h1>
@@ -233,10 +221,8 @@ export function Home() {
               advanced architectural tools to design art specifically for your walls.
             </p>
 
-            {/* FOUR MAIN SERVICE CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-32 max-w-7xl mx-auto">
               
-              {/* CARD 1: AI ROOM DESIGNER */}
               <Link to="/special" className="group relative bg-zinc-900/40 border border-zinc-800 p-6 lg:p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
                 <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <div className="relative z-10 text-left flex flex-col gap-4">
@@ -250,12 +236,7 @@ export function Home() {
                     </p>
                   </div>
                 </div>
-                
-                {/* Visual Preview */}
-                <div className="relative z-10">
-                  <RoomVisualizerPreview />
-                </div>
-
+                <div className="relative z-10"><RoomVisualizerPreview /></div>
                 <div className="relative z-10 text-left mt-auto">
                   <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-[10px] lg:text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
                     Design For Room <ArrowRight className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
@@ -263,7 +244,6 @@ export function Home() {
                 </div>
               </Link>
 
-              {/* CARD 2: HD CREATOR LAB */}
               <Link to="/lab" className="group relative bg-zinc-900/40 border border-zinc-800 p-6 lg:p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
                 <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <div className="relative z-10 text-left flex flex-col gap-4">
@@ -277,12 +257,7 @@ export function Home() {
                     </p>
                   </div>
                 </div>
-
-                {/* Visual Preview */}
-                <div className="relative z-10">
-                  <PromptTyper />
-                </div>
-
+                <div className="relative z-10"><PromptTyper /></div>
                 <div className="relative z-10 text-left mt-auto">
                   <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-[10px] lg:text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
                     Open Creator Lab <ArrowRight className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
@@ -290,7 +265,6 @@ export function Home() {
                 </div>
               </Link>
 
-              {/* CARD 3: CUSTOM MUSIC POSTERS */}
               <Link to="/music-posters" className="group relative bg-zinc-900/40 border border-zinc-800 p-6 lg:p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
                 <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <div className="relative z-10 text-left flex flex-col gap-4">
@@ -304,12 +278,7 @@ export function Home() {
                     </p>
                   </div>
                 </div>
-
-                {/* Visual Preview */}
-                <div className="relative z-10">
-                  <MusicPosterPreview />
-                </div>
-
+                <div className="relative z-10"><MusicPosterPreview /></div>
                 <div className="relative z-10 text-left mt-auto">
                   <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-[10px] lg:text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
                     Start Designing <ArrowRight className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
@@ -317,7 +286,6 @@ export function Home() {
                 </div>
               </Link>
 
-              {/* CARD 4: TREND POSTERS (NEW) */}
               <Link to="/trend-posters" className="group relative bg-zinc-900/40 border border-zinc-800 p-6 lg:p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
                 <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                 <div className="relative z-10 text-left flex flex-col gap-4">
@@ -331,10 +299,7 @@ export function Home() {
                     </p>
                   </div>
                 </div>
-
-                {/* Visual Preview */}
                 <div className="relative z-10 w-full h-28 rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-950/80 p-4 flex items-center justify-center gap-1.5 shadow-inner">
-                  {/* Soundwave animation preview */}
                   {[...Array(12)].map((_, i) => (
                     <div 
                       key={i} 
@@ -346,7 +311,6 @@ export function Home() {
                     />
                   ))}
                 </div>
-
                 <div className="relative z-10 text-left mt-auto">
                   <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-[10px] lg:text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
                     Explore Trends <ArrowRight className="w-3 h-3 lg:w-3.5 lg:h-3.5" />
@@ -355,96 +319,10 @@ export function Home() {
               </Link>
 
             </div>
-              
-              {/* CARD 1: AI ROOM DESIGNER */}
-              <Link to="/special" className="group relative bg-zinc-900/40 border border-zinc-800 p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
-                <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="relative z-10 text-left flex flex-col gap-4">
-                  <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20">
-                    <Camera className="w-6 h-6 text-indigo-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black tracking-tight mb-2 uppercase text-zinc-100">AI Room Designer</h2>
-                    <p className="text-zinc-500 text-xs font-bold leading-normal">
-                      Upload a photo of your space. Our AI analyzes lighting and perspective to visualize the perfect posters on your walls.
-                    </p>
-                  </div>
-                </div>
-                
-                {/* Visual Preview */}
-                <div className="relative z-10">
-                  <RoomVisualizerPreview />
-                </div>
-
-                <div className="relative z-10 text-left">
-                  <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
-                    Design For Room <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </Link>
-
-              {/* CARD 2: HD CREATOR LAB */}
-              <Link to="/lab" className="group relative bg-zinc-900/40 border border-zinc-800 p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
-                <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="relative z-10 text-left flex flex-col gap-4">
-                  <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20">
-                    <Sparkles className="w-6 h-6 text-indigo-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black tracking-tight mb-2 uppercase text-zinc-100">HD Creator Lab</h2>
-                    <p className="text-zinc-500 text-xs font-bold leading-normal">
-                      Generate premium posters using prompts. Upscale your designs to ultra-high resolution and convert them to vector files.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Visual Preview */}
-                <div className="relative z-10">
-                  <PromptTyper />
-                </div>
-
-                <div className="relative z-10 text-left">
-                  <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
-                    Open Creator Lab <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </Link>
-
-              {/* CARD 3: CUSTOM MUSIC POSTERS */}
-              <Link to="/music-posters" className="group relative bg-zinc-900/40 border border-zinc-800 p-8 rounded-3xl overflow-hidden transition-all duration-300 hover:border-indigo-500/50 hover:bg-zinc-900/70 shadow-2xl flex flex-col justify-between gap-6">
-                <div className="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                <div className="relative z-10 text-left flex flex-col gap-4">
-                  <div className="w-12 h-12 bg-indigo-500/10 rounded-2xl flex items-center justify-center border border-indigo-500/20">
-                    <Music className="w-6 h-6 text-indigo-400" />
-                  </div>
-                  <div>
-                    <h2 className="text-2xl font-black tracking-tight mb-2 uppercase text-zinc-100">Custom Music Posters</h2>
-                    <p className="text-zinc-500 text-xs font-bold leading-normal">
-                      Design stunning Album Cover layouts or Spotify-style Song posters. Personalize colors, layouts, and barcodes instantly.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Visual Preview */}
-                <div className="relative z-10">
-                  <MusicPosterPreview />
-                </div>
-
-                <div className="relative z-10 text-left">
-                  <span className="inline-flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-wider group-hover:gap-4 transition-all">
-                    Start Designing <ArrowRight className="w-3.5 h-3.5" />
-                  </span>
-                </div>
-              </Link>
-
-            </div>
           </div>
         </section>
 
-        {/* MARKETPLACE SECTION */}
         <section className="max-w-7xl mx-auto px-6 pb-24">
-          
-          {/* Header & Filter Controls */}
           <div className="flex flex-col gap-8 md:flex-row md:items-end md:justify-between mb-16 border-b border-zinc-900 pb-8">
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -456,9 +334,7 @@ export function Home() {
               <p className="text-zinc-500 text-xs font-bold uppercase tracking-wider">Discover & Buy Community Masterpieces</p>
             </div>
 
-            {/* Filter Tabs & Search */}
             <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
-              {/* Category selector */}
               <div className="flex items-center bg-zinc-900/60 border border-zinc-800/80 p-1 rounded-full relative w-full sm:w-auto overflow-hidden">
                 {CATEGORIES.map((cat) => (
                   <button
@@ -480,7 +356,6 @@ export function Home() {
                 ))}
               </div>
 
-              {/* Search Bar */}
               <div className="flex bg-zinc-900 border border-zinc-800 rounded-full px-4 py-2 items-center gap-2 w-full sm:w-auto">
                 <Search className="w-3.5 h-3.5 text-zinc-500" />
                 <input 
@@ -494,7 +369,6 @@ export function Home() {
             </div>
           </div>
 
-          {/* Product Grid */}
           {loading ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
               {[...Array(8)].map((_, i) => (
@@ -513,30 +387,22 @@ export function Home() {
                     transition={{ duration: 0.3 }}
                     key={product.id} 
                     className="group cursor-pointer"
-                    onClick={() => console.log("[LOG] Home: Viewing product", product.id)}
                   >
                     <div className="relative aspect-[4/5] overflow-hidden rounded-3xl bg-zinc-900 border border-zinc-800 mb-4 shadow-2xl transition-all duration-300 group-hover:border-indigo-500/30">
-                      
-                      {/* Image scale hover */}
                       <img 
                         src={product.thumbnail || product.image} 
                         alt={product.title} 
                         className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
-                      
-                      {/* Hover Overlay */}
                       <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col justify-end p-6">
                         <button className="w-full py-3 bg-zinc-50 hover:bg-zinc-200 text-zinc-950 font-bold text-xs uppercase rounded-full shadow-2xl flex items-center justify-center gap-2 transform translate-y-3 group-hover:translate-y-0 transition-transform duration-300 cursor-pointer">
                           <Eye className="w-3.5 h-3.5" /> Quick View
                         </button>
                       </div>
-
-                      {/* Floating Price badge */}
                       <div className="absolute top-4 right-4 bg-zinc-950/70 backdrop-blur-md border border-zinc-800/80 px-3 py-1.5 rounded-xl">
                         <span className="text-xs font-black text-indigo-300 tracking-tight">${product.price}</span>
                       </div>
                     </div>
-
                     <div className="px-3">
                       <div className="flex items-center justify-between gap-2 mb-1.5">
                         <span className="text-[9px] font-black text-indigo-400 uppercase tracking-widest">{product.category}</span>
@@ -552,7 +418,6 @@ export function Home() {
             </div>
           )}
 
-          {/* Empty Results state */}
           {!loading && filteredProducts.length === 0 && (
             <div className="text-center py-20 border border-dashed border-zinc-800 rounded-3xl bg-zinc-900/10">
               <Search className="w-8 h-8 text-zinc-600 mx-auto mb-4" />
@@ -560,18 +425,13 @@ export function Home() {
             </div>
           )}
 
-          {/* Explore Button */}
           <div className="mt-16 text-center">
-            <button 
-              className="px-8 py-4 bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 rounded-2xl text-[10px] font-black uppercase tracking-[0.25em] hover:bg-zinc-900 transition-all cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.4)]"
-              onClick={() => console.log("[LOG] Home: Loading more products")}
-            >
+            <button className="px-8 py-4 bg-zinc-900/50 border border-zinc-800 hover:border-zinc-700 rounded-2xl text-[10px] font-black uppercase tracking-[0.25em] hover:bg-zinc-900 transition-all cursor-pointer shadow-[0_4px_20px_rgba(0,0,0,0.4)]">
               Explore Full Collection
             </button>
           </div>
         </section>
 
-        {/* TRUST & VALUES GRID */}
         <section className="border-t border-zinc-900 bg-zinc-950/60 relative overflow-hidden py-24">
           <div className="absolute inset-0 bg-grid-dots opacity-40 pointer-events-none" />
           <div className="max-w-6xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-12 relative z-10">
@@ -605,7 +465,6 @@ export function Home() {
           </div>
         </section>
 
-        {/* VIP BANNER / NEWSLETTER */}
         <section className="max-w-5xl mx-auto px-6 py-24">
           <div className="relative rounded-3xl border border-zinc-800 bg-zinc-900/30 backdrop-blur-xl p-8 md:p-12 overflow-hidden shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8">
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/5 via-purple-500/5 to-transparent pointer-events-none" />
