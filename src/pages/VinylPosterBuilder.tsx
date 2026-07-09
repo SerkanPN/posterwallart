@@ -83,7 +83,7 @@ function fitContain(wIn, hIn, maxW, maxH) {
 }
 
 function buildGrooveSpiralChars(text, opts) {
-  const { cx, cy, innerRadius, outerRadius, fontSize, color, fontFamily, letterSpacing } = opts;
+  const { cx, cy, innerRadius, outerRadius, fontSize, color, fontFamily, letterSpacing, fontWeight, fontStyle } = opts;
   
   const clean = (text || '')
     .replace(/[\r\n]+/g, ' - ')
@@ -120,7 +120,8 @@ function buildGrooveSpiralChars(text, opts) {
         fontSize,
         fill: color,
         fontFamily,
-        fontWeight: 700,
+        fontWeight: fontWeight,
+        fontStyle: fontStyle,
         originX: 'center',
         originY: 'center',
         angle: rotationDeg,
@@ -135,6 +136,30 @@ function buildGrooveSpiralChars(text, opts) {
   }
   return chars;
 }
+
+const FontStyleSelector = ({ weight, style, onChange }) => (
+  <select value={`${weight}-${style}`} onChange={(e) => {
+    const [w, s] = e.target.value.split('-');
+    onChange(w, s);
+  }}>
+    <option value="100-normal">Thin (100)</option>
+    <option value="100-italic">Thin Italic</option>
+    <option value="300-normal">Light (300)</option>
+    <option value="300-italic">Light Italic</option>
+    <option value="400-normal">Regular (400)</option>
+    <option value="400-italic">Italic (400)</option>
+    <option value="500-normal">Medium (500)</option>
+    <option value="500-italic">Medium Italic</option>
+    <option value="600-normal">Semi-Bold (600)</option>
+    <option value="600-italic">Semi-Bold Italic</option>
+    <option value="700-normal">Bold (700)</option>
+    <option value="700-italic">Bold Italic</option>
+    <option value="800-normal">Extra-Bold (800)</option>
+    <option value="800-italic">Extra-Bold Italic</option>
+    <option value="900-normal">Black (900)</option>
+    <option value="900-italic">Black Italic</option>
+  </select>
+);
 
 export default function VinylPosterPage({ navigate }) {
   const canvasElRef = useRef(null);
@@ -168,7 +193,7 @@ export default function VinylPosterPage({ navigate }) {
 
   const [topLeftText, setTopLeftText] = useState('ARTIST NAME');
   const [topLeftColor, setTopLeftColor] = useState('#212121');
-  const [topLeftFontFamily, setTopLeftFontFamily] = useState('DM Sans, sans-serif');
+  const [topLeftFontFamily, setTopLeftFontFamily] = useState('Montserrat, sans-serif');
   const [topLeftFontSize, setTopLeftFontSize] = useState(18);
   const [topLeftCharSpacing, setTopLeftCharSpacing] = useState(100);
   const [topLeftFontWeight, setTopLeftFontWeight] = useState('700');
@@ -176,7 +201,7 @@ export default function VinylPosterPage({ navigate }) {
 
   const [topRightText, setTopRightText] = useState('1992');
   const [topRightColor, setTopRightColor] = useState('#212121');
-  const [topRightFontFamily, setTopRightFontFamily] = useState('DM Sans, sans-serif');
+  const [topRightFontFamily, setTopRightFontFamily] = useState('Montserrat, sans-serif');
   const [topRightFontSize, setTopRightFontSize] = useState(18);
   const [topRightCharSpacing, setTopRightCharSpacing] = useState(100);
   const [topRightFontWeight, setTopRightFontWeight] = useState('700');
@@ -184,10 +209,10 @@ export default function VinylPosterPage({ navigate }) {
 
   const [bottomText, setBottomText] = useState('UNKNOWN ALBUM');
   const [bottomColor, setBottomColor] = useState('#555555');
-  const [bottomFontFamily, setBottomFontFamily] = useState('DM Sans, sans-serif');
+  const [bottomFontFamily, setBottomFontFamily] = useState('Montserrat, sans-serif');
   const [bottomFontSize, setBottomFontSize] = useState(14);
   const [bottomCharSpacing, setBottomCharSpacing] = useState(50);
-  const [bottomFontWeight, setBottomFontWeight] = useState('600');
+  const [bottomFontWeight, setBottomFontWeight] = useState('700');
   const [bottomFontStyle, setBottomFontStyle] = useState('normal');
 
   const [songTitleText, setSongTitleText] = useState('SONG NAME');
@@ -195,16 +220,18 @@ export default function VinylPosterPage({ navigate }) {
   const [songTitleFontFamily, setSongTitleFontFamily] = useState('Josefin Sans, sans-serif');
   const [songTitleFontSize, setSongTitleFontSize] = useState(36);
   const [songTitleCharSpacing, setSongTitleCharSpacing] = useState(100);
-  const [songTitleFontWeight, setSongTitleFontWeight] = useState('800');
+  const [songTitleFontWeight, setSongTitleFontWeight] = useState('700');
   const [songTitleFontStyle, setSongTitleFontStyle] = useState('normal');
 
   const [vinylScale, setVinylScale] = useState(78); 
-  const [vinylFontFamily, setVinylFontFamily] = useState('DM Sans, sans-serif');
+  const [vinylFontFamily, setVinylFontFamily] = useState('Josefin Sans, sans-serif');
   const [vinylTextColor, setVinylTextColor] = useState('#181818');
   const [vinylTextSize, setVinylTextSize] = useState(12);
   const [vinylLetterSpacing, setVinylLetterSpacing] = useState(0);
   const [vinylLabelColor, setVinylLabelColor] = useState('#e8e8e8');
   const [vinylLabelSize, setVinylLabelSize] = useState(12.5);
+  const [vinylFontWeight, setVinylFontWeight] = useState('400');
+  const [vinylFontStyle, setVinylFontStyle] = useState('normal');
   const [vinylLyrics, setVinylLyrics] = useState(
     'LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA'
   );
@@ -219,7 +246,6 @@ export default function VinylPosterPage({ navigate }) {
   );
 
   const [selectedType, setSelectedType] = useState(null);
-  const [alignBarVisible, setAlignBarVisible] = useState(false);
   const [toast, setToast] = useState('');
 
   const showToast = useCallback((msg) => {
@@ -328,7 +354,7 @@ export default function VinylPosterPage({ navigate }) {
     canvas.textSongRef = songTitle;
     canvas.textBottomRef = bottom;
 
-    buildVinylGroup(canvas, containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing);
+    buildVinylGroup(canvas, containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing, vinylFontWeight, vinylFontStyle);
 
     canvas.on('selection:created', onSelectionChange);
     canvas.on('selection:updated', onSelectionChange);
@@ -342,7 +368,6 @@ export default function VinylPosterPage({ navigate }) {
       }
       
       setSelectedType(null);
-      setAlignBarVisible(false);
     });
 
     canvas.on('text:changed', (e) => {
@@ -358,8 +383,9 @@ export default function VinylPosterPage({ navigate }) {
       }
     });
 
+    const fontWeightsStr = ':100,100i,300,300i,400,400i,500,500i,600,600i,700,700i,800,800i,900,900i';
     const link = document.createElement('link');
-    link.href = `https://fonts.googleapis.com/css?family=${GOOGLE_FONTS.map(f => f.replace(/ /g, '+') + ':300,300i,400,400i,600,600i,700,700i,800,800i').join('|')}&display=swap`;
+    link.href = `https://fonts.googleapis.com/css?family=${GOOGLE_FONTS.map(f => f.replace(/ /g, '+') + fontWeightsStr).join('|')}&display=swap`;
     link.rel = 'stylesheet';
     document.head.appendChild(link);
 
@@ -383,7 +409,7 @@ export default function VinylPosterPage({ navigate }) {
     if (isRebuildingRef.current) return;
     const obj = e.selected && e.selected.length === 1 ? e.selected[0] : null;
     if (obj) {
-      if (obj.data) {
+      if (obj.data && obj.data.edType) {
         setSelectedType(obj.data.edType);
       } else if (obj.type === 'group') {
         setSelectedType('group');
@@ -393,10 +419,9 @@ export default function VinylPosterPage({ navigate }) {
     } else {
       setSelectedType('multi');
     }
-    setAlignBarVisible(true);
   }
 
-  function buildVinylGroup(canvas, dims, textSize, lyrics, scalePct, fontFam, textCol, labelCol, labelPct, letterSpc) {
+  function buildVinylGroup(canvas, dims, textSize, lyrics, scalePct, fontFam, textCol, labelCol, labelPct, letterSpc, fWeight, fStyle) {
     isRebuildingRef.current = true;
     
     const wasSelected = vinylGroupRef.current && canvas.getActiveObject() === vinylGroupRef.current;
@@ -461,6 +486,8 @@ export default function VinylPosterPage({ navigate }) {
       fontSize: adjustedTextSize,
       color: textCol,
       fontFamily: fontFam,
+      fontWeight: fWeight,
+      fontStyle: fStyle,
       letterSpacing: letterSpc
     });
 
@@ -471,6 +498,7 @@ export default function VinylPosterPage({ navigate }) {
         top: dims.height * 0.58,
         originX: 'center',
         originY: 'center',
+        objectCaching: true,
         data: { edType: EDIT_TYPES.VINYL },
       }
     );
@@ -482,15 +510,15 @@ export default function VinylPosterPage({ navigate }) {
       canvas.setActiveObject(group);
     }
     
-    canvas.renderAll();
+    canvas.requestRenderAll();
     isRebuildingRef.current = false;
   }
 
   const rebuildVinyl = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    buildVinylGroup(canvas, containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing);
-  }, [containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing]);
+    buildVinylGroup(canvas, containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing, vinylFontWeight, vinylFontStyle);
+  }, [containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing, vinylFontWeight, vinylFontStyle]);
 
   const updateCanvasSize = (value) => {
     setCanvasSize(value);
@@ -507,14 +535,14 @@ export default function VinylPosterPage({ navigate }) {
     canvas.textRightRef.set({ left: dims.width * 0.92, top: dims.height * 0.08 });
     canvas.textSongRef.set({ left: dims.width / 2, top: dims.height * 0.12, width: dims.width * 0.84 });
     canvas.textBottomRef.set({ left: dims.width / 2, top: dims.height * 0.92 });
-    buildVinylGroup(canvas, dims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing);
-    canvas.renderAll();
+    buildVinylGroup(canvas, dims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing, vinylFontWeight, vinylFontStyle);
+    canvas.requestRenderAll();
   };
 
   const updateTextContent = (ref, setter, value) => {
     setter(value);
     ref.set({ text: value });
-    fabricRef.current && fabricRef.current.renderAll();
+    fabricRef.current && fabricRef.current.requestRenderAll();
   };
 
   useEffect(() => {
@@ -530,7 +558,7 @@ export default function VinylPosterPage({ navigate }) {
         fontWeight: topLeftFontWeight,
         fontStyle: topLeftFontStyle
       });
-      canvas.renderAll();
+      canvas.requestRenderAll();
       isRebuildingRef.current = false;
     }
   }, [topLeftText, topLeftColor, topLeftFontFamily, topLeftFontSize, topLeftCharSpacing, topLeftFontWeight, topLeftFontStyle]);
@@ -548,7 +576,7 @@ export default function VinylPosterPage({ navigate }) {
         fontWeight: topRightFontWeight,
         fontStyle: topRightFontStyle
       });
-      canvas.renderAll();
+      canvas.requestRenderAll();
       isRebuildingRef.current = false;
     }
   }, [topRightText, topRightColor, topRightFontFamily, topRightFontSize, topRightCharSpacing, topRightFontWeight, topRightFontStyle]);
@@ -566,7 +594,7 @@ export default function VinylPosterPage({ navigate }) {
         fontWeight: songTitleFontWeight,
         fontStyle: songTitleFontStyle
       });
-      canvas.renderAll();
+      canvas.requestRenderAll();
       isRebuildingRef.current = false;
     }
   }, [songTitleText, songTitleColor, songTitleFontFamily, songTitleFontSize, songTitleCharSpacing, songTitleFontWeight, songTitleFontStyle]);
@@ -584,13 +612,16 @@ export default function VinylPosterPage({ navigate }) {
         fontWeight: bottomFontWeight,
         fontStyle: bottomFontStyle
       });
-      canvas.renderAll();
+      canvas.requestRenderAll();
       isRebuildingRef.current = false;
     }
   }, [bottomText, bottomColor, bottomFontFamily, bottomFontSize, bottomCharSpacing, bottomFontWeight, bottomFontStyle]);
 
   useEffect(() => {
-    rebuildVinyl();
+    const handler = setTimeout(() => {
+      rebuildVinyl();
+    }, 100);
+    return () => clearTimeout(handler);
   }, [rebuildVinyl]);
 
   useEffect(() => {
@@ -607,7 +638,7 @@ export default function VinylPosterPage({ navigate }) {
         bgOverlayRef.current.set({ visible: true });
       }
     }
-    canvas.renderAll();
+    canvas.requestRenderAll();
   }, [bgType, bgColor]);
 
   const updateBgColor = (hex) => {
@@ -619,7 +650,7 @@ export default function VinylPosterPage({ navigate }) {
     if (bgImageRef.current) {
       bgImageRef.current.filters = [new fabric.Image.filters.Blur({ blur: val / 100 })];
       bgImageRef.current.applyFilters();
-      fabricRef.current.renderAll();
+      fabricRef.current.requestRenderAll();
     }
   };
 
@@ -653,7 +684,7 @@ export default function VinylPosterPage({ navigate }) {
         canvas.insertAt(img, 1, false);
         bgImageRef.current = img;
         bgOverlayRef.current.bringToFront();
-        canvas.renderAll();
+        canvas.requestRenderAll();
       }, { crossOrigin: 'anonymous' });
     };
     reader.readAsDataURL(file);
@@ -697,10 +728,15 @@ export default function VinylPosterPage({ navigate }) {
 
   const applySearchResult = async (track) => {
     const year = track.releaseDate ? new Date(track.releaseDate).getFullYear().toString() : '';
+    
+    let cName = track.collectionName || '';
+    cName = cName.replace(/\s*(?:\(|\[|-)\s*(?:deluxe|expanded|explicit|clean|remastered|remaster|bonus|ep|single|edition|version|pt\.|part|vol\.).*?(?:\)|\]|$)/gi, '').trim();
+    cName = cName.replace(/\s+-$/, '').trim();
+
     updateTextContent(fabricRef.current.textLeftRef, setTopLeftText, (track.artistName || '').toUpperCase());
     updateTextContent(fabricRef.current.textRightRef, setTopRightText, year);
     updateTextContent(fabricRef.current.textSongRef, setSongTitleText, (track.trackName || '').toUpperCase());
-    updateTextContent(fabricRef.current.textBottomRef, setBottomText, (track.collectionName || '').toUpperCase());
+    updateTextContent(fabricRef.current.textBottomRef, setBottomText, cName.toUpperCase());
 
     showToast('Song data applied. Fetching lyrics...');
     const lyrics = await fetchLyrics(track.artistName, track.trackName);
@@ -722,80 +758,60 @@ export default function VinylPosterPage({ navigate }) {
 
     const cw = containerDims.width;
     const ch = containerDims.height;
+    const zoomFactor = canvas.getZoom();
 
     if (activeObj.type !== 'activeSelection') {
       const bound = activeObj.getBoundingRect();
-      const zoomFactor = canvas.getZoom();
       
-      const absoluteBound = {
-        left: bound.left / zoomFactor,
-        top: bound.top / zoomFactor,
-        width: bound.width / zoomFactor,
-        height: bound.height / zoomFactor
-      };
+      const lLeft = bound.left / zoomFactor;
+      const lTop = bound.top / zoomFactor;
+      const lWidth = bound.width / zoomFactor;
+      const lHeight = bound.height / zoomFactor;
 
-      if (mode === 'left') {
-        activeObj.set({ left: activeObj.left - absoluteBound.left });
-      } else if (mode === 'cx') {
-        canvas.centerObjectH(activeObj);
-      } else if (mode === 'right') {
-        activeObj.set({ left: activeObj.left + (cw - (absoluteBound.left + absoluteBound.width)) });
-      } else if (mode === 'top') {
-        activeObj.set({ top: activeObj.top - absoluteBound.top });
-      } else if (mode === 'cy') {
-        canvas.centerObjectV(activeObj);
-      } else if (mode === 'bottom') {
-        activeObj.set({ top: activeObj.top + (ch - (absoluteBound.top + absoluteBound.height)) });
-      }
-      
+      let dx = 0, dy = 0;
+
+      if (mode === 'left') dx = -lLeft;
+      else if (mode === 'cx') dx = (cw / 2) - (lLeft + lWidth / 2);
+      else if (mode === 'right') dx = cw - (lLeft + lWidth);
+      else if (mode === 'top') dy = -lTop;
+      else if (mode === 'cy') dy = (ch / 2) - (lTop + lHeight / 2);
+      else if (mode === 'bottom') dy = ch - (lTop + lHeight);
+
+      activeObj.set({ left: activeObj.left + dx, top: activeObj.top + dy });
       activeObj.setCoords();
-      canvas.renderAll();
+      canvas.requestRenderAll();
     } else {
       const groupBounds = activeObj.getBoundingRect();
-      const zoomFactor = canvas.getZoom();
-      const absoluteGroupBounds = {
-        left: groupBounds.left / zoomFactor,
-        top: groupBounds.top / zoomFactor,
-        width: groupBounds.width / zoomFactor,
-        height: groupBounds.height / zoomFactor
-      };
+      const groupL = groupBounds.left / zoomFactor;
+      const groupT = groupBounds.top / zoomFactor;
+      const groupW = groupBounds.width / zoomFactor;
+      const groupH = groupBounds.height / zoomFactor;
 
       const objects = activeObj.getObjects();
-      
-      activeObj.toActiveSelection();
+      canvas.discardActiveObject(); 
 
       objects.forEach(obj => {
-        const bound = obj.getBoundingRect();
-        const absoluteBound = {
-          left: bound.left / zoomFactor,
-          top: bound.top / zoomFactor,
-          width: bound.width / zoomFactor,
-          height: bound.height / zoomFactor
-        };
+        const oBound = obj.getBoundingRect();
+        const olL = oBound.left / zoomFactor;
+        const olT = oBound.top / zoomFactor;
+        const olW = oBound.width / zoomFactor;
+        const olH = oBound.height / zoomFactor;
 
-        if (mode === 'left') {
-          obj.set({ left: obj.left - (absoluteBound.left - absoluteGroupBounds.left) });
-        } else if (mode === 'cx') {
-          const targetCenter = absoluteGroupBounds.left + absoluteGroupBounds.width / 2;
-          obj.set({ left: obj.left + (targetCenter - (absoluteBound.left + absoluteBound.width / 2)) });
-        } else if (mode === 'right') {
-          const targetRight = absoluteGroupBounds.left + absoluteGroupBounds.width;
-          obj.set({ left: obj.left + (targetRight - (absoluteBound.left + absoluteBound.width)) });
-        } else if (mode === 'top') {
-          obj.set({ top: obj.top - (absoluteBound.top - absoluteGroupBounds.top) });
-        } else if (mode === 'cy') {
-          const targetCenterY = absoluteGroupBounds.top + absoluteGroupBounds.height / 2;
-          obj.set({ top: obj.top + (targetCenterY - (absoluteBound.top + absoluteBound.height / 2)) });
-        } else if (mode === 'bottom') {
-          const targetBottom = absoluteGroupBounds.top + absoluteGroupBounds.height;
-          obj.set({ top: obj.top + (targetBottom - (absoluteBound.top + absoluteBound.height)) });
-        }
+        let dx = 0, dy = 0;
+        if (mode === 'left') dx = groupL - olL;
+        else if (mode === 'cx') dx = (groupL + groupW / 2) - (olL + olW / 2);
+        else if (mode === 'right') dx = (groupL + groupW) - (olL + olW);
+        else if (mode === 'top') dy = groupT - olT;
+        else if (mode === 'cy') dy = (groupT + groupH / 2) - (olT + olH / 2);
+        else if (mode === 'bottom') dy = (groupT + groupH) - (olT + olH);
+
+        obj.set({ left: obj.left + dx, top: obj.top + dy });
         obj.setCoords();
       });
 
-      const selection = new fabric.ActiveSelection(objects, { canvas });
-      canvas.setActiveObject(selection);
-      canvas.renderAll();
+      const newSelection = new fabric.ActiveSelection(objects, { canvas });
+      canvas.setActiveObject(newSelection);
+      canvas.requestRenderAll();
     }
   };
 
@@ -803,22 +819,41 @@ export default function VinylPosterPage({ navigate }) {
     const canvas = fabricRef.current;
     const active = canvas.getActiveObject();
     if (!active || active.type !== 'activeSelection') return;
+    const zoomFactor = canvas.getZoom();
     const objs = active.getObjects().slice();
     if (objs.length < 3) return;
+
+    canvas.discardActiveObject();
+
     if (axis === 'h') {
-      objs.sort((a, b) => a.left - b.left);
-      const first = objs[0], last = objs[objs.length - 1];
-      const total = last.left - first.left;
+      objs.sort((a, b) => (a.getBoundingRect().left / zoomFactor) - (b.getBoundingRect().left / zoomFactor));
+      const firstL = objs[0].getBoundingRect().left / zoomFactor;
+      const lastL = objs[objs.length - 1].getBoundingRect().left / zoomFactor;
+      const total = lastL - firstL;
       const step = total / (objs.length - 1);
-      objs.forEach((o, i) => { o.set({ left: first.left + step * i }); o.setCoords(); });
+      
+      objs.forEach((o, i) => { 
+        const obL = o.getBoundingRect().left / zoomFactor;
+        o.set({ left: o.left + ((firstL + step * i) - obL) }); 
+        o.setCoords(); 
+      });
     } else {
-      objs.sort((a, b) => a.top - b.top);
-      const first = objs[0], last = objs[objs.length - 1];
-      const total = last.top - first.top;
+      objs.sort((a, b) => (a.getBoundingRect().top / zoomFactor) - (b.getBoundingRect().top / zoomFactor));
+      const firstT = objs[0].getBoundingRect().top / zoomFactor;
+      const lastT = objs[objs.length - 1].getBoundingRect().top / zoomFactor;
+      const total = lastT - firstT;
       const step = total / (objs.length - 1);
-      objs.forEach((o, i) => { o.set({ top: first.top + step * i }); o.setCoords(); });
+
+      objs.forEach((o, i) => { 
+        const obT = o.getBoundingRect().top / zoomFactor;
+        o.set({ top: o.top + ((firstT + step * i) - obT) }); 
+        o.setCoords(); 
+      });
     }
-    canvas.renderAll();
+    
+    const newSelection = new fabric.ActiveSelection(objs, { canvas });
+    canvas.setActiveObject(newSelection);
+    canvas.requestRenderAll();
   };
 
   const handleGroup = () => {
@@ -835,7 +870,7 @@ export default function VinylPosterPage({ navigate }) {
     const newGroup = canvas.getActiveObject();
     if (newGroup) {
       newGroup.set({
-        data: { edType: 'v-group' }
+        data: { edType: 'group' }
       });
     }
     setSelectedType('group');
@@ -1590,10 +1625,7 @@ export default function VinylPosterPage({ navigate }) {
                 </div>
                 <div className="pf-row">
                   <label>Font Style</label>
-                  <select value={topLeftFontStyle} onChange={(e) => setTopLeftFontStyle(e.target.value)}>
-                    <option value="normal">Normal</option>
-                    <option value="italic">Italic</option>
-                  </select>
+                  <FontStyleSelector weight={topLeftFontWeight} style={topLeftFontStyle} onChange={(w, s) => { setTopLeftFontWeight(w); setTopLeftFontStyle(s); }} />
                 </div>
                 <div className="pf-row">
                   <label>Font Size</label>
@@ -1608,16 +1640,6 @@ export default function VinylPosterPage({ navigate }) {
                     <input type="range" min="0" max="400" step="10" value={topLeftCharSpacing} onChange={(e) => setTopLeftCharSpacing(Number(e.target.value))} />
                     <span className="pf-range-val">{topLeftCharSpacing}</span>
                   </div>
-                </div>
-                <div className="pf-row">
-                  <label>Font Weight</label>
-                  <select value={topLeftFontWeight} onChange={(e) => setTopLeftFontWeight(e.target.value)}>
-                    <option value="300">Light (300)</option>
-                    <option value="400">Regular (400)</option>
-                    <option value="600">Semi-Bold (600)</option>
-                    <option value="700">Bold (700)</option>
-                    <option value="800">Extra-Bold (800)</option>
-                  </select>
                 </div>
                 <div className="pf-row">
                   <label>Color</label>
@@ -1650,15 +1672,12 @@ export default function VinylPosterPage({ navigate }) {
                 </div>
                 <div className="pf-row">
                   <label>Font Style</label>
-                  <select value={topRightFontStyle} onChange={(e) => setTopRightFontStyle(e.target.value)}>
-                    <option value="normal">Normal</option>
-                    <option value="italic">Italic</option>
-                  </select>
+                  <FontStyleSelector weight={topRightFontWeight} style={topRightFontStyle} onChange={(w, s) => { setTopRightFontWeight(w); setTopRightFontStyle(s); }} />
                 </div>
                 <div className="pf-row">
                   <label>Font Size</label>
                   <div className="pf-range-row">
-                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setRightFontSize(Number(e.target.value))} />
+                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setTopRightFontSize(Number(e.target.value))} />
                     <span className="pf-range-val">{topRightFontSize}px</span>
                   </div>
                 </div>
@@ -1668,16 +1687,6 @@ export default function VinylPosterPage({ navigate }) {
                     <input type="range" min="0" max="400" step="10" value={topRightCharSpacing} onChange={(e) => setTopRightCharSpacing(Number(e.target.value))} />
                     <span className="pf-range-val">{topRightCharSpacing}</span>
                   </div>
-                </div>
-                <div className="pf-row">
-                  <label>Font Weight</label>
-                  <select value={topRightFontWeight} onChange={(e) => setTopRightFontWeight(e.target.value)}>
-                    <option value="300">Light (300)</option>
-                    <option value="400">Regular (400)</option>
-                    <option value="600">Semi-Bold (600)</option>
-                    <option value="700">Bold (700)</option>
-                    <option value="800">Extra-Bold (800)</option>
-                  </select>
                 </div>
                 <div className="pf-row">
                   <label>Color</label>
@@ -1710,10 +1719,7 @@ export default function VinylPosterPage({ navigate }) {
                 </div>
                 <div className="pf-row">
                   <label>Font Style</label>
-                  <select value={songTitleFontStyle} onChange={(e) => setSongTitleFontStyle(e.target.value)}>
-                    <option value="normal">Normal</option>
-                    <option value="italic">Italic</option>
-                  </select>
+                  <FontStyleSelector weight={songTitleFontWeight} style={songTitleFontStyle} onChange={(w, s) => { setSongTitleFontWeight(w); setSongTitleFontStyle(s); }} />
                 </div>
                 <div className="pf-row">
                   <label>Font Size</label>
@@ -1728,16 +1734,6 @@ export default function VinylPosterPage({ navigate }) {
                     <input type="range" min="0" max="400" step="10" value={songTitleCharSpacing} onChange={(e) => setSongTitleCharSpacing(Number(e.target.value))} />
                     <span className="pf-range-val">{songTitleCharSpacing}</span>
                   </div>
-                </div>
-                <div className="pf-row">
-                  <label>Font Weight</label>
-                  <select value={songTitleFontWeight} onChange={(e) => setSongTitleFontWeight(e.target.value)}>
-                    <option value="300">Light (300)</option>
-                    <option value="400">Regular (400)</option>
-                    <option value="600">Semi-Bold (600)</option>
-                    <option value="700">Bold (700)</option>
-                    <option value="800">Extra-Bold (800)</option>
-                  </select>
                 </div>
                 <div className="pf-row">
                   <label>Color</label>
@@ -1770,10 +1766,7 @@ export default function VinylPosterPage({ navigate }) {
                 </div>
                 <div className="pf-row">
                   <label>Font Style</label>
-                  <select value={bottomFontStyle} onChange={(e) => setBottomFontStyle(e.target.value)}>
-                    <option value="normal">Normal</option>
-                    <option value="italic">Italic</option>
-                  </select>
+                  <FontStyleSelector weight={bottomFontWeight} style={bottomFontStyle} onChange={(w, s) => { setBottomFontWeight(w); setBottomFontStyle(s); }} />
                 </div>
                 <div className="pf-row">
                   <label>Font Size</label>
@@ -1788,16 +1781,6 @@ export default function VinylPosterPage({ navigate }) {
                     <input type="range" min="0" max="400" step="10" value={bottomCharSpacing} onChange={(e) => setBottomCharSpacing(Number(e.target.value))} />
                     <span className="pf-range-val">{bottomCharSpacing}</span>
                   </div>
-                </div>
-                <div className="pf-row">
-                  <label>Font Weight</label>
-                  <select value={bottomFontWeight} onChange={(e) => setBottomFontWeight(e.target.value)}>
-                    <option value="300">Light (300)</option>
-                    <option value="400">Regular (400)</option>
-                    <option value="600">Semi-Bold (600)</option>
-                    <option value="700">Bold (700)</option>
-                    <option value="800">Extra-Bold (800)</option>
-                  </select>
                 </div>
                 <div className="pf-row">
                   <label>Color</label>
@@ -1834,6 +1817,11 @@ export default function VinylPosterPage({ navigate }) {
                 </div>
 
                 <div className="pf-row">
+                  <label>Spiral Font Style</label>
+                  <FontStyleSelector weight={vinylFontWeight} style={vinylFontStyle} onChange={(w, s) => { setVinylFontWeight(w); setVinylFontStyle(s); }} />
+                </div>
+
+                <div className="pf-row">
                   <label>Spiral Text Color</label>
                   <div className="color-row">
                     <input type="color" value={vinylTextColor} onChange={(e) => setVinylTextColor(e.target.value)} />
@@ -1847,6 +1835,9 @@ export default function VinylPosterPage({ navigate }) {
                     <input type="range" min="6" max="40" value={vinylTextSize} onChange={(e) => setVinylTextSize(Number(e.target.value))} />
                     <span className="range-val">{vinylTextSize}px</span>
                   </div>
+                  <p style={{ fontSize: '9px', color: 'var(--accent)', marginTop: '2px', lineHeight: '1.2' }}>
+                    * Lyrics are automatically downscaled if they exceed the record bounds.
+                  </p>
                 </div>
 
                 <div className="pf-row">
