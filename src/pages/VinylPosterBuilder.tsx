@@ -166,7 +166,6 @@ export default function VinylPosterPage({ navigate }) {
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
 
-  // Top Left State
   const [topLeftText, setTopLeftText] = useState('ARTIST NAME');
   const [topLeftColor, setTopLeftColor] = useState('#212121');
   const [topLeftFontFamily, setTopLeftFontFamily] = useState('DM Sans, sans-serif');
@@ -175,7 +174,6 @@ export default function VinylPosterPage({ navigate }) {
   const [topLeftFontWeight, setTopLeftFontWeight] = useState('700');
   const [topLeftFontStyle, setTopLeftFontStyle] = useState('normal');
 
-  // Top Right State
   const [topRightText, setTopRightText] = useState('1992');
   const [topRightColor, setTopRightColor] = useState('#212121');
   const [topRightFontFamily, setTopRightFontFamily] = useState('DM Sans, sans-serif');
@@ -184,7 +182,6 @@ export default function VinylPosterPage({ navigate }) {
   const [topRightFontWeight, setTopRightFontWeight] = useState('700');
   const [topRightFontStyle, setTopRightFontStyle] = useState('normal');
 
-  // Bottom Text State
   const [bottomText, setBottomText] = useState('UNKNOWN ALBUM');
   const [bottomColor, setBottomColor] = useState('#555555');
   const [bottomFontFamily, setBottomFontFamily] = useState('DM Sans, sans-serif');
@@ -193,7 +190,6 @@ export default function VinylPosterPage({ navigate }) {
   const [bottomFontWeight, setBottomFontWeight] = useState('600');
   const [bottomFontStyle, setBottomFontStyle] = useState('normal');
 
-  // Song Title State
   const [songTitleText, setSongTitleText] = useState('SONG NAME');
   const [songTitleColor, setSongTitleColor] = useState('#212121');
   const [songTitleFontFamily, setSongTitleFontFamily] = useState('Josefin Sans, sans-serif');
@@ -202,7 +198,6 @@ export default function VinylPosterPage({ navigate }) {
   const [songTitleFontWeight, setSongTitleFontWeight] = useState('800');
   const [songTitleFontStyle, setSongTitleFontStyle] = useState('normal');
 
-  // Extended Vinyl Properties
   const [vinylScale, setVinylScale] = useState(78); 
   const [vinylFontFamily, setVinylFontFamily] = useState('DM Sans, sans-serif');
   const [vinylTextColor, setVinylTextColor] = useState('#181818');
@@ -236,7 +231,6 @@ export default function VinylPosterPage({ navigate }) {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
-  // ---- Canvas init ----
   useEffect(() => {
     const canvas = new fabric.Canvas(canvasElRef.current, {
       width: containerDims.width,
@@ -374,10 +368,8 @@ export default function VinylPosterPage({ navigate }) {
     return () => {
       canvas.dispose();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Zoom Değiştiğinde Vektörel Olarak Yeniden Çizim Yapılması
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
@@ -500,7 +492,6 @@ export default function VinylPosterPage({ navigate }) {
     buildVinylGroup(canvas, containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing);
   }, [containerDims, vinylTextSize, vinylLyrics, vinylScale, vinylFontFamily, vinylTextColor, vinylLabelColor, vinylLabelSize, vinylLetterSpacing]);
 
-  // ---- Canvas size change ----
   const updateCanvasSize = (value) => {
     setCanvasSize(value);
     const { w, h } = parseSize(value);
@@ -526,7 +517,6 @@ export default function VinylPosterPage({ navigate }) {
     fabricRef.current && fabricRef.current.renderAll();
   };
 
-  // React state güncellemelerinin canvasa aktarılması
   useEffect(() => {
     const canvas = fabricRef.current;
     if (canvas && canvas.textLeftRef) {
@@ -603,7 +593,6 @@ export default function VinylPosterPage({ navigate }) {
     rebuildVinyl();
   }, [rebuildVinyl]);
 
-  // ---- Background ----
   useEffect(() => {
     const canvas = fabricRef.current;
     if (!canvas || !bgRectRef.current) return;
@@ -670,7 +659,6 @@ export default function VinylPosterPage({ navigate }) {
     reader.readAsDataURL(file);
   };
 
-  // ---- iTunes search ----
   const searchSong = async () => {
     if (!searchQuery.trim()) return;
     setSearching(true);
@@ -724,19 +712,17 @@ export default function VinylPosterPage({ navigate }) {
     }
   };
 
-  // ---- Gelişmiş Hizalama Motoru (Canvas ve Grup İçi Uyumlu) ----
   const handleAlign = (mode) => {
     const canvas = fabricRef.current;
     const activeObj = canvas.getActiveObject();
     if (!activeObj) {
-      showToast('Hizalamak için bir öge seçin.');
+      showToast('Select an item to align.');
       return;
     }
 
     const cw = containerDims.width;
     const ch = containerDims.height;
 
-    // A) TEK ÖGE SEÇİLİYSE: Canvas'a göre hizala
     if (activeObj.type !== 'activeSelection') {
       const bound = activeObj.getBoundingRect();
       const zoomFactor = canvas.getZoom();
@@ -764,9 +750,7 @@ export default function VinylPosterPage({ navigate }) {
       
       activeObj.setCoords();
       canvas.renderAll();
-    } 
-    // B) ÇOKLU ÖGE SEÇİLİYSE: Birbirlerine göre hizala
-    else {
+    } else {
       const groupBounds = activeObj.getBoundingRect();
       const zoomFactor = canvas.getZoom();
       const absoluteGroupBounds = {
@@ -778,7 +762,6 @@ export default function VinylPosterPage({ navigate }) {
 
       const objects = activeObj.getObjects();
       
-      // Geçici olarak seçimi dağıtarak mutlak konumlandırma uyguluyoruz
       activeObj.toActiveSelection();
 
       objects.forEach(obj => {
@@ -810,19 +793,39 @@ export default function VinylPosterPage({ navigate }) {
         obj.setCoords();
       });
 
-      // Seçimi tekrar toplayıp aktifleştiriyoruz
       const selection = new fabric.ActiveSelection(objects, { canvas });
       canvas.setActiveObject(selection);
       canvas.renderAll();
     }
   };
 
-  // ---- Gruplandırma Özellikleri ----
+  const edDistribute = (axis) => {
+    const canvas = fabricRef.current;
+    const active = canvas.getActiveObject();
+    if (!active || active.type !== 'activeSelection') return;
+    const objs = active.getObjects().slice();
+    if (objs.length < 3) return;
+    if (axis === 'h') {
+      objs.sort((a, b) => a.left - b.left);
+      const first = objs[0], last = objs[objs.length - 1];
+      const total = last.left - first.left;
+      const step = total / (objs.length - 1);
+      objs.forEach((o, i) => { o.set({ left: first.left + step * i }); o.setCoords(); });
+    } else {
+      objs.sort((a, b) => a.top - b.top);
+      const first = objs[0], last = objs[objs.length - 1];
+      const total = last.top - first.top;
+      const step = total / (objs.length - 1);
+      objs.forEach((o, i) => { o.set({ top: first.top + step * i }); o.setCoords(); });
+    }
+    canvas.renderAll();
+  };
+
   const handleGroup = () => {
     const canvas = fabricRef.current;
     const activeObj = canvas.getActiveObject();
     if (!activeObj || activeObj.type !== 'activeSelection') {
-      showToast('Gruplamak için birden fazla öge seçmelisiniz.');
+      showToast('Select multiple items to group.');
       return;
     }
     
@@ -836,24 +839,23 @@ export default function VinylPosterPage({ navigate }) {
       });
     }
     setSelectedType('group');
-    showToast('Ögeler başarıyla gruplandı.');
+    showToast('Items grouped successfully.');
   };
 
   const handleUngroup = () => {
     const canvas = fabricRef.current;
     const activeObj = canvas.getActiveObject();
     if (!activeObj || activeObj.type !== 'group') {
-      showToast('Dağıtmak için önce bir grup seçmelisiniz.');
+      showToast('Select a group to ungroup.');
       return;
     }
     
     activeObj.toActiveSelection();
     canvas.requestRenderAll();
     setSelectedType('multi');
-    showToast('Grup dağıtıldı.');
+    showToast('Group separated.');
   };
 
-  // ---- Export helpers ----
   const getMultiplier = () => {
     const { w } = parseSize(canvasSize);
     return (w * DPI) / containerDims.width;
@@ -950,7 +952,6 @@ export default function VinylPosterPage({ navigate }) {
     URL.revokeObjectURL(url);
   };
 
-  // ---- Multi export color rows ----
   const updateExportColor = (idx, value) => {
     setExportColors((prev) => {
       const next = [...prev];
@@ -1166,7 +1167,6 @@ export default function VinylPosterPage({ navigate }) {
         }
         .spotify-poster-page .pf-btn:hover { background: #252525; color: var(--spotify-text); }
 
-        /* Sabit Sağ Panel Araç Kutusu (Global Tools) CSS */
         .spotify-poster-page .global-tools-panel {
           padding: 14px 16px;
           border-bottom: 1px solid var(--panel-border);
@@ -1183,7 +1183,7 @@ export default function VinylPosterPage({ navigate }) {
         }
         .spotify-poster-page .gt-align-grid {
           display: grid;
-          grid-template-columns: repeat(3, 1fr);
+          grid-template-columns: repeat(4, 1fr);
           gap: 4px;
           margin-bottom: 8px;
         }
@@ -1194,17 +1194,19 @@ export default function VinylPosterPage({ navigate }) {
           justify-content: center;
           background: var(--input-bg);
           border: 1px solid var(--input-border);
-          color: var(--spotify-text);
+          color: var(--spotify-subtext);
           border-radius: 6px;
           cursor: pointer;
-          font-size: 10px;
-          font-weight: bold;
           transition: all 0.15s;
         }
         .spotify-poster-page .gt-align-btn:hover {
-          background: #252525;
+          background: #1a1a1a;
           border-color: var(--accent);
-          color: var(--accent);
+          color: var(--spotify-text);
+        }
+        .spotify-poster-page .gt-align-btn svg {
+          width: 14px;
+          height: 14px;
         }
         .spotify-poster-page .gt-group-row {
           display: flex;
@@ -1239,11 +1241,6 @@ export default function VinylPosterPage({ navigate }) {
           flex: 1;
           accent-color: var(--accent);
           cursor: pointer;
-        }
-        .spotify-poster-page .gt-zoom-label {
-          font-size: 9px;
-          font-weight: 700;
-          color: var(--spotify-subtext);
         }
         .spotify-poster-page .gt-zoom-val {
           font-size: 11px;
@@ -1499,25 +1496,58 @@ export default function VinylPosterPage({ navigate }) {
           </span>
         </div>
 
-        {/* SABİT ÇALIŞMA ALANI ARAÇ KUTUSU (Zoom, Hizalama, Gruplama) */}
         <div className="global-tools-panel">
-          <div className="gt-section-title">HİZALAMA (ALIGN)</div>
+          <div className="gt-section-title">ALIGNMENT</div>
           <div className="gt-align-grid">
-            <button className="gt-align-btn" title="Sola Hizala" onClick={() => handleAlign('left')}>Sol</button>
-            <button className="gt-align-btn" title="Yatayda Ortala" onClick={() => handleAlign('cx')}>Y-Orta</button>
-            <button className="gt-align-btn" title="Sağa Hizala" onClick={() => handleAlign('right')}>Sağ</button>
-            <button className="gt-align-btn" title="Üste Hizala" onClick={() => handleAlign('top')}>Üst</button>
-            <button className="gt-align-btn" title="Dikeyde Ortala" onClick={() => handleAlign('cy')}>D-Orta</button>
-            <button className="gt-align-btn" title="Alta Hizala" onClick={() => handleAlign('bottom')}>Alt</button>
+            <button className="gt-align-btn" title="Align Left" onClick={() => handleAlign('left')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="3" x2="3" y2="21" strokeWidth="2.5" /><rect x="5" y="8" width="8" height="3" rx="1" /><rect x="5" y="13" width="13" height="3" rx="1" />
+              </svg>
+            </button>
+            <button className="gt-align-btn" title="Center X" onClick={() => handleAlign('cx')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="12" y1="3" x2="12" y2="21" strokeWidth="2.5" /><rect x="6" y="8" width="12" height="3" rx="1" /><rect x="4" y="13" width="16" height="3" rx="1" />
+              </svg>
+            </button>
+            <button className="gt-align-btn" title="Align Right" onClick={() => handleAlign('right')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="21" y1="3" x2="21" y2="21" strokeWidth="2.5" /><rect x="11" y="8" width="8" height="3" rx="1" /><rect x="6" y="13" width="13" height="3" rx="1" />
+              </svg>
+            </button>
+            <button className="gt-align-btn" title="Distribute H" onClick={() => edDistribute('h')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="3" x2="3" y2="21" /><line x1="21" y1="3" x2="21" y2="21" /><rect x="9" y="8" width="6" height="8" rx="1" />
+              </svg>
+            </button>
+            <button className="gt-align-btn" title="Align Top" onClick={() => handleAlign('top')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="3" x2="21" y2="3" strokeWidth="2.5" /><rect x="8" y="5" width="3" height="8" rx="1" /><rect x="13" y="5" width="3" height="13" rx="1" />
+              </svg>
+            </button>
+            <button className="gt-align-btn" title="Center Y" onClick={() => handleAlign('cy')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="12" x2="21" y2="12" strokeWidth="2.5" /><rect x="8" y="4" width="3" height="16" rx="1" /><rect x="13" y="6" width="3" height="12" rx="1" />
+              </svg>
+            </button>
+            <button className="gt-align-btn" title="Align Bottom" onClick={() => handleAlign('bottom')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="21" x2="21" y2="21" strokeWidth="2.5" /><rect x="8" y="11" width="3" height="8" rx="1" /><rect x="13" y="6" width="3" height="13" rx="1" />
+              </svg>
+            </button>
+            <button className="gt-align-btn" title="Distribute V" onClick={() => edDistribute('v')}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="3" y1="3" x2="21" y2="3" /><line x1="3" y1="21" x2="21" y2="21" /><rect x="8" y="9" width="8" height="6" rx="1" />
+              </svg>
+            </button>
           </div>
 
-          <div className="gt-section-title" style={{ marginTop: '10px' }}>GRUPLANDIRMA</div>
+          <div className="gt-section-title" style={{ marginTop: '10px' }}>GROUPING</div>
           <div className="gt-group-row">
-            <button className="gt-group-btn" title="Seçilenleri Grupla" onClick={handleGroup}>Grupla</button>
-            <button className="gt-group-btn" title="Grubu Dağıt" onClick={handleUngroup}>Dağıt</button>
+            <button className="gt-group-btn" title="Group Selected" onClick={handleGroup}>Group</button>
+            <button className="gt-group-btn" title="Ungroup" onClick={handleUngroup}>Ungroup</button>
           </div>
 
-          <div className="gt-section-title">YAKINLAŞTIRMA (ZOOM)</div>
+          <div className="gt-section-title">ZOOM</div>
           <div className="gt-zoom-row">
             <input 
               type="range" 
@@ -1528,7 +1558,7 @@ export default function VinylPosterPage({ navigate }) {
               onChange={(e) => setZoom(Number(e.target.value))} 
             />
             <span className="gt-zoom-val">{Math.round(zoom * 100)}%</span>
-            <button className="gt-zoom-reset" onClick={() => setZoom(1)}>Sıfırla</button>
+            <button className="gt-zoom-reset" onClick={() => setZoom(1)}>Reset</button>
           </div>
         </div>
 
@@ -1538,11 +1568,10 @@ export default function VinylPosterPage({ navigate }) {
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
               </svg>
-              <p>Özelliklerini değiştirmek için canvas üzerindeki bir ögeye tıklayın.</p>
+              <p>Click an element on the canvas to change its properties.</p>
             </div>
           )}
 
-          {/* Artist Name - Properties */}
           {selectedType === EDIT_TYPES.TOP_LEFT && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1603,7 +1632,6 @@ export default function VinylPosterPage({ navigate }) {
             </div>
           )}
 
-          {/* Year - Properties */}
           {selectedType === EDIT_TYPES.TOP_RIGHT && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1664,7 +1692,6 @@ export default function VinylPosterPage({ navigate }) {
             </div>
           )}
 
-          {/* Song Title - Properties */}
           {selectedType === EDIT_TYPES.SONG_TITLE && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1725,7 +1752,6 @@ export default function VinylPosterPage({ navigate }) {
             </div>
           )}
 
-          {/* Bottom Text - Properties */}
           {selectedType === EDIT_TYPES.BOTTOM && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1786,7 +1812,6 @@ export default function VinylPosterPage({ navigate }) {
             </div>
           )}
 
-          {/* Vinyl Record & Lyrics - Properties */}
           {selectedType === EDIT_TYPES.VINYL && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1822,9 +1847,6 @@ export default function VinylPosterPage({ navigate }) {
                     <input type="range" min="6" max="40" value={vinylTextSize} onChange={(e) => setVinylTextSize(Number(e.target.value))} />
                     <span className="range-val">{vinylTextSize}px</span>
                   </div>
-                  <p style={{ fontSize: '9px', color: 'var(--accent)', marginTop: '2px', lineHeight: '1.2' }}>
-                    * Lyrics are automatically downscaled if they exceed the record bounds.
-                  </p>
                 </div>
 
                 <div className="pf-row">
@@ -1870,10 +1892,10 @@ export default function VinylPosterPage({ navigate }) {
           {selectedType === 'group' && (
             <div id="props-fields">
               <div className="pf-section">
-                <div className="pf-section-title">Grup Özellikleri</div>
+                <div className="pf-section-title">Group Properties</div>
                 <p style={{ fontSize: '11px', color: '#888', lineHeight: '1.6' }}>
-                  Bu ögeler şu anda gruplanmış durumda ve tek bir bütün olarak hareket ediyorlar. 
-                  Grubu dağıtmak veya konumlandırma yapmak için yukaradaki araçları kullanabilirsiniz.
+                  These items are currently grouped and behave as a single element. 
+                  Use the tools above to ungroup or align them.
                 </p>
               </div>
             </div>
@@ -1884,7 +1906,7 @@ export default function VinylPosterPage({ navigate }) {
               <div className="pf-section">
                 <div className="pf-section-title">Multiple Selection</div>
                 <p style={{ fontSize: '11px', color: '#888' }}>
-                  Seçilen nesneleri tek bir öge haline getirmek için yukarıdan "Grupla" butonunu kullanabilir veya hizalayabilirsiniz.
+                  Use the toolbar above to align objects or combine them into a group.
                 </p>
               </div>
             </div>
