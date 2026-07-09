@@ -82,11 +82,9 @@ function fitContain(wIn, hIn, maxW, maxH) {
   return { width: Math.round(width), height: Math.round(height) };
 }
 
-// Sarmal oluşturucu
 function buildGrooveSpiralChars(text, opts) {
   const { cx, cy, innerRadius, outerRadius, fontSize, color, fontFamily, letterSpacing } = opts;
   
-  // Cümle sonlarına ve satır aralarına " - " koyarak temizleme işlemi yapıyoruz
   const clean = (text || '')
     .replace(/[\r\n]+/g, ' - ')
     .replace(/([.!?])\s*/g, '$1 - ')
@@ -106,7 +104,6 @@ function buildGrooveSpiralChars(text, opts) {
   let charIndex = 0;
   let guard = 0;
 
-  // Döngü sarmal sınırlarına ulaştığında VEYA metin bittiğinde durur (Döngüsel tekrarlama engellendi)
   while (radius < outerRadius && guard < 20000 && charIndex < source.length) {
     guard++;
     const ch = source[charIndex];
@@ -163,13 +160,13 @@ export default function VinylPosterPage({ navigate }) {
 
   const [canvasSize, setCanvasSize] = useState('30x40');
   const [containerDims, setContainerDims] = useState(fitContain(30, 40, BASE_MAX_W, BASE_MAX_H));
-  const [zoom, setZoom] = useState(1); // Zoom State (0.5x - 10.0x)
+  const [zoom, setZoom] = useState(1); 
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
 
-  // Top Left (Artist Name) State
+  // Top Left State
   const [topLeftText, setTopLeftText] = useState('ARTIST NAME');
   const [topLeftColor, setTopLeftColor] = useState('#212121');
   const [topLeftFontFamily, setTopLeftFontFamily] = useState('DM Sans, sans-serif');
@@ -178,7 +175,7 @@ export default function VinylPosterPage({ navigate }) {
   const [topLeftFontWeight, setTopLeftFontWeight] = useState('700');
   const [topLeftFontStyle, setTopLeftFontStyle] = useState('normal');
 
-  // Top Right (Year) State
+  // Top Right State
   const [topRightText, setTopRightText] = useState('1992');
   const [topRightColor, setTopRightColor] = useState('#212121');
   const [topRightFontFamily, setTopRightFontFamily] = useState('DM Sans, sans-serif');
@@ -346,7 +343,7 @@ export default function VinylPosterPage({ navigate }) {
       if (isRebuildingRef.current) return;
       
       const activeEl = document.activeElement;
-      if (activeEl && (activeEl.closest('#panel') || activeEl.closest('#props-panel') || activeEl.closest('.zoom-control-bar'))) {
+      if (activeEl && (activeEl.closest('#panel') || activeEl.closest('#props-panel'))) {
         return;
       }
       
@@ -367,7 +364,6 @@ export default function VinylPosterPage({ navigate }) {
       }
     });
 
-    // Google Fonts ile Bold ve İtalik ağırlıklarının tamamını yüklüyoruz (300, 400, 600, 700, 800 + i)
     const link = document.createElement('link');
     link.href = `https://fonts.googleapis.com/css?family=${GOOGLE_FONTS.map(f => f.replace(/ /g, '+') + ':300,300i,400,400i,600,600i,700,700i,800,800i').join('|')}&display=swap`;
     link.rel = 'stylesheet';
@@ -394,8 +390,14 @@ export default function VinylPosterPage({ navigate }) {
   function onSelectionChange(e) {
     if (isRebuildingRef.current) return;
     const obj = e.selected && e.selected.length === 1 ? e.selected[0] : null;
-    if (obj && obj.data) {
-      setSelectedType(obj.data.edType);
+    if (obj) {
+      if (obj.data) {
+        setSelectedType(obj.data.edType);
+      } else if (obj.type === 'group') {
+        setSelectedType('group');
+      } else {
+        setSelectedType('multi');
+      }
     } else {
       setSelectedType('multi');
     }
@@ -418,9 +420,7 @@ export default function VinylPosterPage({ navigate }) {
     const labelR = outerR * (labelPct / 100);
     const holeR = outerR * 0.015;
 
-    // Sığdırma algoritması
     let adjustedTextSize = textSize;
-    // Cümle bitişlerini otomatik saptayıp " - " ekliyoruz
     const cleanText = (lyrics || '')
       .replace(/[\r\n]+/g, ' - ')
       .replace(/([.!?])\s*/g, '$1 - ')
@@ -452,7 +452,6 @@ export default function VinylPosterPage({ navigate }) {
       }
     }
 
-    // İstek üzerine anlamsız gri dış sınır çizgisi kaldırıldı
     const label = new fabric.Circle({
       left: cx, top: cy, radius: labelR, fill: labelCol, stroke: '#c9c9c9', strokeWidth: 1,
       originX: 'center', originY: 'center', selectable: false, evented: false,
@@ -473,7 +472,6 @@ export default function VinylPosterPage({ navigate }) {
       letterSpacing: letterSpc
     });
 
-    // edge dairesi gruptan çıkarıldı
     const group = new fabric.Group(
       [...spiralChars, label, hole],
       {
@@ -528,7 +526,7 @@ export default function VinylPosterPage({ navigate }) {
     fabricRef.current && fabricRef.current.renderAll();
   };
 
-  // React state güncellemelerinin sarsıntısız bir biçimde canvasa aktarılması
+  // React state güncellemelerinin canvasa aktarılması
   useEffect(() => {
     const canvas = fabricRef.current;
     if (canvas && canvas.textLeftRef) {
@@ -726,49 +724,133 @@ export default function VinylPosterPage({ navigate }) {
     }
   };
 
-  // ---- Alignment ----
-  const edAlign = (mode) => {
+  // ---- Gelişmiş Hizalama Motoru (Canvas ve Grup İçi Uyumlu) ----
+  const handleAlign = (mode) => {
     const canvas = fabricRef.current;
-    const obj = canvas.getActiveObject();
-    if (!obj) return;
-    const cw = canvas.getWidth();
-    const ch = canvas.getHeight();
-    const bound = obj.getBoundingRect();
-    let dx = 0, dy = 0;
-    switch (mode) {
-      case 'left': dx = -bound.left; break;
-      case 'cx': dx = cw / 2 - (bound.left + bound.width / 2); break;
-      case 'right': dx = cw - (bound.left + bound.width); break;
-      case 'top': dy = -bound.top; break;
-      case 'cy': dy = ch / 2 - (bound.top + bound.height / 2); break;
-      case 'bottom': dy = ch - (bound.top + bound.height); break;
-      default: break;
+    const activeObj = canvas.getActiveObject();
+    if (!activeObj) {
+      showToast('Hizalamak için bir öge seçin.');
+      return;
     }
-    obj.set({ left: obj.left + dx, top: obj.top + dy });
-    obj.setCoords();
-    canvas.renderAll();
+
+    const cw = containerDims.width;
+    const ch = containerDims.height;
+
+    // A) TEK ÖGE SEÇİLİYSE: Canvas'a göre hizala
+    if (activeObj.type !== 'activeSelection') {
+      const bound = activeObj.getBoundingRect();
+      const zoomFactor = canvas.getZoom();
+      
+      const absoluteBound = {
+        left: bound.left / zoomFactor,
+        top: bound.top / zoomFactor,
+        width: bound.width / zoomFactor,
+        height: bound.height / zoomFactor
+      };
+
+      if (mode === 'left') {
+        activeObj.set({ left: activeObj.left - absoluteBound.left });
+      } else if (mode === 'cx') {
+        canvas.centerObjectH(activeObj);
+      } else if (mode === 'right') {
+        activeObj.set({ left: activeObj.left + (cw - (absoluteBound.left + absoluteBound.width)) });
+      } else if (mode === 'top') {
+        activeObj.set({ top: activeObj.top - absoluteBound.top });
+      } else if (mode === 'cy') {
+        canvas.centerObjectV(activeObj);
+      } else if (mode === 'bottom') {
+        activeObj.set({ top: activeObj.top + (ch - (absoluteBound.top + absoluteBound.height)) });
+      }
+      
+      activeObj.setCoords();
+      canvas.renderAll();
+    } 
+    // B) ÇOKLU ÖGE SEÇİLİYSE: Birbirlerine göre hizala
+    else {
+      const groupBounds = activeObj.getBoundingRect();
+      const zoomFactor = canvas.getZoom();
+      const absoluteGroupBounds = {
+        left: groupBounds.left / zoomFactor,
+        top: groupBounds.top / zoomFactor,
+        width: groupBounds.width / zoomFactor,
+        height: groupBounds.height / zoomFactor
+      };
+
+      const objects = activeObj.getObjects();
+      
+      // Geçici olarak seçimi dağıtarak mutlak konumlandırma uyguluyoruz
+      activeObj.toActiveSelection();
+
+      objects.forEach(obj => {
+        const bound = obj.getBoundingRect();
+        const absoluteBound = {
+          left: bound.left / zoomFactor,
+          top: bound.top / zoomFactor,
+          width: bound.width / zoomFactor,
+          height: bound.height / zoomFactor
+        };
+
+        if (mode === 'left') {
+          obj.set({ left: obj.left - (absoluteBound.left - absoluteGroupBounds.left) });
+        } else if (mode === 'cx') {
+          const targetCenter = absoluteGroupBounds.left + absoluteGroupBounds.width / 2;
+          obj.set({ left: obj.left + (targetCenter - (absoluteBound.left + absoluteBound.width / 2)) });
+        } else if (mode === 'right') {
+          const targetRight = absoluteGroupBounds.left + absoluteGroupBounds.width;
+          obj.set({ left: obj.left + (targetRight - (absoluteBound.left + absoluteBound.width)) });
+        } else if (mode === 'top') {
+          obj.set({ top: obj.top - (absoluteBound.top - absoluteGroupBounds.top) });
+        } else if (mode === 'cy') {
+          const targetCenterY = absoluteGroupBounds.top + absoluteGroupBounds.height / 2;
+          obj.set({ top: obj.top + (targetCenterY - (absoluteBound.top + absoluteBound.height / 2)) });
+        } else if (mode === 'bottom') {
+          const targetBottom = absoluteGroupBounds.top + absoluteGroupBounds.height;
+          obj.set({ top: obj.top + (targetBottom - (absoluteBound.top + absoluteBound.height)) });
+        }
+        obj.setCoords();
+      });
+
+      // Seçimi tekrar toplayıp aktifleştiriyoruz
+      const selection = new fabric.ActiveSelection(objects, { canvas });
+      canvas.setActiveObject(selection);
+      canvas.renderAll();
+    }
   };
 
-  const edDistribute = (axis) => {
+  // ---- Gruplandırma Özellikleri ----
+  const handleGroup = () => {
     const canvas = fabricRef.current;
-    const active = canvas.getActiveObject();
-    if (!active || active.type !== 'activeSelection') return;
-    const objs = active.getObjects().slice();
-    if (objs.length < 3) return;
-    if (axis === 'h') {
-      objs.sort((a, b) => a.left - b.left);
-      const first = objs[0], last = objs[objs.length - 1];
-      const total = last.left - first.left;
-      const step = total / (objs.length - 1);
-      objs.forEach((o, i) => { o.set({ left: first.left + step * i }); o.setCoords(); });
-    } else {
-      objs.sort((a, b) => a.top - b.top);
-      const first = objs[0], last = objs[objs.length - 1];
-      const total = last.top - first.top;
-      const step = total / (objs.length - 1);
-      objs.forEach((o, i) => { o.set({ top: first.top + step * i }); o.setCoords(); });
+    const activeObj = canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'activeSelection') {
+      showToast('Gruplamak için birden fazla öge seçmelisiniz.');
+      return;
     }
-    canvas.renderAll();
+    
+    activeObj.toGroup();
+    canvas.requestRenderAll();
+    
+    const newGroup = canvas.getActiveObject();
+    if (newGroup) {
+      newGroup.set({
+        data: { edType: 'v-group' }
+      });
+    }
+    setSelectedType('group');
+    showToast('Ögeler başarıyla gruplandı.');
+  };
+
+  const handleUngroup = () => {
+    const canvas = fabricRef.current;
+    const activeObj = canvas.getActiveObject();
+    if (!activeObj || activeObj.type !== 'group') {
+      showToast('Dağıtmak için önce bir grup seçmelisiniz.');
+      return;
+    }
+    
+    activeObj.toActiveSelection();
+    canvas.requestRenderAll();
+    setSelectedType('multi');
+    showToast('Grup dağıtıldı.');
   };
 
   // ---- Export helpers ----
@@ -1052,20 +1134,6 @@ export default function VinylPosterPage({ navigate }) {
         .spotify-poster-page #props-empty-state { padding: 32px 16px; text-align: center; color: #444; font-size: 11px; line-height: 1.7; }
         .spotify-poster-page #props-empty-state svg { margin-bottom: 12px; }
 
-        .spotify-poster-page #ed-align-bar {
-          position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #111;
-          border: 1px solid var(--panel-border); border-radius: 8px; display: none; align-items: center;
-          gap: 2px; padding: 4px 6px; z-index: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.6);
-        }
-        .spotify-poster-page #ed-align-bar.ed-bar-visible { display: flex; }
-        .spotify-poster-page .ed-ab-btn {
-          width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-          background: none; border: none; color: var(--spotify-subtext); border-radius: 5px; cursor: pointer;
-          transition: all 0.15s;
-        }
-        .spotify-poster-page .ed-ab-btn:hover { background: #1a1a1a; color: var(--spotify-text); }
-        .spotify-poster-page .ed-ab-sep { width: 1px; height: 18px; background: var(--panel-border); margin: 0 3px; }
-
         .spotify-poster-page .pf-section { margin-bottom: 4px; }
         .spotify-poster-page .pf-section-title { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #555; margin: 12px 0 6px; }
         .spotify-poster-page .pf-row { margin-bottom: 7px; }
@@ -1098,54 +1166,103 @@ export default function VinylPosterPage({ navigate }) {
         }
         .spotify-poster-page .pf-btn:hover { background: #252525; color: var(--spotify-text); }
 
-        /* Zoom Control CSS */
-        .spotify-poster-page .zoom-control-bar {
+        /* Sabit Sağ Panel Araç Kutusu (Global Tools) CSS */
+        .spotify-poster-page .global-tools-panel {
+          padding: 14px 16px;
+          border-bottom: 1px solid var(--panel-border);
+          background: #0f0f0f;
+          flex-shrink: 0;
+        }
+        .spotify-poster-page .gt-section-title {
+          font-size: 9px;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: var(--spotify-subtext);
+          margin-bottom: 8px;
+        }
+        .spotify-poster-page .gt-align-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 4px;
+          margin-bottom: 8px;
+        }
+        .spotify-poster-page .gt-align-btn {
+          height: 28px;
           display: flex;
           align-items: center;
-          gap: 12px;
-          background: #111;
-          border: 1px solid var(--panel-border);
-          padding: 8px 16px;
-          border-radius: 24px;
-          margin: 15px auto;
-          z-index: 100;
-          box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-          position: sticky;
-          bottom: 20px;
-        }
-        .spotify-poster-page .zoom-control-bar input[type=range] {
-          width: 140px;
-          accent-color: var(--accent);
-          cursor: pointer;
-        }
-        .spotify-poster-page .zoom-control-bar .zoom-label {
-          font-size: 10px;
-          letter-spacing: 0.1em;
-          color: var(--spotify-subtext);
-          font-weight: 700;
-        }
-        .spotify-poster-page .zoom-control-bar .zoom-val {
-          font-size: 11px;
-          font-weight: 600;
-          color: var(--accent);
-          min-width: 38px;
-          text-align: right;
-        }
-        .spotify-poster-page .zoom-control-bar .zoom-reset-btn {
-          background: #222;
-          border: 1px solid #333;
+          justify-content: center;
+          background: var(--input-bg);
+          border: 1px solid var(--input-border);
           color: var(--spotify-text);
-          font-size: 10px;
-          padding: 3px 10px;
-          border-radius: 12px;
+          border-radius: 6px;
           cursor: pointer;
-          font-weight: 600;
-          transition: background 0.15s;
+          font-size: 10px;
+          font-weight: bold;
+          transition: all 0.15s;
         }
-        .spotify-poster-page .zoom-control-bar .zoom-reset-btn:hover {
+        .spotify-poster-page .gt-align-btn:hover {
+          background: #252525;
+          border-color: var(--accent);
+          color: var(--accent);
+        }
+        .spotify-poster-page .gt-group-row {
+          display: flex;
+          gap: 6px;
+          margin-bottom: 12px;
+        }
+        .spotify-poster-page .gt-group-btn {
+          flex: 1;
+          height: 28px;
+          font-size: 10px;
+          font-weight: 700;
+          letter-spacing: 0.05em;
+          text-transform: uppercase;
+          background: var(--input-bg);
+          border: 1px solid var(--input-border);
+          color: var(--spotify-text);
+          border-radius: 6px;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+        .spotify-poster-page .gt-group-btn:hover {
           background: var(--accent);
           color: #000;
           border-color: var(--accent);
+        }
+        .spotify-poster-page .gt-zoom-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+        .spotify-poster-page .gt-zoom-row input[type=range] {
+          flex: 1;
+          accent-color: var(--accent);
+          cursor: pointer;
+        }
+        .spotify-poster-page .gt-zoom-label {
+          font-size: 9px;
+          font-weight: 700;
+          color: var(--spotify-subtext);
+        }
+        .spotify-poster-page .gt-zoom-val {
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--accent);
+          min-width: 32px;
+          text-align: right;
+        }
+        .spotify-poster-page .gt-zoom-reset {
+          background: #222;
+          border: 1px solid #333;
+          color: #fff;
+          font-size: 9px;
+          padding: 2px 6px;
+          border-radius: 4px;
+          cursor: pointer;
+        }
+        .spotify-poster-page .gt-zoom-reset:hover {
+          background: #333;
         }
       `}</style>
       <div id="panel">
@@ -1358,51 +1475,6 @@ export default function VinylPosterPage({ navigate }) {
       </div>
 
       <div id="canvas-area" ref={containerRef}>
-        <div id="ed-align-bar" className={alignBarVisible ? 'ed-bar-visible' : ''}>
-          <button className="ed-ab-btn" title="Align Left" onClick={() => edAlign('left')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="3" y1="3" x2="3" y2="21" strokeWidth="2.5" /><rect x="5" y="8" width="8" height="3" rx="1" /><rect x="5" y="13" width="13" height="3" rx="1" />
-            </svg>
-          </button>
-          <button className="ed-ab-btn" title="Center X" onClick={() => edAlign('cx')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="12" y1="3" x2="12" y2="21" strokeWidth="2.5" /><rect x="6" y="8" width="12" height="3" rx="1" /><rect x="4" y="13" width="16" height="3" rx="1" />
-            </svg>
-          </button>
-          <button className="ed-ab-btn" title="Align Right" onClick={() => edAlign('right')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="21" y1="3" x2="21" y2="21" strokeWidth="2.5" /><rect x="11" y="8" width="8" height="3" rx="1" /><rect x="6" y="13" width="13" height="3" rx="1" />
-            </svg>
-          </button>
-          <div className="ed-ab-sep" />
-          <button className="ed-ab-btn" title="Align Top" onClick={() => edAlign('top')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="3" y1="3" x2="21" y2="3" strokeWidth="2.5" /><rect x="8" y="5" width="3" height="8" rx="1" /><rect x="13" y="5" width="3" height="13" rx="1" />
-            </svg>
-          </button>
-          <button className="ed-ab-btn" title="Center Y" onClick={() => edAlign('cy')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="3" y1="12" x2="21" y2="12" strokeWidth="2.5" /><rect x="8" y="4" width="3" height="16" rx="1" /><rect x="13" y="6" width="3" height="12" rx="1" />
-            </svg>
-          </button>
-          <button className="ed-ab-btn" title="Align Bottom" onClick={() => edAlign('bottom')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="3" y1="21" x2="21" y2="21" strokeWidth="2.5" /><rect x="8" y="11" width="3" height="8" rx="1" /><rect x="13" y="6" width="3" height="13" rx="1" />
-            </svg>
-          </button>
-          <div className="ed-ab-sep" />
-          <button className="ed-ab-btn" title="Distribute H" onClick={() => edDistribute('h')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="3" y1="3" x2="3" y2="21" /><line x1="21" y1="3" x2="21" y2="21" /><rect x="9" y="8" width="6" height="8" rx="1" />
-            </svg>
-          </button>
-          <button className="ed-ab-btn" title="Distribute V" onClick={() => edDistribute('v')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <line x1="3" y1="3" x2="21" y2="3" /><line x1="3" y1="21" x2="21" y2="21" /><rect x="8" y="9" width="8" height="6" rx="1" />
-            </svg>
-          </button>
-        </div>
-
         <div id="poster-wrapper">
           <div id="poster-container" style={{ 
             width: containerDims.width * zoom, 
@@ -1410,21 +1482,6 @@ export default function VinylPosterPage({ navigate }) {
           }}>
             <canvas ref={canvasElRef} />
           </div>
-        </div>
-
-        {/* Gerçek Vektörel Zoom Sliderı (0.5x - 10.0x) */}
-        <div className="zoom-control-bar">
-          <span className="zoom-label">ZOOM</span>
-          <input 
-            type="range" 
-            min="0.5" 
-            max="10" 
-            step="0.1" 
-            value={zoom} 
-            onChange={(e) => setZoom(Number(e.target.value))} 
-          />
-          <span className="zoom-val">{Math.round(zoom * 100)}%</span>
-          <button onClick={() => setZoom(1)} className="zoom-reset-btn">Reset</button>
         </div>
       </div>
 
@@ -1437,16 +1494,51 @@ export default function VinylPosterPage({ navigate }) {
             {selectedType === EDIT_TYPES.SONG_TITLE && 'Song Title'}
             {selectedType === EDIT_TYPES.BOTTOM && 'Bottom Text'}
             {selectedType === EDIT_TYPES.VINYL && 'Vinyl Record'}
+            {selectedType === 'group' && 'Group'}
             {selectedType === 'multi' && 'Multiple'}
           </span>
         </div>
+
+        {/* SABİT ÇALIŞMA ALANI ARAÇ KUTUSU (Zoom, Hizalama, Gruplama) */}
+        <div className="global-tools-panel">
+          <div className="gt-section-title">HİZALAMA (ALIGN)</div>
+          <div className="gt-align-grid">
+            <button className="gt-align-btn" title="Sola Hizala" onClick={() => handleAlign('left')}>Sol</button>
+            <button className="gt-align-btn" title="Yatayda Ortala" onClick={() => handleAlign('cx')}>Y-Orta</button>
+            <button className="gt-align-btn" title="Sağa Hizala" onClick={() => handleAlign('right')}>Sağ</button>
+            <button className="gt-align-btn" title="Üste Hizala" onClick={() => handleAlign('top')}>Üst</button>
+            <button className="gt-align-btn" title="Dikeyde Ortala" onClick={() => handleAlign('cy')}>D-Orta</button>
+            <button className="gt-align-btn" title="Alta Hizala" onClick={() => handleAlign('bottom')}>Alt</button>
+          </div>
+
+          <div className="gt-section-title" style={{ marginTop: '10px' }}>GRUPLANDIRMA</div>
+          <div className="gt-group-row">
+            <button className="gt-group-btn" title="Seçilenleri Grupla" onClick={handleGroup}>Grupla</button>
+            <button className="gt-group-btn" title="Grubu Dağıt" onClick={handleUngroup}>Dağıt</button>
+          </div>
+
+          <div className="gt-section-title">YAKINLAŞTIRMA (ZOOM)</div>
+          <div className="gt-zoom-row">
+            <input 
+              type="range" 
+              min="0.5" 
+              max="10" 
+              step="0.1" 
+              value={zoom} 
+              onChange={(e) => setZoom(Number(e.target.value))} 
+            />
+            <span className="gt-zoom-val">{Math.round(zoom * 100)}%</span>
+            <button className="gt-zoom-reset" onClick={() => setZoom(1)}>Sıfırla</button>
+          </div>
+        </div>
+
         <div id="props-body">
           {!selectedType && (
             <div id="props-empty-state">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                 <rect x="3" y="3" width="18" height="18" rx="2" />
               </svg>
-              <p>Click an element on the canvas</p>
+              <p>Özelliklerini değiştirmek için canvas üzerindeki bir ögeye tıklayın.</p>
             </div>
           )}
 
@@ -1775,12 +1867,24 @@ export default function VinylPosterPage({ navigate }) {
             </div>
           )}
 
+          {selectedType === 'group' && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Grup Özellikleri</div>
+                <p style={{ fontSize: '11px', color: '#888', lineHeight: '1.6' }}>
+                  Bu ögeler şu anda gruplanmış durumda ve tek bir bütün olarak hareket ediyorlar. 
+                  Grubu dağıtmak veya konumlandırma yapmak için yukaradaki araçları kullanabilirsiniz.
+                </p>
+              </div>
+            </div>
+          )}
+
           {selectedType === 'multi' && (
             <div id="props-fields">
               <div className="pf-section">
                 <div className="pf-section-title">Multiple Selection</div>
                 <p style={{ fontSize: '11px', color: '#888' }}>
-                  Use the align/distribute toolbar above the canvas, or drag the group directly.
+                  Seçilen nesneleri tek bir öge haline getirmek için yukarıdan "Grupla" butonunu kullanabilir veya hizalayabilirsiniz.
                 </p>
               </div>
             </div>
