@@ -333,7 +333,7 @@ export default function VinylPosterBuilder() {
           const input = (document.getElementById('vinyl-lyrics-input') as HTMLTextAreaElement)?.value || "LOREM IPSUM...";
           
           const textLen = input.length * (fs * 0.6); 
-          const minR = 100;
+          const minR = 70;
           const spacing = fs * 1.2;
           
           const standardLoops = (380 - minR) / spacing;
@@ -389,7 +389,7 @@ export default function VinylPosterBuilder() {
           
           const fs = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
           const textLen = input.length * (fs * 0.6);
-          const minR = 100; const spacing = fs * 1.2;
+          const minR = 70; const spacing = fs * 1.2;
           const standardLen = Math.PI * (380 + minR) * (380 - minR) / spacing;
           
           let finalStr = input.trim();
@@ -618,10 +618,10 @@ export default function VinylPosterBuilder() {
           const ls = vs ? parseFloat(vs.getAttribute('letter-spacing') || "2") : 2;
           const l1 = document.getElementById('v-vinyl-label');
           const lcol = l1 ? w.edRgbHex(l1.getAttribute('fill') || '#dedede') : '#dedede';
-          const lsz = l1 ? parseInt(l1.getAttribute('r') || "80") : 80;
+          const lsz = l1 ? parseInt(l1.getAttribute('r') || "50") : 50; // Varsayılan göbek 50
           const hwRaw = el.style.width || '85%'; let hw = 85; if (hwRaw.includes('%')) hw = parseFloat(hwRaw); else if (hwRaw.includes('px')) { const pc = document.getElementById('poster-container'); hw = pc ? Math.round((parseFloat(hwRaw) / pc.offsetWidth) * 100) : 85; }
 
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,hw, `document.getElementById('v-vinyl-center').style.width=this.value+'%'; document.getElementById('v-vinyl-center').style.height='auto'`, '%')}</div><div class="pf-row"><label>Spiral Text Color</label>${cpair(tcol, `document.getElementById('v-spiral-text').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,tsz, `document.getElementById('v-spiral-text').setAttribute('font-size', this.value); document.getElementById('vinyl-text-size').value=this.value; window.updateVinylSpiral();`)}</div><div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,ls, `document.getElementById('v-spiral-text').setAttribute('letter-spacing', this.value)`)}</div><div class="pf-row"><label>Center Label Color</label>${cpair(lcol, `document.getElementById('v-vinyl-label').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,lsz, `document.getElementById('v-vinyl-label').setAttribute('r', this.value); document.getElementById('v-vinyl-hole').setAttribute('r', this.value/10); document.getElementById('v-vinyl-groove1').setAttribute('r', this.value*1.1); document.getElementById('v-vinyl-groove2').setAttribute('r', this.value*1.15)`)}</div></div>`;
+          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,hw, `document.getElementById('v-vinyl-center').style.width=this.value+'%'; document.getElementById('v-vinyl-center').style.height='auto'`, '%')}</div><div class="pf-row"><label>Spiral Text Color</label>${cpair(tcol, `document.getElementById('v-spiral-text').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,tsz, `document.getElementById('v-spiral-text').setAttribute('font-size', this.value); document.getElementById('vinyl-text-size').value=this.value; window.updateVinylSpiral();`)}</div><div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,ls, `document.getElementById('v-spiral-text').setAttribute('letter-spacing', this.value)`)}</div><div class="pf-row"><label>Center Label Color</label>${cpair(lcol, `document.getElementById('v-vinyl-label').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,lsz, `document.getElementById('v-vinyl-label').setAttribute('r', this.value); document.getElementById('v-vinyl-hole').setAttribute('r', this.value/10); document.getElementById('v-vinyl-groove1').setAttribute('r', this.value*1.2); document.getElementById('v-vinyl-groove2').setAttribute('r', this.value*1.28)`)}</div></div>`;
         }
         return html;
       };
@@ -998,12 +998,12 @@ export default function VinylPosterBuilder() {
                         <svg viewBox="0 0 800 800" width="100%" height="100%" id="vinyl-svg">
                             <defs><path id="v-spiral-path" d="" fill="none" /></defs>
                             <circle id="v-vinyl-bg" cx="400" cy="400" r="395" fill="none" />
-                            <circle id="v-vinyl-groove1" cx="400" cy="400" r="88" fill="none" stroke="#2a2a2a" strokeWidth="1" />
-                            <circle id="v-vinyl-groove2" cx="400" cy="400" r="92" fill="none" stroke="#2a2a2a" strokeWidth="1" />
+                            <circle id="v-vinyl-groove1" cx="400" cy="400" r="60" fill="none" stroke="#2a2a2a" strokeWidth="1" />
+                            <circle id="v-vinyl-groove2" cx="400" cy="400" r="64" fill="none" stroke="#2a2a2a" strokeWidth="1" />
                             <text fill="#212121" fontSize="12" letterSpacing="2" fontFamily="'DM Sans', sans-serif" fontWeight="700" textAnchor="start">
                                 <textPath href="#v-spiral-path" id="v-spiral-text" startOffset="0%">LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA</textPath>
                             </text>
-                            <circle id="v-vinyl-label" cx="400" cy="400" r="60" fill="#e0e0e0" />
+                            <circle id="v-vinyl-label" cx="400" cy="400" r="50" fill="#e0e0e0" />
                             <circle id="v-vinyl-hole" cx="400" cy="400" r="6" fill="#111111" />
                         </svg>
                     </div>
