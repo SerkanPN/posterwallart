@@ -227,15 +227,17 @@ export default function VinylPosterPage({ navigate }) {
     });
     canvas.add(topRight);
 
-    const songTitle = new fabric.IText(songTitleText, {
+    const songTitle = new fabric.Textbox(songTitleText, {
       left: containerDims.width / 2,
       top: containerDims.height * 0.12,
+      width: containerDims.width * 0.84,
       originX: 'center',
-      fontSize: 42,
+      textAlign: 'center',
+      fontSize: 36,
       fontFamily: 'Josefin Sans, sans-serif',
       fontWeight: 800,
       fill: songTitleColor,
-      charSpacing: 200,
+      charSpacing: 100,
       data: { edType: EDIT_TYPES.SONG_TITLE },
     });
     canvas.add(songTitle);
@@ -302,7 +304,7 @@ export default function VinylPosterPage({ navigate }) {
     if (vinylGroupRef.current) {
       canvas.remove(vinylGroupRef.current);
     }
-    const size = dims.width * 0.85;
+    const size = dims.width * 0.78;
     const cx = size / 2;
     const cy = size / 2;
     const outerR = size / 2 - 2;
@@ -342,7 +344,7 @@ export default function VinylPosterPage({ navigate }) {
       [vinylBg, groove1, groove2, ...spiralChars, label, hole],
       {
         left: dims.width / 2,
-        top: dims.height * 0.55,
+        top: dims.height * 0.58,
         originX: 'center',
         originY: 'center',
         data: { edType: EDIT_TYPES.VINYL },
@@ -373,7 +375,7 @@ export default function VinylPosterPage({ navigate }) {
     bgOverlayRef.current.set({ width: dims.width, height: dims.height });
     canvas.textLeftRef.set({ left: dims.width * 0.08, top: dims.height * 0.08 });
     canvas.textRightRef.set({ left: dims.width * 0.92, top: dims.height * 0.08 });
-    canvas.textSongRef.set({ left: dims.width / 2, top: dims.height * 0.12 });
+    canvas.textSongRef.set({ left: dims.width / 2, top: dims.height * 0.12, width: dims.width * 0.84 });
     canvas.textBottomRef.set({ left: dims.width / 2, top: dims.height * 0.92 });
     buildVinylGroup(canvas, dims, vinylTextSize, vinylLyrics);
     canvas.renderAll();
@@ -511,42 +513,40 @@ export default function VinylPosterPage({ navigate }) {
     }
   };
 
-  const applySearchResult = (track) => {
+  const fetchLyrics = async (artist, title) => {
+    try {
+      const res = await fetch(
+        `https://api.lyrics.ovh/v1/${encodeURIComponent(artist)}/${encodeURIComponent(title)}`
+      );
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (!data.lyrics) return null;
+      return data.lyrics
+        .replace(/\r/g, '')
+        .split('\n')
+        .filter(Boolean)
+        .join(' ')
+        .toUpperCase();
+    } catch (err) {
+      return null;
+    }
+  };
+
+  const applySearchResult = async (track) => {
     const year = track.releaseDate ? new Date(track.releaseDate).getFullYear().toString() : '';
     updateTextContent(fabricRef.current.textLeftRef, setTopLeftText, (track.artistName || '').toUpperCase());
     updateTextContent(fabricRef.current.textRightRef, setTopRightText, year);
     updateTextContent(fabricRef.current.textSongRef, setSongTitleText, (track.trackName || '').toUpperCase());
     updateTextContent(fabricRef.current.textBottomRef, setBottomText, (track.collectionName || '').toUpperCase());
-    if (track.artworkUrl100) {
-      const hiRes = track.artworkUrl100.replace('100x100', '1200x1200');
-      setBgImageUrl(hiRes);
-      fabric.Image.fromURL(hiRes, (img) => {
-        const canvas = fabricRef.current;
-        if (bgImageRef.current) canvas.remove(bgImageRef.current);
-        const scale = Math.max(
-          containerDims.width / img.width,
-          containerDims.height / img.height
-        ) * 1.15;
-        img.set({
-          left: containerDims.width / 2,
-          top: containerDims.height / 2,
-          originX: 'center',
-          originY: 'center',
-          scaleX: scale,
-          scaleY: scale,
-          selectable: false,
-          evented: false,
-          visible: bgType === 'blur',
-        });
-        img.filters = [new fabric.Image.filters.Blur({ blur: bgBlur / 100 })];
-        img.applyFilters();
-        canvas.insertAt(img, 1, false);
-        bgImageRef.current = img;
-        bgOverlayRef.current.bringToFront();
-        canvas.renderAll();
-      }, { crossOrigin: 'anonymous' });
+
+    showToast('Song data applied. Fetching lyrics...');
+    const lyrics = await fetchLyrics(track.artistName, track.trackName);
+    if (lyrics) {
+      setVinylLyrics(lyrics);
+      showToast('Lyrics found and applied to the vinyl spiral.');
+    } else {
+      showToast('Lyrics not found automatically. Paste them manually if needed.');
     }
-    showToast('Song data applied. Paste lyrics manually if needed.');
   };
 
   // ---- Alignment ----
@@ -1205,7 +1205,14 @@ export default function VinylPosterPage({ navigate }) {
       <div id="props-panel">
         <div id="props-header">
           Properties
-          <span id="props-selected-name">{selectedType && selectedType !== 'multi' ? selectedType : ''}</span>
+          <span id="props-selected-name">
+            {selectedType === EDIT_TYPES.TOP_LEFT && 'Artist Name'}
+            {selectedType === EDIT_TYPES.TOP_RIGHT && 'Year'}
+            {selectedType === EDIT_TYPES.SONG_TITLE && 'Song Title'}
+            {selectedType === EDIT_TYPES.BOTTOM && 'Bottom Text'}
+            {selectedType === EDIT_TYPES.VINYL && 'Vinyl Record'}
+            {selectedType === 'multi' && 'Multiple'}
+          </span>
         </div>
         <div id="props-body">
           {!selectedType && (
@@ -1216,12 +1223,123 @@ export default function VinylPosterPage({ navigate }) {
               <p>Click an element on the canvas</p>
             </div>
           )}
-          {selectedType && (
+          {selectedType === EDIT_TYPES.TOP_LEFT && (
             <div id="props-fields">
               <div className="pf-section">
-                <div className="pf-section-title">Selection</div>
+                <div className="pf-section-title">Artist Name (Top Left)</div>
+                <div className="pf-row">
+                  <label>Text</label>
+                  <input type="text" value={topLeftText}
+                    onChange={(e) => updateTextContent(fabricRef.current.textLeftRef, setTopLeftText, e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Color</label>
+                  <div className="pf-color-row">
+                    <input type="color" value={topLeftColor}
+                      onChange={(e) => updateTextColor(fabricRef.current.textLeftRef, setTopLeftColor, e.target.value)} />
+                    <input type="text" value={topLeftColor}
+                      onChange={(e) => updateTextColor(fabricRef.current.textLeftRef, setTopLeftColor, e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {selectedType === EDIT_TYPES.TOP_RIGHT && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Year (Top Right)</div>
+                <div className="pf-row">
+                  <label>Text</label>
+                  <input type="text" value={topRightText}
+                    onChange={(e) => updateTextContent(fabricRef.current.textRightRef, setTopRightText, e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Color</label>
+                  <div className="pf-color-row">
+                    <input type="color" value={topRightColor}
+                      onChange={(e) => updateTextColor(fabricRef.current.textRightRef, setTopRightColor, e.target.value)} />
+                    <input type="text" value={topRightColor}
+                      onChange={(e) => updateTextColor(fabricRef.current.textRightRef, setTopRightColor, e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {selectedType === EDIT_TYPES.SONG_TITLE && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Song Title</div>
+                <div className="pf-row">
+                  <label>Text</label>
+                  <input type="text" value={songTitleText}
+                    onChange={(e) => updateTextContent(fabricRef.current.textSongRef, setSongTitleText, e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Color</label>
+                  <div className="pf-color-row">
+                    <input type="color" value={songTitleColor}
+                      onChange={(e) => updateTextColor(fabricRef.current.textSongRef, setSongTitleColor, e.target.value)} />
+                    <input type="text" value={songTitleColor}
+                      onChange={(e) => updateTextColor(fabricRef.current.textSongRef, setSongTitleColor, e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {selectedType === EDIT_TYPES.BOTTOM && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Bottom Text</div>
+                <div className="pf-row">
+                  <label>Text</label>
+                  <input type="text" value={bottomText}
+                    onChange={(e) => updateTextContent(fabricRef.current.textBottomRef, setBottomText, e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Color</label>
+                  <div className="pf-color-row">
+                    <input type="color" value={bottomColor}
+                      onChange={(e) => updateTextColor(fabricRef.current.textBottomRef, setBottomColor, e.target.value)} />
+                    <input type="text" value={bottomColor}
+                      onChange={(e) => updateTextColor(fabricRef.current.textBottomRef, setBottomColor, e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          {selectedType === EDIT_TYPES.VINYL && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Vinyl Record &amp; Lyrics</div>
+                <div className="pf-row">
+                  <label>Spiral Text Size</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="6" max="40" value={vinylTextSize}
+                      onChange={(e) => setVinylTextSize(Number(e.target.value))} />
+                    <span className="pf-range-val">{vinylTextSize}px</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Lyrics / Text Content</label>
+                  <textarea
+                    style={{
+                      width: '100%', background: 'var(--input-bg)', border: '1px solid var(--input-border)',
+                      borderRadius: '5px', color: 'var(--spotify-text)', padding: '6px 8px', fontSize: '11px',
+                      fontFamily: 'DM Sans, sans-serif', minHeight: '90px', resize: 'vertical',
+                    }}
+                    value={vinylLyrics}
+                    onChange={(e) => setVinylLyrics(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+          {selectedType === 'multi' && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Multiple Selection</div>
                 <p style={{ fontSize: '11px', color: '#888' }}>
-                  Editable directly on the canvas: drag to move, use handles to scale/rotate, double-click text to edit.
+                  Use the align/distribute toolbar above the canvas, or drag the group directly.
                 </p>
               </div>
             </div>
