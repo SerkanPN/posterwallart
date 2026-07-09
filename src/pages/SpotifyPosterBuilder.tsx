@@ -460,7 +460,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       // ══════════════════════════════════════════════════════════════
-      // COVER LOADING ENGINES (SPOTIFY / VINYL)
+      // COVER LOADING ENGINES
       // ══════════════════════════════════════════════════════════════
 
       w.setCoverImage = function(src: string) {
@@ -532,7 +532,7 @@ export default function SpotifyPosterBuilder() {
       };
 
       // ══════════════════════════════════════════════════════════════
-      // BARCODE GRAPHIC GENERATION
+      // BARCODE GENERATION
       // ══════════════════════════════════════════════════════════════
       w.currentTrackUri = '';
       w.cachedSvgText = null;
@@ -1030,7 +1030,6 @@ export default function SpotifyPosterBuilder() {
               canvas.setBackgroundColor(color, canvas.renderAll.bind(canvas));
               if(bgImg) bgImg.set('visible', false); 
               
-              // Dynamically wait for contrast and SVG render load cycles completely
               await w.applyAutoContrast(color);
               
               await new Promise(r => setTimeout(r, 100));
@@ -1346,35 +1345,35 @@ export default function SpotifyPosterBuilder() {
             <div class="pf-row"><label>Shadow Blur</label>${rrow(0, 80, 1, shadowBlur, `window.setCoverBorderProp('shadow', this.value)`)}</div>
             <div class="pf-row"><label>Image Scale</label>${rrow(10, 200, 1, imgScale, `window.setCoverBorderProp('imageScale', this.value)`, '%')}</div>
           </div>`;
-      }
+        }
 
-      if (id === 'v-vinyl') {
-        const vsTextSize = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
-        const vsLetterSpacing = parseFloat((document.getElementById('vinyl-letter-spacing') as HTMLInputElement)?.value || "2");
-        const vsColor = (document.getElementById('c-v-st-t') as HTMLInputElement)?.value || "#212121";
-        const lblColor = (document.getElementById('c-v-lbl') as HTMLInputElement)?.value || "#e0e0e0";
-        const labelSize = parseInt((document.getElementById('vinyl-center-label-size') as HTMLInputElement)?.value || "80");
-        const currentScale = Math.round((obj.scaleX || 1) * 100);
-        const currentFont = (document.getElementById('vinyl-font-family') as HTMLInputElement)?.value || "'DM Sans', sans-serif";
+        if (id === 'v-vinyl') {
+          const vsTextSize = parseInt((document.getElementById('vinyl-text-size') as HTMLInputElement)?.value || "12");
+          const vsLetterSpacing = parseFloat((document.getElementById('vinyl-letter-spacing') as HTMLInputElement)?.value || "2");
+          const vsColor = (document.getElementById('c-v-st-t') as HTMLInputElement)?.value || "#212121";
+          const lblColor = (document.getElementById('c-v-lbl') as HTMLInputElement)?.value || "#e0e0e0";
+          const labelSize = parseInt((document.getElementById('vinyl-center-label-size') as HTMLInputElement)?.value || "80");
+          const currentScale = Math.round((obj.scaleX || 1) * 100);
+          const currentFont = (document.getElementById('vinyl-font-family') as HTMLInputElement)?.value || "'DM Sans', sans-serif";
 
-        html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record Controls</div>
-        <div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,currentScale, `window.setVinylProp('overallSize', this.value)`, '%')}</div>
-        <div class="pf-row"><label>Spiral Font Family</label>
-          <select onchange="window.setVinylProp('fontFamily', this.value)">
-            <option value="${currentFont}" selected>Current: ${currentFont.replace(/'/g, "")}</option>
-            ${fontOpts}
-          </select>
-        </div>
-        <div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,vsTextSize, `window.setVinylProp('textSize', this.value)`)}</div>
-        <div class="pf-row"><label>Spiral Letter Spacing</label>${rrow(-2,15,0.2,vsLetterSpacing, `window.setVinylProp('letterSpacing', this.value)`, '')}</div>
-        <div class="pf-row"><label>Spiral Text Color</label>${cpair(vsColor, `window.setVinylProp('textColor', this.value)`)}</div>
-        <div class="pf-row"><label>Center Label Color</label>${cpair(lblColor, `window.setVinylProp('labelColor', this.value)`)}</div>
-        <div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,labelSize, `window.setVinylProp('labelSize', this.value)`)}</div>
-        </div>`;
-      }
+          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record Controls</div>
+          <div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,currentScale, `window.setVinylProp('overallSize', this.value)`, '%')}</div>
+          <div class="pf-row"><label>Spiral Font Family</label>
+            <select onchange="window.setVinylProp('fontFamily', this.value)">
+              <option value="${currentFont}" selected>Current: ${currentFont.replace(/'/g, "")}</option>
+              ${fontOpts}
+            </select>
+          </div>
+          <div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,vsTextSize, `window.setVinylProp('textSize', this.value)`)}</div>
+          <div class="pf-row"><label>Spiral Letter Spacing</label>${rrow(-2,15,0.2,vsLetterSpacing, `window.setVinylProp('letterSpacing', this.value)`, '')}</div>
+          <div class="pf-row"><label>Spiral Text Color</label>${cpair(vsColor, `window.setVinylProp('textColor', this.value)`)}</div>
+          <div class="pf-row"><label>Center Label Color</label>${cpair(lblColor, `window.setVinylProp('labelColor', this.value)`)}</div>
+          <div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,labelSize, `window.setVinylProp('labelSize', this.value)`)}</div>
+          </div>`;
+        }
 
-      return html;
-    };
+        return html;
+      };
 
       w.edBuildMulti = function() {
         const fontOpts = `<option value="'DM Sans', sans-serif">DM Sans</option><option value="'Inter', sans-serif">Inter</option><option value="'Montserrat', sans-serif">Montserrat</option><option value="'Oswald', sans-serif">Oswald</option><option value="'Poppins', sans-serif">Poppins</option><option value="'Playfair Display', serif">Playfair Display</option><option value="'Anton', sans-serif">Anton</option><option value="'Bebas Neue', sans-serif">Bebas Neue</option><option value="'Lora', serif">Lora</option><option value="'Merriweather', serif">Merriweather</option>`;
@@ -1826,7 +1825,7 @@ export default function SpotifyPosterBuilder() {
         .spotify-poster-page .pf-btn.active { background: #0d2218; color: var(--accent); border-color: #1DB954; }
       `}</style>
 
-      {/* States dynamically updated and read on main renderer */}
+      {/* Synchronized state values representing hidden inputs */}
       <input type="hidden" id="vinyl-text-size" defaultValue="12" />
       <input type="hidden" id="vinyl-letter-spacing" defaultValue="2" />
       <input type="hidden" id="vinyl-center-label-size" defaultValue="80" />
@@ -2215,9 +2214,9 @@ export default function SpotifyPosterBuilder() {
           <button className="ed-ab-btn" title="Center X" onClick={() => (window as any).edAlign('cx')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="3" x2="12" y2="21" strokeWidth="2.5"/><rect x="6" y="8" width="12" height="3" rx="1"/><rect x="4" y="13" width="16" height="3" rx="1"/></svg></button>
           <button className="ed-ab-btn" title="Align Right" onClick={() => (window as any).edAlign('right')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="21" y1="3" x2="21" y2="21" strokeWidth="2.5"/><rect x="11" y="8" width="8" height="3" rx="1"/><rect x="6" y="13" width="13" height="3" rx="1"/></svg></button>
           <div className="ed-ab-sep"></div>
-          <button className="ed-ab-btn" title="Align Top" onClick={() => (window as any).edAlign('top')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="21" y2="3" strokeWidth="2.5"/><rect x="8" y="5" width="3" height="8" rx="1"/><rect x="13" y="5" width="3" height="13" rx="1"/></svg></button>
+          <button className="ed-ab-btn" title="Align Top" onClick={() => (window as any).edAlign('top')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="3" y2="21" strokeWidth="2.5"/><rect x="8" y="5" width="3" height="8" rx="1"/><rect x="5" y="13" width="13" height="3" rx="1"/></svg></button>
           <button className="ed-ab-btn" title="Center Y" onClick={() => (window as any).edAlign('cy')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="12" x2="21" y2="12" strokeWidth="2.5"/><rect x="8" y="4" width="3" height="16" rx="1"/><rect x="13" y="6" width="3" height="12" rx="1"/></svg></button>
-          <button className="ed-ab-btn" title="Align Bottom" onClick={() => (window as any).edAlign('bottom')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="21" x2="21" y2="21" strokeWidth="2.5"/><rect x="8" y="11" width="3" height="8" rx="1"/><rect x="13" y="6" width="3" height="13" rx="1"/></svg></button>
+          <button className="ed-ab-btn" title="Align Bottom" onClick={() => (window as any).edAlign('bottom')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="21" x2="21" y2="21" strokeWidth="2.5"/><rect x="8" y="11" width="3" height="8" rx="1"/><rect x="6" y="13" width="13" height="3" rx="1"/></svg></button>
           <div className="ed-ab-sep"></div>
           <button className="ed-ab-btn" title="Distribute H" onClick={() => (window as any).edDistribute('h')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="3" y2="21"/><line x1="21" y1="3" x2="21" y2="21"/><rect x="9" y="8" width="6" height="8" rx="1"/></svg></button>
           <button className="ed-ab-btn" title="Distribute V" onClick={() => (window as any).edDistribute('v')}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="3" x2="21" y2="3"/><line x1="3" y1="21" x2="21" y2="21"/><rect x="8" y="9" width="8" height="6" rx="1"/></svg></button>
