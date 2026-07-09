@@ -138,6 +138,9 @@ export default function VinylPosterPage({ navigate }) {
   const bgOverlayRef = useRef(null);
   const vinylGroupRef = useRef(null);
 
+  // Kilit mekanizmaları
+  const isRebuildingRef = useRef(false);
+
   const [openSections, setOpenSections] = useState({
     search: true,
     size: true,
@@ -151,6 +154,7 @@ export default function VinylPosterPage({ navigate }) {
 
   const [canvasSize, setCanvasSize] = useState('30x40');
   const [containerDims, setContainerDims] = useState(fitContain(30, 40, BASE_MAX_W, BASE_MAX_H));
+  const [zoom, setZoom] = useState(1); // Zoom State
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -320,7 +324,17 @@ export default function VinylPosterPage({ navigate }) {
 
     canvas.on('selection:created', onSelectionChange);
     canvas.on('selection:updated', onSelectionChange);
-    canvas.on('selection:cleared', () => {
+    
+    canvas.on('selection:cleared', (e) => {
+      if (isRebuildingRef.current) return;
+      
+      // Kullanıcı ayarlama panellerinden birine tıkladıysa seçimi kaybetme!
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.closest('#panel') || activeEl.closest('#props-panel') || activeEl.closest('.zoom-control-bar'))) {
+        return;
+      }
+      
+      // Eğer tıklama harici bir olay veya canvas boşluğuna tıklanması ise seçimi temizle
       setSelectedType(null);
       setAlignBarVisible(false);
     });
@@ -352,6 +366,7 @@ export default function VinylPosterPage({ navigate }) {
   }, []);
 
   function onSelectionChange(e) {
+    if (isRebuildingRef.current) return;
     const obj = e.selected && e.selected.length === 1 ? e.selected[0] : null;
     if (obj && obj.data) {
       setSelectedType(obj.data.edType);
@@ -362,6 +377,11 @@ export default function VinylPosterPage({ navigate }) {
   }
 
   function buildVinylGroup(canvas, dims, textSize, lyrics, scalePct, fontFam, textCol, labelCol, labelPct, letterSpc) {
+    isRebuildingRef.current = true;
+    
+    // Yeniden oluşturma esnasında seçili olup olmadığını kontrol et
+    const wasSelected = vinylGroupRef.current && canvas.getActiveObject() === vinylGroupRef.current;
+
     if (vinylGroupRef.current) {
       canvas.remove(vinylGroupRef.current);
     }
@@ -373,7 +393,7 @@ export default function VinylPosterPage({ navigate }) {
     const labelR = outerR * (labelPct / 100);
     const holeR = outerR * 0.015;
 
-    // Şarkı sözünün tamamını sarmala sığdırmak için font boyutunu otomatik küçülten algoritma
+    // Sığdırma algoritması
     let adjustedTextSize = textSize;
     const cleanText = (lyrics || '').replace(/\s+/g, ' ').trim().toUpperCase();
     if (cleanText.length > 0) {
@@ -433,9 +453,17 @@ export default function VinylPosterPage({ navigate }) {
         data: { edType: EDIT_TYPES.VINYL },
       }
     );
+    
     canvas.add(group);
     vinylGroupRef.current = group;
+
+    // Eğer önceden seçiliyse seçimi geri yükle
+    if (wasSelected) {
+      canvas.setActiveObject(group);
+    }
+    
     canvas.renderAll();
+    isRebuildingRef.current = false;
   }
 
   const rebuildVinyl = useCallback(() => {
@@ -470,10 +498,11 @@ export default function VinylPosterPage({ navigate }) {
     fabricRef.current && fabricRef.current.renderAll();
   };
 
-  // React state değişikliklerinin canvas metinlerine yansıtılması
+  // React state değişikliklerinin canvas metinlerine sarsıntısız yansıtılması
   useEffect(() => {
     const canvas = fabricRef.current;
     if (canvas && canvas.textLeftRef) {
+      isRebuildingRef.current = true;
       canvas.textLeftRef.set({
         text: topLeftText,
         fill: topLeftColor,
@@ -483,12 +512,14 @@ export default function VinylPosterPage({ navigate }) {
         fontWeight: topLeftFontWeight
       });
       canvas.renderAll();
+      isRebuildingRef.current = false;
     }
   }, [topLeftText, topLeftColor, topLeftFontFamily, topLeftFontSize, topLeftCharSpacing, topLeftFontWeight]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
     if (canvas && canvas.textRightRef) {
+      isRebuildingRef.current = true;
       canvas.textRightRef.set({
         text: topRightText,
         fill: topRightColor,
@@ -498,12 +529,14 @@ export default function VinylPosterPage({ navigate }) {
         fontWeight: topRightFontWeight
       });
       canvas.renderAll();
+      isRebuildingRef.current = false;
     }
   }, [topRightText, topRightColor, topRightFontFamily, topRightFontSize, topRightCharSpacing, topRightFontWeight]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
     if (canvas && canvas.textSongRef) {
+      isRebuildingRef.current = true;
       canvas.textSongRef.set({
         text: songTitleText,
         fill: songTitleColor,
@@ -513,12 +546,14 @@ export default function VinylPosterPage({ navigate }) {
         fontWeight: songTitleFontWeight
       });
       canvas.renderAll();
+      isRebuildingRef.current = false;
     }
   }, [songTitleText, songTitleColor, songTitleFontFamily, songTitleFontSize, songTitleCharSpacing, songTitleFontWeight]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
     if (canvas && canvas.textBottomRef) {
+      isRebuildingRef.current = true;
       canvas.textBottomRef.set({
         text: bottomText,
         fill: bottomColor,
@@ -528,6 +563,7 @@ export default function VinylPosterPage({ navigate }) {
         fontWeight: bottomFontWeight
       });
       canvas.renderAll();
+      isRebuildingRef.current = false;
     }
   }, [bottomText, bottomColor, bottomFontFamily, bottomFontSize, bottomCharSpacing, bottomFontWeight]);
 
@@ -926,7 +962,7 @@ export default function VinylPosterPage({ navigate }) {
 
         .spotify-poster-page #canvas-area {
           flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
-          background: #0d0d0d; padding: 30px; overflow: hidden; position: relative;
+          background: #0d0d0d; padding: 30px; overflow: auto; position: relative;
         }
         .spotify-poster-page #canvas-area::before {
           content: ''; position: absolute; inset: 0;
@@ -934,11 +970,14 @@ export default function VinylPosterPage({ navigate }) {
         }
         .spotify-poster-page #poster-wrapper {
           position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 20px;
+          padding: 80px;
         }
         .spotify-poster-page #poster-container {
           position: relative; overflow: hidden;
           box-shadow: 0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05);
-          border-radius: 4px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1), height 0.4s cubic-bezier(0.4,0,0.2,1);
+          border-radius: 4px;
+          transform-origin: center center;
+          transition: transform 0.15s ease-out, width 0.4s cubic-bezier(0.4,0,0.2,1), height 0.4s cubic-bezier(0.4,0,0.2,1);
         }
 
         .spotify-poster-page .accordion-btn {
@@ -1024,6 +1063,56 @@ export default function VinylPosterPage({ navigate }) {
           font-family: 'DM Sans', sans-serif; transition: all 0.15s; text-align: center;
         }
         .spotify-poster-page .pf-btn:hover { background: #252525; color: var(--spotify-text); }
+
+        /* Zoom Control CSS */
+        .spotify-poster-page .zoom-control-bar {
+          display: flex;
+          align-items: center;
+          gap: 12px;
+          background: #111;
+          border: 1px solid var(--panel-border);
+          padding: 8px 16px;
+          border-radius: 24px;
+          margin-top: 15px;
+          z-index: 100;
+          box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+          position: sticky;
+          bottom: 20px;
+        }
+        .spotify-poster-page .zoom-control-bar input[type=range] {
+          width: 140px;
+          accent-color: var(--accent);
+          cursor: pointer;
+        }
+        .spotify-poster-page .zoom-control-bar .zoom-label {
+          font-size: 10px;
+          letter-spacing: 0.1em;
+          color: var(--spotify-subtext);
+          font-weight: 700;
+        }
+        .spotify-poster-page .zoom-control-bar .zoom-val {
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--accent);
+          min-width: 38px;
+          text-align: right;
+        }
+        .spotify-poster-page .zoom-control-bar .zoom-reset-btn {
+          background: #222;
+          border: 1px solid #333;
+          color: var(--spotify-text);
+          font-size: 10px;
+          padding: 3px 10px;
+          border-radius: 12px;
+          cursor: pointer;
+          font-weight: 600;
+          transition: background 0.15s;
+        }
+        .spotify-poster-page .zoom-control-bar .zoom-reset-btn:hover {
+          background: var(--accent);
+          color: #000;
+          border-color: var(--accent);
+        }
       `}</style>
       <div id="panel">
         <div className="panel-header">
@@ -1281,9 +1370,28 @@ export default function VinylPosterPage({ navigate }) {
         </div>
 
         <div id="poster-wrapper">
-          <div id="poster-container" style={{ width: containerDims.width, height: containerDims.height }}>
+          <div id="poster-container" style={{ 
+            width: containerDims.width, 
+            height: containerDims.height,
+            transform: `scale(${zoom})`
+          }}>
             <canvas ref={canvasElRef} />
           </div>
+        </div>
+
+        {/* Zoom Kontrol Slider'ı */}
+        <div className="zoom-control-bar">
+          <span className="zoom-label">ZOOM</span>
+          <input 
+            type="range" 
+            min="0.5" 
+            max="2" 
+            step="0.05" 
+            value={zoom} 
+            onChange={(e) => setZoom(Number(e.target.value))} 
+          />
+          <span className="zoom-val">{Math.round(zoom * 100)}%</span>
+          <button onClick={() => setZoom(1)} className="zoom-reset-btn">Reset</button>
         </div>
       </div>
 
@@ -1383,7 +1491,7 @@ export default function VinylPosterPage({ navigate }) {
                 <div className="pf-row">
                   <label>Font Size</label>
                   <div className="pf-range-row">
-                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setTopRightFontSize(Number(e.target.value))} />
+                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setRightFontSize(Number(e.target.value))} />
                     <span className="pf-range-val">{topRightFontSize}px</span>
                   </div>
                 </div>
