@@ -46,6 +46,7 @@ export default function VinylPosterBuilder() {
         '26x36': [26,36], '28x40': [28,40], '30x40':[30,40],
         '40x50': [40, 50], '50x60': [50,60], '60x80': [60,80], 
         '68x80': [68,80], '88x104': [88,104]
+      };
 
       w.updateCanvasSize = function() {
         const selectEl = document.getElementById('canvas-size') as HTMLSelectElement;
