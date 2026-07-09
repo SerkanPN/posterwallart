@@ -71,32 +71,51 @@ function fitContain(wIn, hIn, maxW, maxH) {
   return { width: Math.round(width), height: Math.round(height) };
 }
 
-function buildSpiralChars(text, opts) {
-  const { cx, cy, startRadius, endRadius, fontSize, color, fontFamily, loops } = opts;
-  const chars = (text || '').split('');
-  if (!chars.length) return [];
-  const totalAngle = Math.PI * 2 * loops;
-  return chars.map((ch, i) => {
-    const t = chars.length > 1 ? i / (chars.length - 1) : 0;
-    const angle = t * totalAngle - Math.PI / 2;
-    const radius = startRadius + t * (endRadius - startRadius);
-    const x = cx + radius * Math.cos(angle);
-    const y = cy + radius * Math.sin(angle);
-    const rotationDeg = (angle * 180) / Math.PI + 90;
-    return new fabric.Text(ch === ' ' ? '\u00A0' : ch, {
-      left: x,
-      top: y,
-      fontSize,
-      fill: color,
-      fontFamily,
-      fontWeight: 700,
-      originX: 'center',
-      originY: 'center',
-      angle: rotationDeg,
-      selectable: false,
-      evented: false,
-    });
-  });
+function buildGrooveSpiralChars(text, opts) {
+  const { cx, cy, innerRadius, outerRadius, fontSize, color, fontFamily } = opts;
+  const clean = (text || '').replace(/\s+/g, ' ').trim().toUpperCase();
+  const source = clean.length ? clean + '   ' : '   ';
+
+  const pitch = fontSize * 1.05; // radial distance per full revolution -> groove spacing
+  const radialPerAngle = pitch / (Math.PI * 2);
+  const charWidth = fontSize * 0.62; // approx glyph advance including tracking
+
+  const chars = [];
+  let angle = 0;
+  let radius = innerRadius;
+  let charIndex = 0;
+  let guard = 0;
+
+  while (radius < outerRadius && guard < 20000) {
+    guard++;
+    const ch = source[charIndex % source.length];
+    charIndex++;
+    const drawAngle = angle - Math.PI / 2;
+    const x = cx + radius * Math.cos(drawAngle);
+    const y = cy + radius * Math.sin(drawAngle);
+    const rotationDeg = (drawAngle * 180) / Math.PI + 90;
+
+    if (ch !== ' ') {
+      chars.push(new fabric.Text(ch, {
+        left: x,
+        top: y,
+        fontSize,
+        fill: color,
+        fontFamily,
+        fontWeight: 700,
+        originX: 'center',
+        originY: 'center',
+        angle: rotationDeg,
+        selectable: false,
+        evented: false,
+      }));
+    }
+
+    const angleStep = charWidth / Math.max(radius, fontSize);
+    angle += angleStep;
+    radius += radialPerAngle * angleStep;
+  }
+  return chars;
 }
 
 export default function VinylPosterPage({ navigate }) {
@@ -309,39 +328,33 @@ export default function VinylPosterPage({ navigate }) {
     const cy = size / 2;
     const outerR = size / 2 - 2;
 
-    const vinylBg = new fabric.Circle({
-      left: cx, top: cy, radius: outerR, fill: '#151515',
-      originX: 'center', originY: 'center', selectable: false, evented: false,
-    });
-    const groove1 = new fabric.Circle({
-      left: cx, top: cy, radius: outerR * 0.15, fill: '', stroke: '#2a2a2a', strokeWidth: 1,
-      originX: 'center', originY: 'center', selectable: false, evented: false,
-    });
-    const groove2 = new fabric.Circle({
-      left: cx, top: cy, radius: outerR * 0.16, fill: '', stroke: '#2a2a2a', strokeWidth: 1,
+    const labelR = outerR * 0.125;
+    const holeR = outerR * 0.015;
+
+    const edge = new fabric.Circle({
+      left: cx, top: cy, radius: outerR, fill: '', stroke: '#d8d8d8', strokeWidth: 1,
       originX: 'center', originY: 'center', selectable: false, evented: false,
     });
     const label = new fabric.Circle({
-      left: cx, top: cy, radius: outerR * 0.125, fill: '#e0e0e0',
+      left: cx, top: cy, radius: labelR, fill: '#e8e8e8', stroke: '#c9c9c9', strokeWidth: 1,
       originX: 'center', originY: 'center', selectable: false, evented: false,
     });
     const hole = new fabric.Circle({
-      left: cx, top: cy, radius: outerR * 0.015, fill: '#111111',
+      left: cx, top: cy, radius: holeR, fill: '#111111',
       originX: 'center', originY: 'center', selectable: false, evented: false,
     });
 
-    const spiralChars = buildSpiralChars(lyrics, {
+    const spiralChars = buildGrooveSpiralChars(lyrics, {
       cx, cy,
-      startRadius: outerR * 0.18,
-      endRadius: outerR * 0.98,
+      innerRadius: labelR + textSize * 0.6,
+      outerRadius: outerR - textSize * 0.3,
       fontSize: textSize,
-      color: '#dddddd',
+      color: '#181818',
       fontFamily: 'DM Sans, sans-serif',
-      loops: 3.2,
     });
 
     const group = new fabric.Group(
-      [vinylBg, groove1, groove2, ...spiralChars, label, hole],
+      [edge, ...spiralChars, label, hole],
       {
         left: dims.width / 2,
         top: dims.height * 0.58,
