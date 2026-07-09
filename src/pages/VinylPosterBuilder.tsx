@@ -613,15 +613,33 @@ export default function VinylPosterBuilder() {
 
         if (id === 'v-vinyl') {
           const vs = document.getElementById('v-spiral-text');
-          const tcol = vs ? w.edRgbHex(vs.getAttribute('fill') || '#b3b3b3') : '#b3b3b3';
+          const tcol = vs ? w.edRgbHex(vs.getAttribute('fill') || '#212121') : '#212121';
           const tsz = vs ? parseInt(vs.getAttribute('font-size') || "12") : 12;
           const ls = vs ? parseFloat(vs.getAttribute('letter-spacing') || "2") : 2;
+          const ff = vs ? (vs.getAttribute('font-family') || "'DM Sans', sans-serif").replace(/"/g, "'") : "'DM Sans', sans-serif";
+          
           const l1 = document.getElementById('v-vinyl-label');
-          const lcol = l1 ? w.edRgbHex(l1.getAttribute('fill') || '#dedede') : '#dedede';
-          const lsz = l1 ? parseInt(l1.getAttribute('r') || "50") : 50; // Varsayılan göbek 50
+          const lcol = l1 ? w.edRgbHex(l1.getAttribute('fill') || '#e0e0e0') : '#e0e0e0';
+          const lsz = l1 ? parseInt(l1.getAttribute('r') || "50") : 50;
+          
           const hwRaw = el.style.width || '85%'; let hw = 85; if (hwRaw.includes('%')) hw = parseFloat(hwRaw); else if (hwRaw.includes('px')) { const pc = document.getElementById('poster-container'); hw = pc ? Math.round((parseFloat(hwRaw) / pc.offsetWidth) * 100) : 85; }
 
-          html += `<hr class="pf-divider"><div class="pf-section"><div class="pf-section-title">Vinyl Record</div><div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,hw, `document.getElementById('v-vinyl-center').style.width=this.value+'%'; document.getElementById('v-vinyl-center').style.height='auto'`, '%')}</div><div class="pf-row"><label>Spiral Text Color</label>${cpair(tcol, `document.getElementById('v-spiral-text').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,tsz, `document.getElementById('v-spiral-text').setAttribute('font-size', this.value); document.getElementById('vinyl-text-size').value=this.value; window.updateVinylSpiral();`)}</div><div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,ls, `document.getElementById('v-spiral-text').setAttribute('letter-spacing', this.value)`)}</div><div class="pf-row"><label>Center Label Color</label>${cpair(lcol, `document.getElementById('v-vinyl-label').setAttribute('fill', this.value)`)}</div><div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,lsz, `document.getElementById('v-vinyl-label').setAttribute('r', this.value); document.getElementById('v-vinyl-hole').setAttribute('r', this.value/10); document.getElementById('v-vinyl-groove1').setAttribute('r', this.value*1.2); document.getElementById('v-vinyl-groove2').setAttribute('r', this.value*1.28)`)}</div></div>`;
+          html += `<hr class="pf-divider"><div class="pf-section">
+            <div class="pf-section-title">Vinyl Record</div>
+            <div class="pf-row"><label>Overall Size (%)</label>${rrow(10,150,1,hw, `document.getElementById('v-vinyl-center').style.width=this.value+'%'; document.getElementById('v-vinyl-center').style.height='auto'`, '%')}</div>
+            <div class="pf-row">
+                <label>Spiral Font Family</label>
+                <select onchange="document.getElementById('v-spiral-text').setAttribute('font-family', this.value); window.updateVinylSpiral();">
+                    <option value="${ff}" selected>Current Font</option>
+                    ${fontOpts}
+                </select>
+            </div>
+            <div class="pf-row"><label>Spiral Text Color</label>${cpair(tcol, `document.getElementById('v-spiral-text').setAttribute('fill', this.value)`)}</div>
+            <div class="pf-row"><label>Spiral Text Size</label>${rrow(6,30,1,tsz, `document.getElementById('v-spiral-text').setAttribute('font-size', this.value); document.getElementById('vinyl-text-size').value=this.value; window.updateVinylSpiral();`)}</div>
+            <div class="pf-row"><label>Letter Spacing</label>${rrow(0,10,0.5,ls, `document.getElementById('v-spiral-text').setAttribute('letter-spacing', this.value)`)}</div>
+            <div class="pf-row"><label>Center Label Color</label>${cpair(lcol, `document.getElementById('v-vinyl-label').setAttribute('fill', this.value)`)}</div>
+            <div class="pf-row"><label>Center Label Size</label>${rrow(20,200,1,lsz, `document.getElementById('v-vinyl-label').setAttribute('r', this.value); document.getElementById('v-vinyl-hole').setAttribute('r', this.value/10); document.getElementById('v-vinyl-groove1').setAttribute('r', this.value*1.2); document.getElementById('v-vinyl-groove2').setAttribute('r', this.value*1.28)`)}</div>
+          </div>`;
         }
         return html;
       };
