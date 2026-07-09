@@ -710,6 +710,214 @@ export default function VinylPosterPage({ navigate }) {
 
   return (
     <div className="spotify-poster-page">
+      <style>{`
+        .spotify-poster-page {
+          --panel-bg: #0d0d0d;
+          --panel-border: #1e1e1e;
+          --spotify-text: #ffffff;
+          --spotify-subtext: #8a8a8a;
+          --accent: #1DB954;
+          --input-bg: #161616;
+          --input-border: #262626;
+          display: flex;
+          height: 100vh;
+          width: 100%;
+          background: #000;
+          color: var(--spotify-text);
+          font-family: 'DM Sans', sans-serif;
+          overflow: hidden;
+        }
+        .spotify-poster-page #panel {
+          width: 300px;
+          min-width: 300px;
+          background: var(--panel-bg);
+          border-right: 1px solid var(--panel-border);
+          overflow-y: auto;
+          display: flex;
+          flex-direction: column;
+        }
+        .spotify-poster-page #panel::-webkit-scrollbar { width: 3px; }
+        .spotify-poster-page #panel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        .spotify-poster-page .panel-header {
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 16px; border-bottom: 1px solid var(--panel-border); flex-shrink: 0;
+        }
+        .spotify-poster-page .title-group { display: flex; align-items: center; gap: 8px; }
+        .spotify-poster-page .title-group h1 {
+          font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 0;
+        }
+        .spotify-poster-page .back-btn {
+          background: none; border: 1px solid var(--panel-border); color: var(--spotify-subtext);
+          font-size: 11px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-family: inherit;
+          transition: all 0.15s;
+        }
+        .spotify-poster-page .back-btn:hover { color: var(--spotify-text); border-color: #333; }
+
+        .spotify-poster-page .search-row { display: flex; gap: 6px; padding: 0 16px 10px; align-items: flex-start; }
+        .spotify-poster-page .search-row .form-row { flex: 1; padding: 0; }
+
+        .spotify-poster-page .form-row { padding: 0 16px 12px; }
+        .spotify-poster-page .form-row label {
+          display: block; font-size: 10px; color: var(--spotify-subtext); margin-bottom: 5px;
+          text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
+        }
+        .spotify-poster-page .form-row input[type=text],
+        .spotify-poster-page .form-row select,
+        .spotify-poster-page .form-row textarea {
+          width: 100%; background: var(--input-bg); border: 1px solid var(--input-border);
+          border-radius: 6px; color: var(--spotify-text); padding: 8px 10px; font-size: 12px;
+          font-family: inherit; outline: none; transition: border-color 0.15s; box-sizing: border-box;
+        }
+        .spotify-poster-page .form-row input[type=text]:focus,
+        .spotify-poster-page .form-row select:focus,
+        .spotify-poster-page .form-row textarea:focus { border-color: var(--accent); }
+        .spotify-poster-page .form-row select option { background: #1a1a1a; }
+        .spotify-poster-page .form-row textarea { min-height: 76px; resize: vertical; line-height: 1.5; }
+
+        .spotify-poster-page .color-row { display: flex; gap: 8px; align-items: center; padding: 0 16px 12px; }
+        .spotify-poster-page .color-row input[type=color] {
+          width: 34px; height: 30px; border: none; border-radius: 6px; padding: 2px;
+          background: var(--input-bg); cursor: pointer; flex-shrink: 0;
+        }
+        .spotify-poster-page .color-row input[type=text] {
+          flex: 1; background: var(--input-bg); border: 1px solid var(--input-border);
+          border-radius: 6px; color: var(--spotify-text); padding: 6px 8px; font-size: 11px; font-family: inherit;
+        }
+
+        .spotify-poster-page .range-row { display: flex; align-items: center; gap: 8px; padding: 0 16px 12px; }
+        .spotify-poster-page .range-row input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+        .spotify-poster-page .range-val { font-size: 10px; color: var(--accent); font-weight: 600; min-width: 34px; text-align: right; }
+
+        .spotify-poster-page .upload-area {
+          position: relative; border: 1px dashed var(--panel-border); border-radius: 8px;
+          padding: 22px 12px; text-align: center; cursor: pointer; margin: 0 16px 4px;
+          transition: border-color 0.15s;
+        }
+        .spotify-poster-page .upload-area:hover { border-color: var(--accent); }
+        .spotify-poster-page .upload-area p { font-size: 11px; color: var(--spotify-subtext); margin: 0; }
+
+        .spotify-poster-page .btn {
+          border: none; border-radius: 6px; padding: 9px 14px; font-size: 12px; font-weight: 600;
+          cursor: pointer; font-family: inherit; transition: opacity 0.15s;
+        }
+        .spotify-poster-page .btn:hover { opacity: 0.85; }
+        .spotify-poster-page .btn-primary { background: var(--accent); color: #000; }
+        .spotify-poster-page .btn-secondary {
+          background: var(--input-bg); color: var(--spotify-text); border: 1px solid var(--input-border); flex: 1;
+        }
+        .spotify-poster-page .btn-download-group { display: flex; gap: 6px; padding: 0 16px 4px; }
+
+        .spotify-poster-page .loading-spinner {
+          width: 16px; height: 16px; border: 2px solid var(--panel-border);
+          border-top-color: var(--accent); border-radius: 50%; animation: vinyl-spin 0.7s linear infinite;
+        }
+        @keyframes vinyl-spin { to { transform: rotate(360deg); } }
+
+        .spotify-poster-page .search-results { padding: 0 16px 12px; max-height: 220px; overflow-y: auto; }
+        .spotify-poster-page .search-result-item { border-radius: 6px; padding: 6px; }
+        .spotify-poster-page .search-result-item:hover { background: var(--input-bg); }
+
+        .spotify-poster-page #canvas-area {
+          flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+          background: #0d0d0d; padding: 30px; overflow: hidden; position: relative;
+        }
+        .spotify-poster-page #canvas-area::before {
+          content: ''; position: absolute; inset: 0;
+          background: radial-gradient(ellipse at center, #1a1a1a 0%, #0d0d0d 70%); pointer-events: none;
+        }
+        .spotify-poster-page #poster-wrapper {
+          position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 20px;
+        }
+        .spotify-poster-page #poster-container {
+          position: relative; overflow: hidden;
+          box-shadow: 0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05);
+          border-radius: 4px; transition: width 0.4s cubic-bezier(0.4,0,0.2,1), height 0.4s cubic-bezier(0.4,0,0.2,1);
+        }
+
+        .spotify-poster-page .accordion-btn {
+          width: 100%; background: none; border: none; color: var(--spotify-subtext);
+          font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+          text-align: left; padding: 16px; cursor: pointer; display: flex; justify-content: space-between;
+          align-items: center; border-bottom: 1px solid var(--panel-border); font-family: 'DM Sans', sans-serif;
+          transition: color 0.15s;
+        }
+        .spotify-poster-page .accordion-btn:hover { color: var(--spotify-text); }
+        .spotify-poster-page .accordion-btn .arrow { font-size: 9px; transition: transform 0.2s; }
+        .spotify-poster-page .accordion-btn.open .arrow { transform: rotate(180deg); }
+        .spotify-poster-page .accordion-content { display: none; padding: 14px 0; border-bottom: 1px solid var(--panel-border); }
+        .spotify-poster-page .accordion-content.open { display: block; }
+
+        .spotify-poster-page #toast {
+          position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+          background: var(--accent); color: #000; padding: 10px 20px; border-radius: 24px;
+          font-size: 13px; font-weight: 600; opacity: 0; transition: all 0.3s; z-index: 9999; pointer-events: none;
+        }
+        .spotify-poster-page #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        .spotify-poster-page #props-panel {
+          width: 260px; min-width: 260px; background: var(--panel-bg); border-left: 1px solid var(--panel-border);
+          overflow-y: auto; flex-shrink: 0; display: flex; flex-direction: column;
+        }
+        .spotify-poster-page #props-panel::-webkit-scrollbar { width: 3px; }
+        .spotify-poster-page #props-panel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        .spotify-poster-page #props-header {
+          padding: 14px 16px 10px; border-bottom: 1px solid var(--panel-border); font-size: 10px;
+          font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--spotify-subtext);
+          display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+        }
+        .spotify-poster-page #props-selected-name { color: var(--accent); font-size: 10px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+        .spotify-poster-page #props-body { flex: 1; overflow-y: auto; padding: 12px 14px; }
+        .spotify-poster-page #props-body::-webkit-scrollbar { width: 3px; }
+        .spotify-poster-page #props-body::-webkit-scrollbar-thumb { background: #333; }
+        .spotify-poster-page #props-empty-state { padding: 32px 16px; text-align: center; color: #444; font-size: 11px; line-height: 1.7; }
+        .spotify-poster-page #props-empty-state svg { margin-bottom: 12px; }
+
+        .spotify-poster-page #ed-align-bar {
+          position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: #111;
+          border: 1px solid var(--panel-border); border-radius: 8px; display: none; align-items: center;
+          gap: 2px; padding: 4px 6px; z-index: 500; box-shadow: 0 4px 16px rgba(0,0,0,0.6);
+        }
+        .spotify-poster-page #ed-align-bar.ed-bar-visible { display: flex; }
+        .spotify-poster-page .ed-ab-btn {
+          width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+          background: none; border: none; color: var(--spotify-subtext); border-radius: 5px; cursor: pointer;
+          transition: all 0.15s;
+        }
+        .spotify-poster-page .ed-ab-btn:hover { background: #1a1a1a; color: var(--spotify-text); }
+        .spotify-poster-page .ed-ab-sep { width: 1px; height: 18px; background: var(--panel-border); margin: 0 3px; }
+
+        .spotify-poster-page .pf-section { margin-bottom: 4px; }
+        .spotify-poster-page .pf-section-title { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #555; margin: 12px 0 6px; }
+        .spotify-poster-page .pf-row { margin-bottom: 7px; }
+        .spotify-poster-page .pf-row label { display: block; font-size: 10px; color: var(--spotify-subtext); margin-bottom: 3px; }
+        .spotify-poster-page .pf-row input[type=text],
+        .spotify-poster-page .pf-row input[type=number],
+        .spotify-poster-page .pf-row select {
+          width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 5px;
+          color: var(--spotify-text); padding: 5px 8px; font-size: 11px; font-family: 'DM Sans', sans-serif; outline: none;
+          transition: border-color 0.15s;
+        }
+        .spotify-poster-page .pf-row input:focus, .spotify-poster-page .pf-row select:focus { border-color: var(--accent); }
+        .spotify-poster-page .pf-row select option { background: #1a1a1a; }
+        .spotify-poster-page .pf-row input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+        .spotify-poster-page .pf-row input[type=color] { width: 30px; height: 26px; border: none; border-radius: 4px; cursor: pointer; padding: 2px; background: var(--input-bg); }
+        .spotify-poster-page .pf-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+        .spotify-poster-page .pf-3col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+        .spotify-poster-page .pf-color-row { display: flex; gap: 6px; align-items: center; }
+        .spotify-poster-page .pf-color-row input[type=text] { flex: 1; }
+        .spotify-poster-page .pf-range-row { display: flex; align-items: center; gap: 6px; }
+        .spotify-poster-page .pf-range-val { font-size: 10px; color: var(--accent); font-weight: 600; min-width: 32px; text-align: right; }
+        .spotify-poster-page .pf-toggle-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+        .spotify-poster-page .pf-toggle-row > span { font-size: 11px; color: var(--spotify-subtext); }
+        .spotify-poster-page .pf-divider { border: none; border-top: 1px solid #1e1e1e; margin: 10px 0; }
+        .spotify-poster-page .pf-btn-row { display: flex; gap: 4px; }
+        .spotify-poster-page .pf-btn {
+          flex: 1; padding: 5px 4px; background: var(--input-bg); border: 1px solid var(--input-border);
+          border-radius: 4px; color: var(--spotify-subtext); font-size: 10px; cursor: pointer;
+          font-family: 'DM Sans', sans-serif; transition: all 0.15s; text-align: center;
+        }
+        .spotify-poster-page .pf-btn:hover { background: #252525; color: var(--spotify-text); }
+      `}</style>
       <div id="panel">
         <div className="panel-header">
           <div className="title-group">
