@@ -82,11 +82,20 @@ function fitContain(wIn, hIn, maxW, maxH) {
   return { width: Math.round(width), height: Math.round(height) };
 }
 
+// Sarmal oluşturucu
 function buildGrooveSpiralChars(text, opts) {
   const { cx, cy, innerRadius, outerRadius, fontSize, color, fontFamily, letterSpacing } = opts;
-  const clean = (text || '').replace(/\s+/g, ' ').trim().toUpperCase();
-  const source = clean.length ? clean + '   ' : '   ';
+  
+  // Cümle sonlarına ve satır aralarına " - " koyarak temizleme işlemi yapıyoruz
+  const clean = (text || '')
+    .replace(/[\r\n]+/g, ' - ')
+    .replace(/([.!?])\s*/g, '$1 - ')
+    .replace(/\s*-\s*/g, ' - ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toUpperCase();
 
+  const source = clean;
   const pitch = fontSize * 1.05; 
   const radialPerAngle = pitch / (Math.PI * 2);
   const charWidth = (fontSize * 0.62) + letterSpacing; 
@@ -97,9 +106,10 @@ function buildGrooveSpiralChars(text, opts) {
   let charIndex = 0;
   let guard = 0;
 
-  while (radius < outerRadius && guard < 20000) {
+  // Döngü sarmal sınırlarına ulaştığında VEYA metin bittiğinde durur (Döngüsel tekrarlama engellendi)
+  while (radius < outerRadius && guard < 20000 && charIndex < source.length) {
     guard++;
-    const ch = source[charIndex % source.length];
+    const ch = source[charIndex];
     charIndex++;
     const drawAngle = angle - Math.PI / 2;
     const x = cx + radius * Math.cos(drawAngle);
@@ -138,7 +148,6 @@ export default function VinylPosterPage({ navigate }) {
   const bgOverlayRef = useRef(null);
   const vinylGroupRef = useRef(null);
 
-  // Kilit mekanizmaları
   const isRebuildingRef = useRef(false);
 
   const [openSections, setOpenSections] = useState({
@@ -154,7 +163,7 @@ export default function VinylPosterPage({ navigate }) {
 
   const [canvasSize, setCanvasSize] = useState('30x40');
   const [containerDims, setContainerDims] = useState(fitContain(30, 40, BASE_MAX_W, BASE_MAX_H));
-  const [zoom, setZoom] = useState(1); // Zoom State
+  const [zoom, setZoom] = useState(1); // Zoom State (0.5x - 10.0x)
 
   const [searchQuery, setSearchQuery] = useState('');
   const [searching, setSearching] = useState(false);
@@ -167,6 +176,7 @@ export default function VinylPosterPage({ navigate }) {
   const [topLeftFontSize, setTopLeftFontSize] = useState(18);
   const [topLeftCharSpacing, setTopLeftCharSpacing] = useState(100);
   const [topLeftFontWeight, setTopLeftFontWeight] = useState('700');
+  const [topLeftFontStyle, setTopLeftFontStyle] = useState('normal');
 
   // Top Right (Year) State
   const [topRightText, setTopRightText] = useState('1992');
@@ -175,6 +185,7 @@ export default function VinylPosterPage({ navigate }) {
   const [topRightFontSize, setTopRightFontSize] = useState(18);
   const [topRightCharSpacing, setTopRightCharSpacing] = useState(100);
   const [topRightFontWeight, setTopRightFontWeight] = useState('700');
+  const [topRightFontStyle, setTopRightFontStyle] = useState('normal');
 
   // Bottom Text State
   const [bottomText, setBottomText] = useState('UNKNOWN ALBUM');
@@ -183,6 +194,7 @@ export default function VinylPosterPage({ navigate }) {
   const [bottomFontSize, setBottomFontSize] = useState(14);
   const [bottomCharSpacing, setBottomCharSpacing] = useState(50);
   const [bottomFontWeight, setBottomFontWeight] = useState('600');
+  const [bottomFontStyle, setBottomFontStyle] = useState('normal');
 
   // Song Title State
   const [songTitleText, setSongTitleText] = useState('SONG NAME');
@@ -191,6 +203,7 @@ export default function VinylPosterPage({ navigate }) {
   const [songTitleFontSize, setSongTitleFontSize] = useState(36);
   const [songTitleCharSpacing, setSongTitleCharSpacing] = useState(100);
   const [songTitleFontWeight, setSongTitleFontWeight] = useState('800');
+  const [songTitleFontStyle, setSongTitleFontStyle] = useState('normal');
 
   // Extended Vinyl Properties
   const [vinylScale, setVinylScale] = useState(78); 
@@ -268,6 +281,7 @@ export default function VinylPosterPage({ navigate }) {
       fontSize: topLeftFontSize,
       fontFamily: topLeftFontFamily,
       fontWeight: topLeftFontWeight,
+      fontStyle: topLeftFontStyle,
       fill: topLeftColor,
       charSpacing: topLeftCharSpacing,
       data: { edType: EDIT_TYPES.TOP_LEFT },
@@ -281,6 +295,7 @@ export default function VinylPosterPage({ navigate }) {
       fontSize: topRightFontSize,
       fontFamily: topRightFontFamily,
       fontWeight: topRightFontWeight,
+      fontStyle: topRightFontStyle,
       fill: topRightColor,
       charSpacing: topRightCharSpacing,
       data: { edType: EDIT_TYPES.TOP_RIGHT },
@@ -296,6 +311,7 @@ export default function VinylPosterPage({ navigate }) {
       fontSize: songTitleFontSize,
       fontFamily: songTitleFontFamily,
       fontWeight: songTitleFontWeight,
+      fontStyle: songTitleFontStyle,
       fill: songTitleColor,
       charSpacing: songTitleCharSpacing,
       data: { edType: EDIT_TYPES.SONG_TITLE },
@@ -309,6 +325,7 @@ export default function VinylPosterPage({ navigate }) {
       fontSize: bottomFontSize,
       fontFamily: bottomFontFamily,
       fontWeight: bottomFontWeight,
+      fontStyle: bottomFontStyle,
       fill: bottomColor,
       charSpacing: bottomCharSpacing,
       data: { edType: EDIT_TYPES.BOTTOM },
@@ -328,13 +345,11 @@ export default function VinylPosterPage({ navigate }) {
     canvas.on('selection:cleared', (e) => {
       if (isRebuildingRef.current) return;
       
-      // Kullanıcı ayarlama panellerinden birine tıkladıysa seçimi kaybetme!
       const activeEl = document.activeElement;
       if (activeEl && (activeEl.closest('#panel') || activeEl.closest('#props-panel') || activeEl.closest('.zoom-control-bar'))) {
         return;
       }
       
-      // Eğer tıklama harici bir olay veya canvas boşluğuna tıklanması ise seçimi temizle
       setSelectedType(null);
       setAlignBarVisible(false);
     });
@@ -352,8 +367,9 @@ export default function VinylPosterPage({ navigate }) {
       }
     });
 
+    // Google Fonts ile Bold ve İtalik ağırlıklarının tamamını yüklüyoruz (300, 400, 600, 700, 800 + i)
     const link = document.createElement('link');
-    link.href = `https://fonts.googleapis.com/css?family=${GOOGLE_FONTS.map(f => f.replace(/ /g, '+')).join('|')}&display=swap`;
+    link.href = `https://fonts.googleapis.com/css?family=${GOOGLE_FONTS.map(f => f.replace(/ /g, '+') + ':300,300i,400,400i,600,600i,700,700i,800,800i').join('|')}&display=swap`;
     link.rel = 'stylesheet';
     document.head.appendChild(link);
 
@@ -364,6 +380,16 @@ export default function VinylPosterPage({ navigate }) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Zoom Değiştiğinde Vektörel Olarak Yeniden Çizim Yapılması
+  useEffect(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    canvas.setZoom(zoom);
+    canvas.setWidth(containerDims.width * zoom);
+    canvas.setHeight(containerDims.height * zoom);
+    canvas.renderAll();
+  }, [zoom, containerDims]);
 
   function onSelectionChange(e) {
     if (isRebuildingRef.current) return;
@@ -379,7 +405,6 @@ export default function VinylPosterPage({ navigate }) {
   function buildVinylGroup(canvas, dims, textSize, lyrics, scalePct, fontFam, textCol, labelCol, labelPct, letterSpc) {
     isRebuildingRef.current = true;
     
-    // Yeniden oluşturma esnasında seçili olup olmadığını kontrol et
     const wasSelected = vinylGroupRef.current && canvas.getActiveObject() === vinylGroupRef.current;
 
     if (vinylGroupRef.current) {
@@ -395,7 +420,15 @@ export default function VinylPosterPage({ navigate }) {
 
     // Sığdırma algoritması
     let adjustedTextSize = textSize;
-    const cleanText = (lyrics || '').replace(/\s+/g, ' ').trim().toUpperCase();
+    // Cümle bitişlerini otomatik saptayıp " - " ekliyoruz
+    const cleanText = (lyrics || '')
+      .replace(/[\r\n]+/g, ' - ')
+      .replace(/([.!?])\s*/g, '$1 - ')
+      .replace(/\s*-\s*/g, ' - ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toUpperCase();
+
     if (cleanText.length > 0) {
       let iter = 0;
       while (adjustedTextSize > 4 && iter < 100) {
@@ -419,10 +452,7 @@ export default function VinylPosterPage({ navigate }) {
       }
     }
 
-    const edge = new fabric.Circle({
-      left: cx, top: cy, radius: outerR, fill: '', stroke: '#d8d8d8', strokeWidth: 1,
-      originX: 'center', originY: 'center', selectable: false, evented: false,
-    });
+    // İstek üzerine anlamsız gri dış sınır çizgisi kaldırıldı
     const label = new fabric.Circle({
       left: cx, top: cy, radius: labelR, fill: labelCol, stroke: '#c9c9c9', strokeWidth: 1,
       originX: 'center', originY: 'center', selectable: false, evented: false,
@@ -443,8 +473,9 @@ export default function VinylPosterPage({ navigate }) {
       letterSpacing: letterSpc
     });
 
+    // edge dairesi gruptan çıkarıldı
     const group = new fabric.Group(
-      [edge, ...spiralChars, label, hole],
+      [...spiralChars, label, hole],
       {
         left: dims.width / 2,
         top: dims.height * 0.58,
@@ -457,7 +488,6 @@ export default function VinylPosterPage({ navigate }) {
     canvas.add(group);
     vinylGroupRef.current = group;
 
-    // Eğer önceden seçiliyse seçimi geri yükle
     if (wasSelected) {
       canvas.setActiveObject(group);
     }
@@ -480,8 +510,8 @@ export default function VinylPosterPage({ navigate }) {
     setContainerDims(dims);
     const canvas = fabricRef.current;
     if (!canvas) return;
-    canvas.setWidth(dims.width);
-    canvas.setHeight(dims.height);
+    canvas.setWidth(dims.width * zoom);
+    canvas.setHeight(dims.height * zoom);
     bgRectRef.current.set({ width: dims.width, height: dims.height });
     bgOverlayRef.current.set({ width: dims.width, height: dims.height });
     canvas.textLeftRef.set({ left: dims.width * 0.08, top: dims.height * 0.08 });
@@ -498,7 +528,7 @@ export default function VinylPosterPage({ navigate }) {
     fabricRef.current && fabricRef.current.renderAll();
   };
 
-  // React state değişikliklerinin canvas metinlerine sarsıntısız yansıtılması
+  // React state güncellemelerinin sarsıntısız bir biçimde canvasa aktarılması
   useEffect(() => {
     const canvas = fabricRef.current;
     if (canvas && canvas.textLeftRef) {
@@ -509,12 +539,13 @@ export default function VinylPosterPage({ navigate }) {
         fontFamily: topLeftFontFamily,
         fontSize: topLeftFontSize,
         charSpacing: topLeftCharSpacing,
-        fontWeight: topLeftFontWeight
+        fontWeight: topLeftFontWeight,
+        fontStyle: topLeftFontStyle
       });
       canvas.renderAll();
       isRebuildingRef.current = false;
     }
-  }, [topLeftText, topLeftColor, topLeftFontFamily, topLeftFontSize, topLeftCharSpacing, topLeftFontWeight]);
+  }, [topLeftText, topLeftColor, topLeftFontFamily, topLeftFontSize, topLeftCharSpacing, topLeftFontWeight, topLeftFontStyle]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
@@ -526,12 +557,13 @@ export default function VinylPosterPage({ navigate }) {
         fontFamily: topRightFontFamily,
         fontSize: topRightFontSize,
         charSpacing: topRightCharSpacing,
-        fontWeight: topRightFontWeight
+        fontWeight: topRightFontWeight,
+        fontStyle: topRightFontStyle
       });
       canvas.renderAll();
       isRebuildingRef.current = false;
     }
-  }, [topRightText, topRightColor, topRightFontFamily, topRightFontSize, topRightCharSpacing, topRightFontWeight]);
+  }, [topRightText, topRightColor, topRightFontFamily, topRightFontSize, topRightCharSpacing, topRightFontWeight, topRightFontStyle]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
@@ -543,12 +575,13 @@ export default function VinylPosterPage({ navigate }) {
         fontFamily: songTitleFontFamily,
         fontSize: songTitleFontSize,
         charSpacing: songTitleCharSpacing,
-        fontWeight: songTitleFontWeight
+        fontWeight: songTitleFontWeight,
+        fontStyle: songTitleFontStyle
       });
       canvas.renderAll();
       isRebuildingRef.current = false;
     }
-  }, [songTitleText, songTitleColor, songTitleFontFamily, songTitleFontSize, songTitleCharSpacing, songTitleFontWeight]);
+  }, [songTitleText, songTitleColor, songTitleFontFamily, songTitleFontSize, songTitleCharSpacing, songTitleFontWeight, songTitleFontStyle]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
@@ -560,12 +593,13 @@ export default function VinylPosterPage({ navigate }) {
         fontFamily: bottomFontFamily,
         fontSize: bottomFontSize,
         charSpacing: bottomCharSpacing,
-        fontWeight: bottomFontWeight
+        fontWeight: bottomFontWeight,
+        fontStyle: bottomFontStyle
       });
       canvas.renderAll();
       isRebuildingRef.current = false;
     }
-  }, [bottomText, bottomColor, bottomFontFamily, bottomFontSize, bottomCharSpacing, bottomFontWeight]);
+  }, [bottomText, bottomColor, bottomFontFamily, bottomFontSize, bottomCharSpacing, bottomFontWeight, bottomFontStyle]);
 
   useEffect(() => {
     rebuildVinyl();
@@ -961,7 +995,7 @@ export default function VinylPosterPage({ navigate }) {
         .spotify-poster-page .search-result-item:hover { background: var(--input-bg); }
 
         .spotify-poster-page #canvas-area {
-          flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+          flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
           background: #0d0d0d; padding: 30px; overflow: auto; position: relative;
         }
         .spotify-poster-page #canvas-area::before {
@@ -1073,7 +1107,7 @@ export default function VinylPosterPage({ navigate }) {
           border: 1px solid var(--panel-border);
           padding: 8px 16px;
           border-radius: 24px;
-          margin-top: 15px;
+          margin: 15px auto;
           z-index: 100;
           box-shadow: 0 10px 30px rgba(0,0,0,0.5);
           position: sticky;
@@ -1371,22 +1405,21 @@ export default function VinylPosterPage({ navigate }) {
 
         <div id="poster-wrapper">
           <div id="poster-container" style={{ 
-            width: containerDims.width, 
-            height: containerDims.height,
-            transform: `scale(${zoom})`
+            width: containerDims.width * zoom, 
+            height: containerDims.height * zoom
           }}>
             <canvas ref={canvasElRef} />
           </div>
         </div>
 
-        {/* Zoom Kontrol Slider'ı */}
+        {/* Gerçek Vektörel Zoom Sliderı (0.5x - 10.0x) */}
         <div className="zoom-control-bar">
           <span className="zoom-label">ZOOM</span>
           <input 
             type="range" 
             min="0.5" 
-            max="2" 
-            step="0.05" 
+            max="10" 
+            step="0.1" 
             value={zoom} 
             onChange={(e) => setZoom(Number(e.target.value))} 
           />
@@ -1432,6 +1465,13 @@ export default function VinylPosterPage({ navigate }) {
                   <select value={topLeftFontFamily} onChange={(e) => setTopLeftFontFamily(e.target.value)}>
                     <option value="DM Sans, sans-serif">DM Sans</option>
                     {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+                <div className="pf-row">
+                  <label>Font Style</label>
+                  <select value={topLeftFontStyle} onChange={(e) => setTopLeftFontStyle(e.target.value)}>
+                    <option value="normal">Normal</option>
+                    <option value="italic">Italic</option>
                   </select>
                 </div>
                 <div className="pf-row">
@@ -1489,6 +1529,13 @@ export default function VinylPosterPage({ navigate }) {
                   </select>
                 </div>
                 <div className="pf-row">
+                  <label>Font Style</label>
+                  <select value={topRightFontStyle} onChange={(e) => setTopRightFontStyle(e.target.value)}>
+                    <option value="normal">Normal</option>
+                    <option value="italic">Italic</option>
+                  </select>
+                </div>
+                <div className="pf-row">
                   <label>Font Size</label>
                   <div className="pf-range-row">
                     <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setRightFontSize(Number(e.target.value))} />
@@ -1543,6 +1590,13 @@ export default function VinylPosterPage({ navigate }) {
                   </select>
                 </div>
                 <div className="pf-row">
+                  <label>Font Style</label>
+                  <select value={songTitleFontStyle} onChange={(e) => setSongTitleFontStyle(e.target.value)}>
+                    <option value="normal">Normal</option>
+                    <option value="italic">Italic</option>
+                  </select>
+                </div>
+                <div className="pf-row">
                   <label>Font Size</label>
                   <div className="pf-range-row">
                     <input type="range" min="12" max="100" value={songTitleFontSize} onChange={(e) => setSongTitleFontSize(Number(e.target.value))} />
@@ -1594,6 +1648,13 @@ export default function VinylPosterPage({ navigate }) {
                   <select value={bottomFontFamily} onChange={(e) => setBottomFontFamily(e.target.value)}>
                     <option value="DM Sans, sans-serif">DM Sans</option>
                     {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+                <div className="pf-row">
+                  <label>Font Style</label>
+                  <select value={bottomFontStyle} onChange={(e) => setBottomFontStyle(e.target.value)}>
+                    <option value="normal">Normal</option>
+                    <option value="italic">Italic</option>
                   </select>
                 </div>
                 <div className="pf-row">
