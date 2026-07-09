@@ -9,12 +9,13 @@ import { Profile } from './pages/Profile';
 import { SellerDashboard } from './pages/SellerDashboard';
 import { Wishlist } from './pages/Wishlist';
 import { ProductDetail } from './pages/ProductDetail';
-import { SpecialForRoom } from './pages/SpecialForRoom'; // Added missing import
-import { HDTools } from './pages/HDTools';              // Added missing import
+import { SpecialForRoom } from './pages/SpecialForRoom'; 
+import { HDTools } from './pages/HDTools';              
 import AlbumPosterBuilder from './pages/AlbumPosterBuilder';
 import { useStore } from './store/useStore';
 import { MusicPosterSelection } from './pages/MusicPosterSelection';
-import SpotifyPosterBuilder from './pages/SpotifyPosterBuilder'; // Dosya ismini nasıl kaydettiysen o şekilde yaz
+import SpotifyPosterBuilder from './pages/SpotifyPosterBuilder'; 
+import VinylPosterBuilder from './pages/VinylPosterBuilder'; // YENİ EKLENDİ
 
 export default function App() {
   const { checkUser } = useStore();
@@ -41,9 +42,12 @@ export default function App() {
           {/* AI SERVICES */}
           <Route path="special" element={<SpecialForRoom />} />
           <Route path="lab" element={<HDTools />} />
+
+          {/* POSTER BUILDERS (BÖLÜNMÜŞ YAPI) */}
           <Route path="music-posters" element={<MusicPosterSelection />} />
           <Route path="custom-album" element={<AlbumPosterBuilder />} />
-          <Route path="song-poster" element={<SpotifyPosterBuilder />} />
+          <Route path="song-poster/spotify" element={<SpotifyPosterBuilder />} />
+          <Route path="song-poster/vinyl" element={<VinylPosterBuilder />} />
           
           {/* USER SYSTEM */}
           <Route path="cart" element={<Cart />} />
