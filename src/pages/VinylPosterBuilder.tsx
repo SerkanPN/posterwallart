@@ -1003,8 +1003,8 @@ export default function VinylPosterBuilder() {
                             <text fill="#212121" fontSize="12" letterSpacing="2" fontFamily="'DM Sans', sans-serif" fontWeight="700" textAnchor="start">
                                 <textPath href="#v-spiral-path" id="v-spiral-text" startOffset="0%">LOREM IPSUM DOLOR SIT AMET CONSECTETUR ADIPISCING ELIT SED DO EIUSMOD TEMPOR INCIDIDUNT UT LABORE ET DOLORE MAGNA ALIQUA</textPath>
                             </text>
-                            <circle id="v-vinyl-label" cx="400" cy="400" r="80" fill="#e0e0e0" />
-                            <circle id="v-vinyl-hole" cx="400" cy="400" r="8" fill="#111111" />
+                            <circle id="v-vinyl-label" cx="400" cy="400" r="60" fill="#e0e0e0" />
+                            <circle id="v-vinyl-hole" cx="400" cy="400" r="6" fill="#111111" />
                         </svg>
                     </div>
                     <div id="v-bottom-text" className="ed-el" data-ed="v-bottom">UNKNOWN ALBUM</div>
