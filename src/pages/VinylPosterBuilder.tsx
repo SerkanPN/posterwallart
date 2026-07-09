@@ -829,7 +829,7 @@ export default function VinylPosterBuilder() {
               <option value="26x36">26" x 36"</option>
               <option value="28x40">28" x 40"</option>
               <option value="30x40">30" x 40"</option>
-              <option value="40x50">40" x 50" (Default)</option>
+              <option value="40x50">40" x 50"</option>
               <option value="50x60">50" x 60"</option>
               <option value="60x80">60" x 80"</option>
               <option value="68x80">68" x 80"</option>
