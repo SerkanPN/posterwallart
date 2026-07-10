@@ -394,9 +394,9 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const [waveGradientColors, setWaveGradientColors] = useState<string[]>(['#66ffcc', '#008000', '#003300', '#000000', '#000000']);
   const [waveGradientAngle, setWaveGradientAngle] = useState<number>(0);
 
-  const [waveDensity, setWaveDensity] = useState(300); 
+  const [waveDensity, setWaveDensity] = useState(240); 
   const [waveThickness, setWaveThickness] = useState(1.5);
-  const [waveHeightScale, setWaveHeightScale] = useState(150); 
+  const [waveHeightScale, setWaveHeightScale] = useState(50); 
   const [waveWidthScale, setWaveWidthScale] = useState(80); 
 
   const [bgColor, setBgColor] = useState('#fbfbfb');
