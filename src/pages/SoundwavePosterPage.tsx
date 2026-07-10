@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
 import jsPDF from 'jspdf';
-import { AlertTriangle, MessageCircle, X } from 'lucide-react';
+import { AlertTriangle, Lock, MessageCircle, X } from 'lucide-react';
 
 const GOOGLE_FONTS = [
   "Inter", "Montserrat", "Roboto", "Open Sans", "Oswald", "Lato", "Poppins", 
@@ -46,18 +46,6 @@ const PRINT_SIZES = [
   { value: '60x80', label: '60" x 80"' },
   { value: '68x80', label: '68" x 80"' },
   { value: '88x104', label: '88" x 104"' },
-];
-
-const EXTENDED_PALETTE = [
-  { name: 'Dove', hex: '#e5e5e5' }, { name: 'Smoke', hex: '#b3b3b3' }, { name: 'Grey', hex: '#808080' },
-  { name: 'Coal', hex: '#333333' }, { name: 'Black', hex: '#000000' }, { name: 'Sun', hex: '#ffdb58' },
-  { name: 'Yellow', hex: '#ffc107' }, { name: 'Orange', hex: '#ff8c00' }, { name: 'Red', hex: '#cc0000' },
-  { name: 'Mocha', hex: '#654321' }, { name: 'Lav', hex: '#b399ff' }, { name: 'Purple', hex: '#660066' },
-  { name: 'Pink', hex: '#ff99cc' }, { name: 'Peach', hex: '#ff9980' }, { name: 'Plum', hex: '#990033' },
-  { name: 'Sky', hex: '#66ccff' }, { name: 'Blue', hex: '#0066cc' }, { name: 'Navy', hex: '#000066' },
-  { name: 'Denim', hex: '#336699' }, { name: 'Petrol', hex: '#003333' }, { name: 'Mint', hex: '#66ffcc' },
-  { name: 'Teal', hex: '#009999' }, { name: 'Lime', hex: '#33cc33' }, { name: 'Green', hex: '#008000' },
-  { name: 'Forest', hex: '#003300' }
 ];
 
 const PRESETS = [
@@ -314,6 +302,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const isRebuildingRef = useRef<boolean>(false);
   const rawAudioDataRef = useRef<Float32Array | null>(null);
 
+  const [isLocked, setIsLocked] = useState<boolean>(false);
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
   const [userConfirmed, setUserConfirmed] = useState<boolean>(false);
   const [previewImage, setPreviewImage] = useState<string>('');
@@ -476,7 +465,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       height: containerDims.height,
       backgroundColor: bgColor,
       preserveObjectStacking: true,
-      selection: true,
+      selection: !isLocked,
     });
     fabricRef.current = canvas;
 
@@ -606,30 +595,32 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     buildSoundwavePath(canvas, containerDims);
     buildQRCode(canvas, containerDims);
 
-    canvas.on('selection:created', onSelectionChange);
-    canvas.on('selection:updated', onSelectionChange);
-    
-    canvas.on('selection:cleared', () => {
-      if (isRebuildingRef.current) return;
-      const activeEl = document.activeElement;
-      if (activeEl && (activeEl.closest('#panel') || activeEl.closest('#props-panel'))) return;
-      setSelectedType(null);
-    });
+    if (!isLocked) {
+      canvas.on('selection:created', onSelectionChange);
+      canvas.on('selection:updated', onSelectionChange);
+      
+      canvas.on('selection:cleared', () => {
+        if (isRebuildingRef.current) return;
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.closest('#panel') || activeEl.closest('#props-panel'))) return;
+        setSelectedType(null);
+      });
 
-    canvas.on('text:changed', (e: any) => {
-      const t = e.target;
-      if (!t || !t.data) return;
-      const v = t.text;
-      switch (t.data.edType) {
-        case EDIT_TYPES.TOP_LEFT: setTopLeftText(v); break;
-        case EDIT_TYPES.TOP_RIGHT: setTopRightText(v); break;
-        case EDIT_TYPES.MAIN_TITLE: setMainTitleText(v); break;
-        case EDIT_TYPES.SUB_TITLE: setSubTitleText(v); break;
-        case EDIT_TYPES.BOTTOM_1: setBottom1Text(v); break;
-        case EDIT_TYPES.BOTTOM_2: setBottom2Text(v); break;
-        default: break;
-      }
-    });
+      canvas.on('text:changed', (e: any) => {
+        const t = e.target;
+        if (!t || !t.data) return;
+        const v = t.text;
+        switch (t.data.edType) {
+          case EDIT_TYPES.TOP_LEFT: setTopLeftText(v); break;
+          case EDIT_TYPES.TOP_RIGHT: setTopRightText(v); break;
+          case EDIT_TYPES.MAIN_TITLE: setMainTitleText(v); break;
+          case EDIT_TYPES.SUB_TITLE: setSubTitleText(v); break;
+          case EDIT_TYPES.BOTTOM_1: setBottom1Text(v); break;
+          case EDIT_TYPES.BOTTOM_2: setBottom2Text(v); break;
+          default: break;
+        }
+      });
+    }
 
     const fontWeightsStr = ':100,100i,300,300i,400,400i,500,500i,600,600i,700,700i,800,800i,900,900i';
     const link = document.createElement('link');
@@ -642,7 +633,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     return () => {
       canvas.dispose();
     };
-  }, []);
+  }, [isLocked]);
 
   useEffect(() => {
     applyDynamicLayout(fabricRef.current, containerDims, showQR, qrSize);
@@ -658,7 +649,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   }, [zoom, containerDims]);
 
   function onSelectionChange(e: any) {
-    if (isRebuildingRef.current) return;
+    if (isRebuildingRef.current || isLocked) return;
     const obj = e.selected && e.selected.length === 1 ? e.selected[0] : null;
     if (obj) {
       if (obj.data && obj.data.edType) {
@@ -775,7 +766,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         left: dims.width / 2,
         top: dims.height * 0.40, 
         objectCaching: false,
-        selectable: true,
+        selectable: !isLocked,
         data: { edType: EDIT_TYPES.SOUNDWAVE },
     });
 
@@ -789,7 +780,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     canvas.add(wavePath);
     wavePathRef.current = wavePath;
 
-    if (wasSelected) {
+    if (wasSelected && !isLocked) {
       canvas.setActiveObject(wavePath);
     }
     
@@ -819,7 +810,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         originY: 'center',
         scaleX: qrSize / img.width!,
         scaleY: qrSize / img.height!,
-        selectable: true,
+        selectable: !isLocked,
         data: { edType: EDIT_TYPES.QR_CODE }
       });
       canvas.add(img);
@@ -835,13 +826,13 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     const canvas = fabricRef.current;
     if (!canvas) return;
     buildSoundwavePath(canvas, containerDims);
-  }, [containerDims, waveMode, waveDensity, waveThickness, waveWidthScale, waveHeightScale, waveFillType, waveSolidColor, waveGradientColors, waveGradientStops, waveGradientAngle]);
+  }, [containerDims, waveMode, waveDensity, waveThickness, waveWidthScale, waveHeightScale, waveFillType, waveSolidColor, waveGradientColors, waveGradientStops, waveGradientAngle, isLocked]);
 
   const rebuildQRCode = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
     buildQRCode(canvas, containerDims);
-  }, [containerDims, showQR, qrLink, qrSize]);
+  }, [containerDims, showQR, qrLink, qrSize, isLocked]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -851,6 +842,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   }, [rebuildQRCode]);
 
   const handleSizeOrOrientationChange = (newSize: string, newOrient: 'portrait' | 'landscape') => {
+    if(isLocked) return;
     setCanvasSize(newSize);
     setOrientation(newOrient);
     
@@ -1017,6 +1009,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const handleAlign = (mode: string) => {
+    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
@@ -1082,6 +1075,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const edDistribute = (axis: string) => {
+    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const active = canvas.getActiveObject();
@@ -1124,6 +1118,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const handleGroup = () => {
+    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
@@ -1144,6 +1139,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const handleUngroup = () => {
+    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
@@ -1206,7 +1202,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   return (
-    <div className="soundwave-poster-page">
+    <div className={`soundwave-poster-page ${isLocked ? 'locked-mode' : ''}`}>
       <style>{`
         .soundwave-poster-page {
           --panel-bg: #0d0d0d;
@@ -1223,6 +1219,15 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           color: var(--spotify-text);
           font-family: 'DM Sans', sans-serif;
           overflow: hidden;
+        }
+
+        .soundwave-poster-page.locked-mode #panel,
+        .soundwave-poster-page.locked-mode #props-panel {
+          display: none;
+        }
+
+        .soundwave-poster-page.locked-mode #canvas-area {
+          padding-top: 100px;
         }
 
         .soundwave-poster-page #panel {
@@ -1533,6 +1538,12 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .review-btn-grid button {
           padding: 16px 32px; border-radius: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; font-size: 14px; min-width: 240px;
         }
+
+        .readonly-banner {
+          background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);
+          color: #fca5a5; padding: 16px 24px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between;
+          max-width: 800px; margin: 0 auto 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%;
+        }
       `}</style>
 
       {showReviewModal && (
@@ -1595,7 +1606,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         </div>
       )}
 
-      <div id="panel">
+      <div id="panel" className={isLocked ? 'hidden' : ''}>
         <div className="panel-header">
           <div className="title-group">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1640,11 +1651,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
                 <option value="space-voyager">Space Voyager</option>
               </optgroup>
             </select>
-            {activePreset !== 'custom' && (
-              <p style={{ fontSize: '10px', color: 'var(--spotify-subtext)', marginTop: '8px', lineHeight: '1.4' }}>
-                {PRESETS.find(p => p.id === activePreset)?.desc}
-              </p>
-            )}
           </div>
         </div>
 
@@ -1818,13 +1824,29 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         </div>
       </div>
 
-      <div id="canvas-area" ref={containerRef}>
+      <div id="canvas-area" ref={containerRef} className={isLocked ? 'locked-mode' : ''}>
         
-        <div className="canvas-header-actions">
-          <button className="btn btn-masterpiece" onClick={handleDownloadMasterpieceClick}>
-            Download Masterpiece
-          </button>
-        </div>
+        {isLocked && (
+          <div className="readonly-banner">
+            <div>
+              <div className="flex items-center gap-2 text-red-200 font-bold mb-1">
+                <Lock className="w-4 h-4" /> Design Locked (Read-Only Mode)
+              </div>
+              <p className="text-xs text-red-300/80">Your design has been finalized. If you made a mistake, please contact support.</p>
+            </div>
+            <button className="flex items-center gap-2 bg-red-950 border border-red-900 text-red-200 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-900 transition-colors cursor-pointer">
+              <MessageCircle className="w-4 h-4" /> Open Support Ticket
+            </button>
+          </div>
+        )}
+
+        {!isLocked && (
+          <div className="canvas-header-actions">
+            <button className="btn btn-masterpiece" onClick={handleDownloadMasterpieceClick}>
+              Download Masterpiece
+            </button>
+          </div>
+        )}
 
         <div id="poster-wrapper">
           <div id="poster-container" style={{ 
@@ -1836,7 +1858,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         </div>
       </div>
 
-      <div id="props-panel">
+      <div id="props-panel" className={isLocked ? 'hidden' : ''}>
         <div id="props-header">
           Properties
           <span id="props-selected-name">
