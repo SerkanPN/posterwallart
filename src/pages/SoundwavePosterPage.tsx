@@ -406,7 +406,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
   const [showQR, setShowQR] = useState(false);
   const [qrLink, setQrLink] = useState('https://musicposters.shop');
-  const [qrSize, setQrSize] = useState(30);
+  const [qrSize, setQrSize] = useState(45);
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [toast, setToast] = useState<string>('');
@@ -425,15 +425,15 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     isRebuildingRef.current = true;
     const cw = dims.width;
     const ch = dims.height;
-    const yOffset = qrEnabled ? -0.07 : 0;
+    const yOffset = qrEnabled ? -0.05 : 0;
 
     if (canvas.textLeftRef) canvas.textLeftRef.set({ left: cw * 0.08, top: ch * 0.08 }).setCoords();
     if (canvas.textRightRef) canvas.textRightRef.set({ left: cw * 0.92, top: ch * 0.08 }).setCoords();
-    if (canvas.textTitleRef) canvas.textTitleRef.set({ left: cw / 2, top: ch * (0.63 + yOffset) }).setCoords();
-    if (canvas.textSubRef) canvas.textSubRef.set({ left: cw / 2, top: ch * (0.68 + yOffset) }).setCoords();
-    if (canvas.dividerRef) canvas.dividerRef.set({ x1: cw * 0.35, y1: ch * (0.72 + yOffset), x2: cw * 0.65, y2: ch * (0.72 + yOffset) }).setCoords();
-    if (canvas.textBottom1Ref) canvas.textBottom1Ref.set({ left: cw / 2, top: ch * (0.76 + yOffset) }).setCoords();
-    if (canvas.textBottom2Ref) canvas.textBottom2Ref.set({ left: cw / 2, top: ch * (0.79 + yOffset) }).setCoords();
+    if (canvas.textTitleRef) canvas.textTitleRef.set({ left: cw / 2, top: ch * (0.65 + yOffset) }).setCoords();
+    if (canvas.textSubRef) canvas.textSubRef.set({ left: cw / 2, top: ch * (0.70 + yOffset) }).setCoords();
+    if (canvas.dividerRef) canvas.dividerRef.set({ x1: cw * 0.35, y1: ch * (0.74 + yOffset), x2: cw * 0.65, y2: ch * (0.74 + yOffset) }).setCoords();
+    if (canvas.textBottom1Ref) canvas.textBottom1Ref.set({ left: cw / 2, top: ch * (0.78 + yOffset) }).setCoords();
+    if (canvas.textBottom2Ref) canvas.textBottom2Ref.set({ left: cw / 2, top: ch * (0.81 + yOffset) }).setCoords();
 
     canvas.requestRenderAll();
     isRebuildingRef.current = false;
@@ -496,7 +496,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const cw = containerDims.width;
     const ch = containerDims.height;
-    const yOffset = showQR ? -0.07 : 0;
 
     const topLeft = new fabric.IText(topLeftText, {
       left: cw * 0.08,
@@ -527,7 +526,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const mainTitle = new fabric.Textbox(mainTitleText, {
       left: cw / 2,
-      top: ch * (0.63 + yOffset),
+      top: ch * 0.65,
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -543,7 +542,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const subTitle = new fabric.Textbox(subTitleText, {
       left: cw / 2,
-      top: ch * (0.68 + yOffset),
+      top: ch * 0.70,
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -557,7 +556,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     });
     canvas.add(subTitle);
 
-    const divider = new fabric.Line([cw * 0.35, ch * (0.72 + yOffset), cw * 0.65, ch * (0.72 + yOffset)], {
+    const divider = new fabric.Line([cw * 0.35, ch * 0.74, cw * 0.65, ch * 0.74], {
       stroke: dividerColor,
       strokeWidth: 1,
       selectable: true,
@@ -567,7 +566,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const bottom1 = new fabric.Textbox(bottom1Text, {
       left: cw / 2,
-      top: ch * (0.76 + yOffset),
+      top: ch * 0.78,
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -583,7 +582,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const bottom2 = new fabric.Textbox(bottom2Text, {
       left: cw / 2,
-      top: ch * (0.79 + yOffset),
+      top: ch * 0.81,
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -607,6 +606,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     buildSoundwavePath(canvas, containerDims);
     buildQRCode(canvas, containerDims);
+    applyDynamicLayout(canvas, containerDims, showQR);
 
     if (!isLocked) {
       canvas.on('selection:created', onSelectionChange);
@@ -818,7 +818,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     fabric.Image.fromURL(apiUrl).then((img) => {
       img.set({
         left: dims.width / 2,
-        top: dims.height * 0.86,
+        top: dims.height * 0.88,
         originX: 'center',
         originY: 'center',
         scaleX: qrSize / img.width!,
@@ -872,7 +872,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     
     buildSoundwavePath(canvas, dims);
     buildQRCode(canvas, dims);
-    canvas.requestRenderAll();
+    applyDynamicLayout(canvas, dims, showQR);
   };
 
   const updateTextContent = (ref: any, setter: (val: string) => void, value: string) => {
@@ -1026,7 +1026,10 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
-    if (!activeObj) return;
+    if (!activeObj) {
+      showToast('Select an item to align.');
+      return;
+    }
 
     const cw = containerDims.width;
     const ch = containerDims.height;
@@ -1133,7 +1136,10 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
-    if (!activeObj || activeObj.type !== 'activeSelection') return;
+    if (!activeObj || activeObj.type !== 'activeSelection') {
+      showToast('Select multiple items to group.');
+      return;
+    }
     
     (activeObj as fabric.ActiveSelection).toGroup();
     canvas.requestRenderAll();
@@ -1145,6 +1151,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       });
     }
     setSelectedType('group');
+    showToast('Items grouped successfully.');
   };
 
   const handleUngroup = () => {
@@ -1152,11 +1159,15 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
-    if (!activeObj || activeObj.type !== 'group') return;
+    if (!activeObj || activeObj.type !== 'group') {
+      showToast('Select a group to ungroup.');
+      return;
+    }
     
     (activeObj as fabric.Group).toActiveSelection();
     canvas.requestRenderAll();
     setSelectedType('multi');
+    showToast('Group separated.');
   };
 
   const getMultiplier = () => {
@@ -1665,11 +1676,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
                 <option value="space-voyager">Space Voyager</option>
               </optgroup>
             </select>
-            {activePreset !== 'custom' && (
-              <p style={{ fontSize: '10px', color: 'var(--spotify-subtext)', marginTop: '8px', lineHeight: '1.4' }}>
-                {PRESETS.find(p => p.id === activePreset)?.desc}
-              </p>
-            )}
           </div>
         </div>
 
@@ -1708,8 +1714,8 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           <div className="form-row">
             <label>Background Color</label>
             <div className="color-row">
-              <input type="color" value={bgColor} onChange={(e) => updateBgColor(e.target.value)} />
-              <input type="text" value={bgColor} onChange={(e) => updateBgColor(e.target.value)} />
+              <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
+              <input type="text" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
             </div>
           </div>
         </div>
@@ -2266,22 +2272,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
                       onChange={(e) => setBottom2Color(e.target.value)} />
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
-
-          {selectedType === EDIT_TYPES.SOUNDWAVE && (
-            <div id="props-fields">
-              <div className="pf-section">
-                <div className="pf-section-title">Soundwave Styling</div>
-              </div>
-            </div>
-          )}
-
-          {selectedType === EDIT_TYPES.QR_CODE && (
-            <div id="props-fields">
-              <div className="pf-section">
-                <div className="pf-section-title">QR Code Properties</div>
               </div>
             </div>
           )}
