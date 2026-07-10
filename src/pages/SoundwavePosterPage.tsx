@@ -48,6 +48,18 @@ const PRINT_SIZES = [
   { value: '88x104', label: '88" x 104"' },
 ];
 
+const EXTENDED_PALETTE = [
+  { name: 'Dove', hex: '#e5e5e5' }, { name: 'Smoke', hex: '#b3b3b3' }, { name: 'Grey', hex: '#808080' },
+  { name: 'Coal', hex: '#333333' }, { name: 'Black', hex: '#000000' }, { name: 'Sun', hex: '#ffdb58' },
+  { name: 'Yellow', hex: '#ffc107' }, { name: 'Orange', hex: '#ff8c00' }, { name: 'Red', hex: '#cc0000' },
+  { name: 'Mocha', hex: '#654321' }, { name: 'Lav', hex: '#b399ff' }, { name: 'Purple', hex: '#660066' },
+  { name: 'Pink', hex: '#ff99cc' }, { name: 'Peach', hex: '#ff9980' }, { name: 'Plum', hex: '#990033' },
+  { name: 'Sky', hex: '#66ccff' }, { name: 'Blue', hex: '#0066cc' }, { name: 'Navy', hex: '#000066' },
+  { name: 'Denim', hex: '#336699' }, { name: 'Petrol', hex: '#003333' }, { name: 'Mint', hex: '#66ffcc' },
+  { name: 'Teal', hex: '#009999' }, { name: 'Lime', hex: '#33cc33' }, { name: 'Green', hex: '#008000' },
+  { name: 'Forest', hex: '#003300' }
+];
+
 const PRESETS = [
   {
     id: 'first-heartbeat',
@@ -802,7 +814,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     isRebuildingRef.current = true;
     const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrLink)}`;
 
-    fabric.Image.fromURL(apiUrl).then((img) => {
+    fabric.Image.fromURL(apiUrl, { crossOrigin: 'anonymous' }).then((img) => {
       img.set({
         left: dims.width / 2,
         top: (dims.height / 2) + 195,
@@ -1190,13 +1202,20 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     }
 
     setShowReviewModal(false);
+    setIsLocked(true);
   };
 
   const handleDownloadMasterpieceClick = () => {
     const canvas = fabricRef.current;
     if (canvas) {
       canvas.discardActiveObject();
-      setPreviewImage(canvas.toDataURL({ format: 'png', multiplier: 2.0 })); 
+      canvas.requestRenderAll();
+      try {
+        const dataUrl = canvas.toDataURL({ format: 'png', multiplier: 2.0 });
+        setPreviewImage(dataUrl);
+      } catch (err) {
+        setPreviewImage('');
+      }
     }
     setShowReviewModal(true);
   };
@@ -1357,6 +1376,13 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .soundwave-poster-page .accordion-btn.open .arrow { transform: rotate(180deg); }
         .soundwave-poster-page .accordion-content { display: none; padding: 14px 0; border-bottom: 1px solid var(--panel-border); }
         .soundwave-poster-page .accordion-content.open { display: block; }
+
+        .soundwave-poster-page .sw-toast {
+          position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+          background: var(--accent); color: #000; padding: 10px 20px; border-radius: 24px;
+          font-size: 13px; font-weight: 600; opacity: 0; transition: all 0.3s; z-index: 9999; pointer-events: none;
+        }
+        .soundwave-poster-page .sw-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
         .soundwave-poster-page #props-panel {
           width: 260px; min-width: 260px; background: var(--panel-bg); border-left: 1px solid var(--panel-border);
@@ -1560,7 +1586,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
               </div>
             </div>
 
-            <img src={previewImage} alt="Preview" className="review-preview-img" />
+            {previewImage && <img src={previewImage} alt="Preview" className="review-preview-img" />}
 
             <div className="review-action-area">
               <label className="review-checkbox-wrapper">
@@ -2269,7 +2295,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         </div>
       </div>
 
-      <div id="toast" className={toast ? 'show' : ''}>&#10003; {toast || 'Done'}</div>
+      <div className={`sw-toast ${toast ? 'show' : ''}`}>&#10003; {toast}</div>
     </div>
   );
 }
