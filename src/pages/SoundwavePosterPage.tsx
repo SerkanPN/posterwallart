@@ -1,6 +1,5 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
-import JSZip from 'jszip';
 import jsPDF from 'jspdf';
 
 const GOOGLE_FONTS = [
@@ -47,20 +46,6 @@ const PRINT_SIZES = [
   { value: '68x80', label: '68" x 80"' },
   { value: '88x104', label: '88" x 104"' },
 ];
-
-const EXTENDED_PALETTE = [
-  { name: 'Dove', hex: '#e5e5e5' }, { name: 'Smoke', hex: '#b3b3b3' }, { name: 'Grey', hex: '#808080' },
-  { name: 'Coal', hex: '#333333' }, { name: 'Black', hex: '#000000' }, { name: 'Sun', hex: '#ffdb58' },
-  { name: 'Yellow', hex: '#ffc107' }, { name: 'Orange', hex: '#ff8c00' }, { name: 'Red', hex: '#cc0000' },
-  { name: 'Mocha', hex: '#654321' }, { name: 'Lav', hex: '#b399ff' }, { name: 'Purple', hex: '#660066' },
-  { name: 'Pink', hex: '#ff99cc' }, { name: 'Peach', hex: '#ff9980' }, { name: 'Plum', hex: '#990033' },
-  { name: 'Sky', hex: '#66ccff' }, { name: 'Blue', hex: '#0066cc' }, { name: 'Navy', hex: '#000066' },
-  { name: 'Denim', hex: '#336699' }, { name: 'Petrol', hex: '#003333' }, { name: 'Mint', hex: '#66ffcc' },
-  { name: 'Teal', hex: '#009999' }, { name: 'Lime', hex: '#33cc33' }, { name: 'Green', hex: '#008000' },
-  { name: 'Forest', hex: '#003300' }
-];
-
-const DEFAULT_POSTER_COLORS = EXTENDED_PALETTE.slice(0, 12).map(c => c.hex);
 
 const PRESETS = [
   {
@@ -321,12 +306,9 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     presets: true,
     size: false,
-    texts: false,
     soundwave: false,
     qrcode: false,
-    background: false,
-    multiExport: false,
-    download: true,
+    background: false
   });
 
   const [activePreset, setActivePreset] = useState<string>('custom');
@@ -407,10 +389,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const [showQR, setShowQR] = useState(false);
   const [qrLink, setQrLink] = useState('https://posterwallart.shop');
   const [qrSize, setQrSize] = useState(60);
-
-  const [exportColors, setExportColors] = useState(
-    DEFAULT_POSTER_COLORS.map((c) => ({ color: c, checked: true }))
-  );
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [toast, setToast] = useState<string>('');
@@ -1163,110 +1141,46 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     return (w * DPI) / containerDims.width;
   };
 
-  const getCheckedColors = () => {
-    const checked = exportColors.filter((c) => c.checked).map((c) => c.color);
-    return checked.length ? checked : [bgColor];
-  };
-
-  const withSwappedColor = async (color: string, fn: () => Promise<void>) => {
-    const canvas = fabricRef.current;
-    if (!canvas) return;
-    const prevColor = bgColor;
-    if (bgRectRef.current) bgRectRef.current.set({ fill: color, visible: true });
-    canvas.discardActiveObject();
-    canvas.renderAll();
-    await fn();
-    if (bgRectRef.current) bgRectRef.current.set({ fill: prevColor, visible: true });
-    canvas.renderAll();
-  };
-
   const downloadPNG = async () => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const zip = new JSZip();
-    const colors = getCheckedColors();
     const multiplier = getMultiplier();
-    for (let i = 0; i < colors.length; i++) {
-      const color = colors[i];
-      await withSwappedColor(color, async () => {
-        const dataUrl = canvas.toDataURL({ format: 'png', multiplier });
-        const base64 = dataUrl.split(',')[1];
-        zip.file(`soundwave-poster-${color.replace('#', '')}.png`, base64, { base64: true });
-      });
-    }
-    const blob = await zip.generateAsync({ type: 'blob' });
-    triggerDownload(blob, 'soundwave-poster-png.zip');
+    const dataUrl = canvas.toDataURL({ format: 'png', multiplier });
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `soundwave-poster.png`;
+    a.click();
     showToast('PNG export ready');
   };
 
   const downloadPDF = async () => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const zip = new JSZip();
-    const colors = getCheckedColors();
     const multiplier = getMultiplier();
     const { w, h } = parseAndOrientSize(canvasSize, orientation);
-    for (let i = 0; i < colors.length; i++) {
-      const color = colors[i];
-      await withSwappedColor(color, async () => {
-        const dataUrl = canvas.toDataURL({ format: 'png', multiplier });
-        const pdf = new jsPDF({
-          orientation: w > h ? 'landscape' : 'portrait',
-          unit: 'in',
-          format: [w, h],
-        });
-        pdf.addImage(dataUrl, 'PNG', 0, 0, w, h);
-        const pdfBlob = pdf.output('blob');
-        zip.file(`soundwave-poster-${color.replace('#', '')}.pdf`, pdfBlob);
-      });
-    }
-    const blob = await zip.generateAsync({ type: 'blob' });
-    triggerDownload(blob, 'soundwave-poster-pdf.zip');
+    const dataUrl = canvas.toDataURL({ format: 'png', multiplier });
+    const pdf = new jsPDF({
+      orientation: w > h ? 'landscape' : 'portrait',
+      unit: 'in',
+      format: [w, h],
+    });
+    pdf.addImage(dataUrl, 'PNG', 0, 0, w, h);
+    pdf.save(`soundwave-poster.pdf`);
     showToast('PDF export ready');
   };
 
   const downloadSVG = async () => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const zip = new JSZip();
-    const colors = getCheckedColors();
-    for (let i = 0; i < colors.length; i++) {
-      const color = colors[i];
-      await withSwappedColor(color, async () => {
-        const svg = canvas.toSVG();
-        zip.file(`soundwave-poster-${color.replace('#', '')}.svg`, svg);
-      });
-    }
-    const blob = await zip.generateAsync({ type: 'blob' });
-    triggerDownload(blob, 'soundwave-poster-svg.zip');
-    showToast('SVG export ready');
-  };
-
-  const triggerDownload = (blob: Blob, filename: string) => {
+    const svg = canvas.toSVG();
+    const blob = new Blob([svg], { type: 'image/svg+xml' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
+    a.download = `soundwave-poster.svg`;
     a.click();
-    document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  };
-
-  const updateExportColor = (idx: number, value: string) => {
-    setExportColors((prev) => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], color: value };
-      return next;
-    });
-  };
-
-  const toggleExportColor = (idx: number) => {
-    setExportColors((prev) => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], checked: !next[idx].checked };
-      return next;
-    });
+    showToast('SVG export ready');
   };
 
   return (
@@ -1362,7 +1276,10 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .spotify-poster-page .btn-secondary {
           background: var(--input-bg); color: var(--spotify-text); border: 1px solid var(--input-border); flex: 1;
         }
-        .spotify-poster-page .btn-download-group { display: flex; gap: 6px; padding: 0 16px 4px; }
+
+        .spotify-poster-page .canvas-header-actions {
+          display: flex; gap: 8px; margin-bottom: 16px; z-index: 50; position: relative;
+        }
 
         .spotify-poster-page #canvas-area {
           flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
@@ -1374,7 +1291,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         }
         .spotify-poster-page #poster-wrapper {
           position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 20px;
-          padding: 80px;
+          padding: 40px;
         }
         .spotify-poster-page #poster-container {
           position: relative; overflow: hidden;
@@ -1628,14 +1545,14 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         </div>
 
         <button className={`accordion-btn${openSections.background ? ' open' : ''}`} onClick={() => toggleAccordion('background')}>
-          &#128444;&#65039; Main Background<span className="arrow">&#9660;</span>
+          &#128444;&#65039; Background<span className="arrow">&#9660;</span>
         </button>
         <div className={`accordion-content${openSections.background ? ' open' : ''}`}>
           <div className="form-row">
             <label>Background Color</label>
             <div className="color-row">
-              <input type="color" value={bgColor} onChange={(e) => updateBgColor(e.target.value)} />
-              <input type="text" value={bgColor} onChange={(e) => updateBgColor(e.target.value)} />
+              <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
+              <input type="text" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
             </div>
           </div>
         </div>
@@ -1746,7 +1663,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           &#128241; QR Code Settings<span className="arrow">&#9660;</span>
         </button>
         <div className={`accordion-content${openSections.qrcode ? ' open' : ''}`}>
-          <label className="pf-checkbox-row">
+          <label className="pf-checkbox-row" style={{ padding: '0 16px' }}>
             <input type="checkbox" checked={showQR} onChange={(e) => setShowQR(e.target.checked)} />
             <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Show QR Code</span>
           </label>
@@ -1767,140 +1684,16 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
             </>
           )}
         </div>
-
-        <button className={`accordion-btn${openSections.texts ? ' open' : ''}`} onClick={() => toggleAccordion('texts')}>
-          &#128294; Typographic Details<span className="arrow">&#9660;</span>
-        </button>
-        <div className={`accordion-content${openSections.texts ? ' open' : ''}`}>
-          
-          <div className="form-row">
-            <label>Main Title</label>
-            <input type="text" value={mainTitleText}
-              onChange={(e) => updateTextContent(fabricRef.current?.textTitleRef, setMainTitleText, e.target.value)} />
-          </div>
-          <div className="form-row">
-            <label>Main Title Color</label>
-            <div className="color-row">
-              <input type="color" value={mainTitleColor}
-                onChange={(e) => setMainTitleColor(e.target.value)} />
-              <input type="text" value={mainTitleColor}
-                onChange={(e) => setMainTitleColor(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-row" style={{ marginTop: '12px' }}>
-            <label>Subtitle</label>
-            <input type="text" value={subTitleText}
-              onChange={(e) => updateTextContent(fabricRef.current?.textSubRef, setSubTitleText, e.target.value)} />
-          </div>
-          <div className="form-row">
-            <label>Subtitle Color</label>
-            <div className="color-row">
-              <input type="color" value={subTitleColor}
-                onChange={(e) => setSubTitleColor(e.target.value)} />
-              <input type="text" value={subTitleColor}
-                onChange={(e) => setSubTitleColor(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-row" style={{ marginTop: '12px' }}>
-            <label>Top Left Text</label>
-            <input type="text" value={topLeftText}
-              onChange={(e) => updateTextContent(fabricRef.current?.textLeftRef, setTopLeftText, e.target.value)} />
-          </div>
-          <div className="form-row">
-            <label>Top Left Color</label>
-            <div className="color-row">
-              <input type="color" value={topLeftColor}
-                onChange={(e) => setTopLeftColor(e.target.value)} />
-              <input type="text" value={topLeftColor}
-                onChange={(e) => setTopLeftColor(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-row" style={{ marginTop: '12px' }}>
-            <label>Top Right Text</label>
-            <input type="text" value={topRightText}
-              onChange={(e) => updateTextContent(fabricRef.current?.textRightRef, setTopRightText, e.target.value)} />
-          </div>
-          <div className="form-row">
-            <label>Top Right Color</label>
-            <div className="color-row">
-              <input type="color" value={topRightColor}
-                onChange={(e) => setTopRightColor(e.target.value)} />
-              <input type="text" value={topRightColor}
-                onChange={(e) => setTopRightColor(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-row" style={{ marginTop: '12px' }}>
-            <label>Bottom Text 1</label>
-            <input type="text" value={bottom1Text}
-              onChange={(e) => updateTextContent(fabricRef.current?.textBottom1Ref, setBottom1Text, e.target.value)} />
-          </div>
-          <div className="form-row">
-            <label>Bottom Text 1 Color</label>
-            <div className="color-row">
-              <input type="color" value={bottom1Color}
-                onChange={(e) => setBottom1Color(e.target.value)} />
-              <input type="text" value={bottom1Color}
-                onChange={(e) => setBottom1Color(e.target.value)} />
-            </div>
-          </div>
-
-          <div className="form-row" style={{ marginTop: '12px' }}>
-            <label>Bottom Text 2</label>
-            <input type="text" value={bottom2Text}
-              onChange={(e) => updateTextContent(fabricRef.current?.textBottom2Ref, setBottom2Text, e.target.value)} />
-          </div>
-          <div className="form-row">
-            <label>Bottom Text 2 Color</label>
-            <div className="color-row">
-              <input type="color" value={bottom2Color}
-                onChange={(e) => setBottom2Color(e.target.value)} />
-              <input type="text" value={bottom2Color}
-                onChange={(e) => setBottom2Color(e.target.value)} />
-            </div>
-          </div>
-
-        </div>
-
-        <button className={`accordion-btn${openSections.multiExport ? ' open' : ''}`} onClick={() => toggleAccordion('multiExport')}>
-          &#127912; Multi-Color Export<span className="arrow">&#9660;</span>
-        </button>
-        <div className={`accordion-content${openSections.multiExport ? ' open' : ''}`}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            {exportColors.map((item, i) => (
-              <div className="pf-color-row multi-export-item" key={i}>
-                <input type="checkbox" checked={item.checked} className="export-color-check"
-                  style={{ cursor: 'pointer' }} onChange={() => toggleExportColor(i)} />
-                <input type="color" value={item.color} className="export-color-picker"
-                  onChange={(e) => updateExportColor(i, e.target.value)}
-                  style={{ width: '26px', height: '26px', border: 'none', padding: '0', background: 'transparent', cursor: 'pointer' }} />
-                <input type="text" value={item.color} style={{ fontSize: '10px', padding: '4px' }}
-                  onChange={(e) => {
-                    let v = e.target.value;
-                    if (/^#[0-9a-fA-F]{3}$/i.test(v)) v = '#' + v[1] + v[1] + v[2] + v[2] + v[3] + v[3];
-                    if (/^#[0-9a-fA-F]{6}$/i.test(v)) updateExportColor(i, v);
-                  }} />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <button className={`accordion-btn${openSections.download ? ' open' : ''}`} onClick={() => toggleAccordion('download')}>
-          &#11015;&#65039; Download<span className="arrow">&#9660;</span>
-        </button>
-        <div className={`accordion-content${openSections.download ? ' open' : ''}`}>
-          <div className="btn-download-group">
-            <button className="btn btn-secondary" onClick={downloadPNG}>PNG (ZIP)</button>
-            <button className="btn btn-secondary" onClick={downloadPDF}>PDF (ZIP)</button>
-            <button className="btn btn-secondary" onClick={downloadSVG}>SVG (ZIP)</button>
-          </div>
-        </div>
       </div>
 
       <div id="canvas-area" ref={containerRef}>
+        
+        <div className="canvas-header-actions">
+          <button className="btn btn-secondary" onClick={downloadPNG}>Download PNG</button>
+          <button className="btn btn-secondary" onClick={downloadPDF}>Download PDF</button>
+          <button className="btn btn-secondary" onClick={downloadSVG}>Download SVG</button>
+        </div>
+
         <div id="poster-wrapper">
           <div id="poster-container" style={{ 
             width: containerDims.width * zoom, 
@@ -2169,7 +1962,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
                 <div className="pf-row">
                   <label>Font Size</label>
                   <div className="pf-range-row">
-                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setRightFontSize(Number(e.target.value))} />
+                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setTopRightFontSize(Number(e.target.value))} />
                     <span className="pf-range-val">{topRightFontSize}px</span>
                   </div>
                 </div>
