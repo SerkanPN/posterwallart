@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
 import jsPDF from 'jspdf';
-import { AlertTriangle, Lock, MessageCircle } from 'lucide-react';
+import { AlertTriangle, Lock, MessageCircle, X } from 'lucide-react';
 
 const GOOGLE_FONTS = [
   "Inter", "Montserrat", "Roboto", "Open Sans", "Oswald", "Lato", "Poppins", 
@@ -1201,19 +1201,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       URL.revokeObjectURL(url);
     }
 
-    const designStateJSON = {
-      canvasSize, orientation, bgColor,
-      topLeftText, topLeftColor, topLeftFontFamily, topLeftFontSize, topLeftCharSpacing, topLeftFontWeight, topLeftFontStyle,
-      topRightText, topRightColor, topRightFontFamily, topRightFontSize, topRightCharSpacing, topRightFontWeight, topRightFontStyle,
-      mainTitleText, mainTitleColor, mainTitleFontFamily, mainTitleFontSize, mainTitleCharSpacing, mainTitleFontWeight, mainTitleFontStyle,
-      subTitleText, subTitleColor, subTitleFontFamily, subTitleFontSize, subTitleCharSpacing, subTitleFontWeight, subTitleFontStyle,
-      dividerColor,
-      bottom1Text, bottom1Color, bottom1FontFamily, bottom1FontSize, bottom1CharSpacing, bottom1FontWeight, bottom1FontStyle,
-      bottom2Text, bottom2Color, bottom2FontFamily, bottom2FontSize, bottom2CharSpacing, bottom2FontWeight, bottom2FontStyle,
-      waveMode, waveFillType, waveSolidColor, waveGradientStops, waveGradientColors, waveGradientAngle, waveDensity, waveThickness, waveHeightScale, waveWidthScale,
-      showQR, qrLink, qrSize
-    };
-
     setShowReviewModal(false);
     setIsLocked(true);
   };
@@ -1222,7 +1209,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     const canvas = fabricRef.current;
     if (canvas) {
       canvas.discardActiveObject();
-      setPreviewImage(canvas.toDataURL({ format: 'png', multiplier: 0.5 }));
+      setPreviewImage(canvas.toDataURL({ format: 'png', multiplier: 2.0 })); 
     }
     setShowReviewModal(true);
   };
@@ -1382,14 +1369,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .soundwave-poster-page .accordion-btn .arrow { font-size: 9px; transition: transform 0.2s; }
         .soundwave-poster-page .accordion-btn.open .arrow { transform: rotate(180deg); }
         .soundwave-poster-page .accordion-content { display: none; padding: 14px 0; border-bottom: 1px solid var(--panel-border); }
-        .soundwave-poster-page .accordion-content.open { display: block; }
-
-        .soundwave-poster-page #toast {
-          position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
-          background: var(--accent); color: #000; padding: 10px 20px; border-radius: 24px;
-          font-size: 13px; font-weight: 600; opacity: 0; transition: all 0.3s; z-index: 9999; pointer-events: none;
-        }
-        .soundwave-poster-page #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .spotify-poster-page .accordion-content.open { display: block; }
 
         .soundwave-poster-page #props-panel {
           width: 260px; min-width: 260px; background: var(--panel-bg); border-left: 1px solid var(--panel-border);
@@ -1407,7 +1387,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .soundwave-poster-page #props-body::-webkit-scrollbar { width: 3px; }
         .soundwave-poster-page #props-body::-webkit-scrollbar-thumb { background: #333; }
         .soundwave-poster-page #props-empty-state { padding: 32px 16px; text-align: center; color: #444; font-size: 11px; line-height: 1.7; }
-        .spotify-poster-page #props-empty-state svg { margin-bottom: 12px; }
+        .soundwave-poster-page #props-empty-state svg { margin-bottom: 12px; }
 
         .soundwave-poster-page .pf-section { margin-bottom: 4px; }
         .soundwave-poster-page .pf-section-title { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #555; margin: 12px 0 6px; }
@@ -1427,7 +1407,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .soundwave-poster-page .pf-color-row { display: flex; gap: 6px; align-items: center; }
         .soundwave-poster-page .pf-color-row input[type=text] { flex: 1; }
         .soundwave-poster-page .pf-range-row { display: flex; align-items: center; gap: 6px; }
-        .soundwave-poster-page .pf-range-val { font-size: 10px; color: var(--accent); font-weight: 600; min-width: 32px; text-align: right; }
+        .spotify-poster-page .pf-range-val { font-size: 10px; color: var(--accent); font-weight: 600; min-width: 32px; text-align: right; }
 
         .soundwave-poster-page .global-tools-panel {
           padding: 14px 16px;
@@ -1520,7 +1500,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           border-radius: 4px;
           cursor: pointer;
         }
-        .soundwave-poster-page .gt-zoom-reset:hover {
+        .spotify-poster-page .gt-zoom-reset:hover {
           background: #333;
         }
         .orient-group {
@@ -1534,106 +1514,107 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         }
 
         .review-modal-overlay {
-          position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
-          display: flex; align-items: center; justify-content: center; z-index: 9999;
+          position: fixed; inset: 0; background: rgba(0,0,0,0.95); backdrop-filter: blur(15px);
+          display: flex; align-items: flex-start; justify-content: center; z-index: 9999; overflow-y: auto; padding: 40px 20px;
         }
         .review-modal-content {
-          background: #111; border: 1px solid #222; border-radius: 24px; padding: 40px;
-          max-width: 900px; width: 90%; display: flex; gap: 40px; box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+          max-width: 900px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 30px;
         }
-        .review-preview-col {
-          flex: 1; display: flex; justify-content: center; align-items: center;
-          background: #000; border-radius: 12px; padding: 20px; border: 1px solid #222;
-        }
-        .review-preview-img {
-          max-width: 100%; max-height: 50vh; object-fit: contain; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-        .review-action-col {
-          flex: 1; display: flex; flex-direction: column; justify-content: center;
-        }
+        
         .review-warning-box {
           background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2);
-          padding: 16px; border-radius: 12px; display: flex; gap: 12px; align-items: flex-start; margin-bottom: 24px;
+          padding: 16px 24px; border-radius: 12px; display: flex; gap: 16px; align-items: center; width: 100%;
         }
+        
+        .review-preview-img {
+          width: auto; max-height: 75vh; object-fit: contain; box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+          border: 1px solid rgba(255,255,255,0.1); border-radius: 4px;
+        }
+
+        .review-action-area {
+          width: 100%; display: flex; flex-direction: column; align-items: center; gap: 24px;
+        }
+        
         .review-checkbox-wrapper {
-          display: flex; align-items: flex-start; gap: 12px; cursor: pointer; margin-bottom: 32px;
-          background: #1a1a1a; padding: 16px; border-radius: 12px; border: 1px solid #333; transition: border-color 0.2s;
+          display: flex; align-items: center; gap: 12px; cursor: pointer;
+          background: #1a1a1a; padding: 16px 24px; border-radius: 12px; border: 1px solid #333; transition: border-color 0.2s;
+          width: 100%; justify-content: center;
         }
         .review-checkbox-wrapper:hover { border-color: #555; }
         .review-checkbox-wrapper input[type=checkbox] {
-          width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); cursor: pointer;
+          width: 24px; height: 24px; accent-color: var(--accent); cursor: pointer;
         }
+
         .review-btn-grid {
-          display: grid; grid-template-columns: 1fr; gap: 12px;
+          display: flex; gap: 12px; width: 100%; justify-content: center; flex-wrap: wrap;
         }
         .review-btn-grid button {
-          padding: 14px; border-radius: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; font-size: 13px;
+          padding: 16px 32px; border-radius: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; font-size: 14px; min-width: 240px;
         }
 
         .readonly-banner {
           background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);
           color: #fca5a5; padding: 16px 24px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between;
-          max-width: 800px; margin: 0 auto 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+          max-width: 800px; margin: 0 auto 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%;
         }
       `}</style>
 
       {showReviewModal && (
         <div className="review-modal-overlay">
           <div className="review-modal-content">
-            <div className="review-preview-col">
-              <img src={previewImage} alt="Preview" className="review-preview-img" />
-            </div>
-            <div className="review-action-col">
-              <h2 className="text-3xl font-black uppercase text-white mb-6 tracking-tight">Final Review</h2>
-              
-              <div className="review-warning-box">
-                <AlertTriangle className="w-6 h-6 text-red-400 shrink-0" />
-                <p className="text-red-200 text-sm leading-relaxed">
+            
+            <div className="review-warning-box">
+              <AlertTriangle className="w-8 h-8 text-red-400 shrink-0" />
+              <div>
+                <h3 className="text-red-400 font-black uppercase tracking-wider mb-1">Final Review Required</h3>
+                <p className="text-red-200/80 text-sm leading-relaxed">
                   Please review your design carefully. Once downloaded, the design will be <strong>locked and cannot be edited again.</strong>
                 </p>
               </div>
+            </div>
 
+            <img src={previewImage} alt="Preview" className="review-preview-img" />
+
+            <div className="review-action-area">
               <label className="review-checkbox-wrapper">
                 <input type="checkbox" checked={userConfirmed} onChange={(e) => setUserConfirmed(e.target.checked)} />
-                <div className="text-sm text-zinc-300">
-                  <strong className="text-white block mb-1">I approve my design</strong>
-                  I confirm that all names, dates, texts, and colors are correct and exactly how I want them to be printed.
-                </div>
+                <span className="text-sm text-zinc-300 font-medium">
+                  <strong className="text-white">I approve my design.</strong> I confirm that all names, dates, texts, and colors are exactly how I want them to be printed.
+                </span>
               </label>
 
               <div className="review-btn-grid">
                 <button 
-                  className={`btn ${userConfirmed ? 'btn-primary' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
+                  className={`btn ${userConfirmed ? 'btn-primary' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed border-none'}`}
                   disabled={!userConfirmed}
                   onClick={() => triggerDownloadAction('pdf')}
                 >
-                  Download PDF (Print Ready)
+                  Download PDF (Print)
                 </button>
-                <div className="grid grid-cols-2 gap-3">
-                  <button 
-                    className={`btn ${userConfirmed ? 'btn-secondary' : 'bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed'}`}
-                    disabled={!userConfirmed}
-                    onClick={() => triggerDownloadAction('png')}
-                  >
-                    Download PNG
-                  </button>
-                  <button 
-                    className={`btn ${userConfirmed ? 'btn-secondary' : 'bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed'}`}
-                    disabled={!userConfirmed}
-                    onClick={() => triggerDownloadAction('svg')}
-                  >
-                    Download SVG
-                  </button>
-                </div>
+                <button 
+                  className={`btn ${userConfirmed ? 'btn-secondary' : 'bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed'}`}
+                  disabled={!userConfirmed}
+                  onClick={() => triggerDownloadAction('png')}
+                >
+                  Download PNG
+                </button>
+                <button 
+                  className={`btn ${userConfirmed ? 'btn-secondary' : 'bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed'}`}
+                  disabled={!userConfirmed}
+                  onClick={() => triggerDownloadAction('svg')}
+                >
+                  Download SVG
+                </button>
               </div>
 
               <button 
-                className="mt-6 text-zinc-500 hover:text-white text-xs font-bold uppercase tracking-wider transition-colors"
+                className="mt-4 text-zinc-500 hover:text-white text-xs font-bold uppercase tracking-wider transition-colors flex items-center gap-2"
                 onClick={() => setShowReviewModal(false)}
               >
-                Cancel & Go Back to Editing
+                <X className="w-4 h-4" /> Cancel & Go Back to Editing
               </button>
             </div>
+
           </div>
         </div>
       )}
@@ -1683,6 +1664,11 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
                 <option value="space-voyager">Space Voyager</option>
               </optgroup>
             </select>
+            {activePreset !== 'custom' && (
+              <p style={{ fontSize: '10px', color: 'var(--spotify-subtext)', marginTop: '8px', lineHeight: '1.4' }}>
+                {PRESETS.find(p => p.id === activePreset)?.desc}
+              </p>
+            )}
           </div>
         </div>
 
@@ -1866,7 +1852,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
               </div>
               <p className="text-xs text-red-300/80">Your design has been finalized. If you made a mistake, please contact support.</p>
             </div>
-            <button className="flex items-center gap-2 bg-red-950 border border-red-900 text-red-200 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-900 transition-colors">
+            <button className="flex items-center gap-2 bg-red-950 border border-red-900 text-red-200 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-900 transition-colors cursor-pointer">
               <MessageCircle className="w-4 h-4" /> Open Support Ticket
             </button>
           </div>
