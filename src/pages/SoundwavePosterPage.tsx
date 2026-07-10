@@ -62,6 +62,159 @@ const EXTENDED_PALETTE = [
 
 const DEFAULT_POSTER_COLORS = EXTENDED_PALETTE.slice(0, 12).map(c => c.hex);
 
+const PRESETS = [
+  {
+    id: 'first-heartbeat',
+    label: 'First Heartbeat',
+    desc: 'Capture the rhythm of a new life. Perfect for gender reveals or nursery decor. Upload an ultrasound recording to make it real.',
+    texts: {
+      tl: 'BABY BOY', tr: '14.05.2026', title: 'FIRST HEARTBEAT', sub: '142 BPM', b1: 'ULTRASOUND RECORDING', b2: 'MEMORIAL HOSPITAL'
+    },
+    colors: { bg: '#fdf2f8', title: '#831843', sub: '#be185d', div: '#fbcfe8', bottom: '#9d174d', top: '#9d174d' },
+    wave: { type: 'gradient', solid: '#000000', stops: 2, grad: ['#f472b6', '#38bdf8', '#000000', '#000000', '#000000'] }
+  },
+  {
+    id: 'first-cry',
+    label: 'First Cry',
+    desc: 'The beautiful sound of arriving into the world. A warm, aesthetic sunset gradient representing the dawn of life.',
+    texts: {
+      tl: 'LEO ALEXANDER', tr: '08:42 AM', title: 'HELLO WORLD', sub: 'THE FIRST CRY', b1: 'WELCOME TO THE FAMILY', b2: '3.2 KG - 51 CM'
+    },
+    colors: { bg: '#fffbeb', title: '#78350f', sub: '#b45309', div: '#fde68a', bottom: '#92400e', top: '#92400e' },
+    wave: { type: 'gradient', solid: '#000000', stops: 3, grad: ['#fbbf24', '#f59e0b', '#ea580c', '#000000', '#000000'] }
+  },
+  {
+    id: 'first-word',
+    label: 'First Word',
+    desc: 'A playful and bright template to immortalize the very first word spoken by your child.',
+    texts: {
+      tl: "EMMA'S FIRST WORD", tr: '9 MONTHS OLD', title: '"MAMA"', sub: 'RECORDED AT HOME', b1: 'A MOMENT TO REMEMBER', b2: '12.10.2025'
+    },
+    colors: { bg: '#f0fdf4', title: '#14532d', sub: '#166534', div: '#bbf7d0', bottom: '#15803d', top: '#15803d' },
+    wave: { type: 'solid', solid: '#22c55e', stops: 2, grad: ['#000000', '#000000', '#000000', '#000000', '#000000'] }
+  },
+  {
+    id: 'first-laugh',
+    label: 'First Laugh',
+    desc: 'The best sound in the world. Refreshing teal and mint tones to match the pure joy of a baby laughing.',
+    texts: {
+      tl: 'BABY MILA', tr: '00:00:15', title: 'PURE JOY', sub: 'THE FIRST LAUGH', b1: 'THE BEST SOUND IN THE WORLD', b2: 'SUNDAY MORNING'
+    },
+    colors: { bg: '#f0fdfa', title: '#064e3b', sub: '#065f46', div: '#a7f3d0', bottom: '#047857', top: '#047857' },
+    wave: { type: 'gradient', solid: '#000000', stops: 2, grad: ['#2dd4bf', '#0ea5e9', '#000000', '#000000', '#000000'] }
+  },
+  {
+    id: 'proposal',
+    label: 'The Proposal',
+    desc: 'Turn a hidden voice recording of a marriage proposal into a timeless piece of art. Deep romantic tones.',
+    texts: {
+      tl: 'WILL YOU MARRY ME?', tr: '24.08.2025', title: 'SHE SAID YES', sub: 'THE PROPOSAL', b1: 'HIDDEN AUDIO RECORDING', b2: 'CENTRAL PARK, NEW YORK'
+    },
+    colors: { bg: '#fef2f2', title: '#7f1d1d', sub: '#991b1b', div: '#fecaca', bottom: '#b91c1c', top: '#b91c1c' },
+    wave: { type: 'gradient', solid: '#000000', stops: 3, grad: ['#ef4444', '#b91c1c', '#7f1d1d', '#000000', '#000000'] }
+  },
+  {
+    id: 'wedding-dance',
+    label: 'First Dance',
+    desc: 'Elegant, timeless, and classic. A luxurious monochrome and gold theme for a wedding song soundwave.',
+    texts: {
+      tl: 'SARAH & JOHN', tr: 'OUR WEDDING DAY', title: 'OUR FIRST DANCE', sub: 'PERFECT BY ED SHEERAN', b1: 'FOREVER AND ALWAYS', b2: '15TH OF SEPTEMBER'
+    },
+    colors: { bg: '#fafafa', title: '#171717', sub: '#404040', div: '#e5e5e5', bottom: '#262626', top: '#262626' },
+    wave: { type: 'gradient', solid: '#000000', stops: 3, grad: ['#fcd34d', '#d97706', '#b45309', '#000000', '#000000'] }
+  },
+  {
+    id: 'i-love-you',
+    label: 'I Love You Message',
+    desc: 'Perfect for long-distance relationships or simple affectionate gestures. A late-night voice message turned into art.',
+    texts: {
+      tl: 'FROM ALEX', tr: 'TO SOPHIA', title: 'I LOVE YOU', sub: 'A LATE NIGHT VOICE MESSAGE', b1: 'DISTANCE MEANS NOTHING', b2: '3400 KILOMETERS AWAY'
+    },
+    colors: { bg: '#faf5ff', title: '#312e81', sub: '#3730a3', div: '#e0e7ff', bottom: '#4338ca', top: '#4338ca' },
+    wave: { type: 'gradient', solid: '#000000', stops: 2, grad: ['#818cf8', '#c084fc', '#000000', '#000000', '#000000'] }
+  },
+  {
+    id: 'memorial',
+    label: 'In Loving Memory',
+    desc: 'A solemn and respectful tribute. Preserve an old voicemail or video recording of a passed loved one.',
+    texts: {
+      tl: 'GRANDPA GEORGE', tr: '1940 - 2025', title: '"I AM ALWAYS WITH YOU"', sub: 'A SAVED VOICEMAIL', b1: 'IN LOVING MEMORY', b2: 'FOREVER IN OUR HEARTS'
+    },
+    colors: { bg: '#f4f4f5', title: '#171717', sub: '#404040', div: '#d4d4d8', bottom: '#52525b', top: '#52525b' },
+    wave: { type: 'solid', solid: '#27272a', stops: 2, grad: ['#000000', '#000000', '#000000', '#000000', '#000000'] }
+  },
+  {
+    id: 'pet-memorial',
+    label: 'Pet Memorial',
+    desc: 'Immortalize your best friend’s bark, meow, or purr. Warm, earthy colors representing a loyal companion.',
+    texts: {
+      tl: 'CHARLIE THE GOLDEN', tr: '2012 - 2025', title: 'HAPPY BARKS', sub: 'THE BEST BOY', b1: 'THE SOUND OF HOME', b2: 'WE WILL MISS YOU'
+    },
+    colors: { bg: '#fff7ed', title: '#451a03', sub: '#78350f', div: '#fef3c7', bottom: '#92400e', top: '#92400e' },
+    wave: { type: 'gradient', solid: '#000000', stops: 2, grad: ['#d97706', '#92400e', '#000000', '#000000', '#000000'] }
+  },
+  {
+    id: 'song-chorus',
+    label: 'Iconic Song Chorus',
+    desc: 'A vibrant cyberpunk aesthetic for displaying the exact soundwave of a legendary guitar solo or vocal chorus.',
+    texts: {
+      tl: 'PINK FLOYD', tr: '1979', title: 'COMFORTABLY NUMB', sub: 'THE GUITAR SOLO (04:30 - 06:22)', b1: 'THE WALL', b2: 'HARVEST RECORDS'
+    },
+    colors: { bg: '#09090b', title: '#f4f4f5', sub: '#a1a1aa', div: '#27272a', bottom: '#d4d4d8', top: '#d4d4d8' },
+    wave: { type: 'gradient', solid: '#000000', stops: 3, grad: ['#2dd4bf', '#818cf8', '#f472b6', '#000000', '#000000'] }
+  },
+  {
+    id: 'movie-quote',
+    label: 'Movie Quote',
+    desc: 'Cinematic layout for your favorite movie or TV show dialogue. Bold, striking, and theatrical.',
+    texts: {
+      tl: 'MATTHEW MCCONAUGHEY', tr: '2014', title: 'INTERSTELLAR', sub: '"LOVE IS THE ONE THING WE\'RE CAPABLE OF PERCEIVING..."', b1: 'DIRECTED BY CHRISTOPHER NOLAN', b2: 'HANS ZIMMER SCORE'
+    },
+    colors: { bg: '#0f172a', title: '#e0e7ff', sub: '#a5b4fc', div: '#1e293b', bottom: '#c7d2fe', top: '#c7d2fe' },
+    wave: { type: 'gradient', solid: '#000000', stops: 2, grad: ['#38bdf8', '#facc15', '#000000', '#000000', '#000000'] }
+  },
+  {
+    id: 'graduation',
+    label: 'Graduation Speech',
+    desc: 'Commemorate an academic achievement. Perfect for valedictorian speeches or commencement addresses.',
+    texts: {
+      tl: 'MICHAEL CHANG', tr: 'CLASS OF 2026', title: 'THE SPEECH', sub: 'VALEDICTORIAN ADDRESS', b1: 'HARVARD UNIVERSITY', b2: 'THE BEGINNING OF EVERYTHING'
+    },
+    colors: { bg: '#f8fafc', title: '#0f172a', sub: '#334155', div: '#e2e8f0', bottom: '#475569', top: '#475569' },
+    wave: { type: 'gradient', solid: '#000000', stops: 2, grad: ['#1d4ed8', '#0f172a', '#000000', '#000000', '#000000'] }
+  },
+  {
+    id: 'inside-joke',
+    label: 'Inside Joke / Laughter',
+    desc: 'Capture uncontrollable laughter or an inside joke shared among close friends.',
+    texts: {
+      tl: 'THE SQUAD', tr: 'SUMMER TRIP \'25', title: 'YOU HAD TO BE THERE', sub: '5 MINUTES OF UNCONTROLLABLE LAUGHTER', b1: 'ROAD TRIP TO MALIBU', b2: 'BEST MEMORIES'
+    },
+    colors: { bg: '#fdf4ff', title: '#4a044e', sub: '#701a75', div: '#fce7f3', bottom: '#86198f', top: '#86198f' },
+    wave: { type: 'gradient', solid: '#000000', stops: 4, grad: ['#f43f5e', '#a855f7', '#3b82f6', '#10b981', '#000000'] }
+  },
+  {
+    id: 'time-capsule',
+    label: 'Time Capsule',
+    desc: 'A voice memo recorded for the future. Futuristic and encrypted aesthetic.',
+    texts: {
+      tl: 'TOP SECRET', tr: 'DO NOT OPEN UNTIL 2035', title: 'TIME CAPSULE', sub: 'A MESSAGE TO MY FUTURE SELF', b1: 'RECORDED ON JANUARY 1ST, 2026', b2: 'ENCRYPTED AUDIO'
+    },
+    colors: { bg: '#020617', title: '#38bdf8', sub: '#0ea5e9', div: '#0f172a', bottom: '#7dd3fc', top: '#7dd3fc' },
+    wave: { type: 'gradient', solid: '#000000', stops: 2, grad: ['#0ea5e9', '#4f46e5', '#000000', '#000000', '#000000'] }
+  },
+  {
+    id: 'space-voyager',
+    label: 'Space Voyager',
+    desc: 'Inspired by the Voyager Golden Record. Deep space aesthetics for scientific or cosmic audio clips.',
+    texts: {
+      tl: 'NASA RECORDING', tr: '1977', title: 'THE SOUND OF EARTH', sub: 'VOYAGER GOLDEN RECORD', b1: 'INTERSTELLAR MISSION', b2: 'CARL SAGAN'
+    },
+    colors: { bg: '#000000', title: '#fef08a', sub: '#fde047', div: '#27272a', bottom: '#fde047', top: '#fde047' },
+    wave: { type: 'solid', solid: '#eab308', stops: 2, grad: ['#000000', '#000000', '#000000', '#000000', '#000000'] }
+  }
+];
+
 const DPI = 300;
 const BASE_MAX_W = 600;
 const BASE_MAX_H = 800;
@@ -73,6 +226,8 @@ const EDIT_TYPES = {
   BOTTOM_1: 'sw-bottom-1',
   BOTTOM_2: 'sw-bottom-2',
   SOUNDWAVE: 'sw-soundwave',
+  TOP_LEFT: 'sw-top-left',
+  TOP_RIGHT: 'sw-top-right'
 };
 
 interface OrientedSize {
@@ -162,13 +317,16 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const rawAudioDataRef = useRef<Float32Array | null>(null);
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    size: true,
+    presets: true,
+    size: false,
     texts: true,
-    soundwave: true,
+    soundwave: false,
     background: false,
-    multiExport: true,
+    multiExport: false,
     download: true,
   });
+
+  const [activePreset, setActivePreset] = useState<string>('custom');
 
   const [canvasSize, setCanvasSize] = useState<string>('30x40');
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('landscape');
@@ -178,7 +336,22 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   });
   const [zoom, setZoom] = useState<number>(1); 
 
-  // Typographic State matching the Reference
+  const [topLeftText, setTopLeftText] = useState('ELECTRIC HEARTBEAT');
+  const [topLeftColor, setTopLeftColor] = useState('#000000');
+  const [topLeftFontFamily, setTopLeftFontFamily] = useState('Montserrat, sans-serif');
+  const [topLeftFontSize, setTopLeftFontSize] = useState(12);
+  const [topLeftCharSpacing, setTopLeftCharSpacing] = useState(100);
+  const [topLeftFontWeight, setTopLeftFontWeight] = useState('700');
+  const [topLeftFontStyle, setTopLeftFontStyle] = useState('normal');
+
+  const [topRightText, setTopRightText] = useState('14.05.2026');
+  const [topRightColor, setTopRightColor] = useState('#000000');
+  const [topRightFontFamily, setTopRightFontFamily] = useState('Montserrat, sans-serif');
+  const [topRightFontSize, setTopRightFontSize] = useState(12);
+  const [topRightCharSpacing, setTopRightCharSpacing] = useState(100);
+  const [topRightFontWeight, setTopRightFontWeight] = useState('700');
+  const [topRightFontStyle, setTopRightFontStyle] = useState('normal');
+
   const [mainTitleText, setMainTitleText] = useState('ELECTRIC HEARTBEAT');
   const [mainTitleColor, setMainTitleColor] = useState('#000000');
   const [mainTitleFontFamily, setMainTitleFontFamily] = useState('Montserrat, sans-serif');
@@ -213,7 +386,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const [bottom2FontWeight, setBottom2FontWeight] = useState('600');
   const [bottom2FontStyle, setBottom2FontStyle] = useState('normal');
 
-  // Advanced Soundwave Properties
   const [waveMode, setWaveMode] = useState<'random' | 'audio'>('random'); 
   const [waveFillType, setWaveFillType] = useState<'solid' | 'gradient'>('gradient');
   const [waveSolidColor, setWaveSolidColor] = useState('#008000');
@@ -222,10 +394,10 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const [waveGradientColors, setWaveGradientColors] = useState<string[]>(['#66ffcc', '#008000', '#003300', '#000000', '#000000']);
   const [waveGradientAngle, setWaveGradientAngle] = useState<number>(0);
 
-  const [waveDensity, setWaveDensity] = useState(300); // Lines count
+  const [waveDensity, setWaveDensity] = useState(300); 
   const [waveThickness, setWaveThickness] = useState(1.5);
-  const [waveHeightScale, setWaveHeightScale] = useState(150); // Height of the wave
-  const [waveWidthScale, setWaveWidthScale] = useState(80); // Width % of the canvas
+  const [waveHeightScale, setWaveHeightScale] = useState(150); 
+  const [waveWidthScale, setWaveWidthScale] = useState(80); 
 
   const [bgColor, setBgColor] = useState('#fbfbfb');
 
@@ -243,6 +415,37 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
   const toggleAccordion = (key: string) => {
     setOpenSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const applyPreset = (presetId: string) => {
+    setActivePreset(presetId);
+    if (presetId === 'custom') return;
+
+    const preset = PRESETS.find(p => p.id === presetId);
+    if (!preset) return;
+
+    setTopLeftText(preset.texts.tl);
+    setTopRightText(preset.texts.tr);
+    setMainTitleText(preset.texts.title);
+    setSubTitleText(preset.texts.sub);
+    setBottom1Text(preset.texts.b1);
+    setBottom2Text(preset.texts.b2);
+
+    setBgColor(preset.colors.bg);
+    setMainTitleColor(preset.colors.title);
+    setSubTitleColor(preset.colors.sub);
+    setDividerColor(preset.colors.div);
+    setBottom1Color(preset.colors.bottom);
+    setBottom2Color(preset.colors.bottom);
+    setTopLeftColor(preset.colors.top);
+    setTopRightColor(preset.colors.top);
+
+    setWaveFillType(preset.wave.type as 'solid' | 'gradient');
+    setWaveSolidColor(preset.wave.solid);
+    setWaveGradientStops(preset.wave.stops);
+    setWaveGradientColors(preset.wave.grad);
+
+    showToast('Template applied successfully');
   };
 
   useEffect(() => {
@@ -271,6 +474,33 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const cy = containerDims.height / 2;
     const cw = containerDims.width;
+
+    const topLeft = new fabric.IText(topLeftText, {
+      left: cw * 0.08,
+      top: containerDims.height * 0.08,
+      fontSize: topLeftFontSize,
+      fontFamily: topLeftFontFamily,
+      fontWeight: topLeftFontWeight,
+      fontStyle: topLeftFontStyle,
+      fill: topLeftColor,
+      charSpacing: topLeftCharSpacing,
+      data: { edType: EDIT_TYPES.TOP_LEFT },
+    });
+    canvas.add(topLeft);
+
+    const topRight = new fabric.IText(topRightText, {
+      left: cw * 0.92,
+      top: containerDims.height * 0.08,
+      originX: 'right',
+      fontSize: topRightFontSize,
+      fontFamily: topRightFontFamily,
+      fontWeight: topRightFontWeight,
+      fontStyle: topRightFontStyle,
+      fill: topRightColor,
+      charSpacing: topRightCharSpacing,
+      data: { edType: EDIT_TYPES.TOP_RIGHT },
+    });
+    canvas.add(topRight);
 
     const mainTitle = new fabric.Textbox(mainTitleText, {
       left: cw / 2,
@@ -344,6 +574,8 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     });
     canvas.add(bottom2);
 
+    (canvas as any).textLeftRef = topLeft;
+    (canvas as any).textRightRef = topRight;
     (canvas as any).textTitleRef = mainTitle;
     (canvas as any).textSubRef = subTitle;
     (canvas as any).dividerRef = divider;
@@ -367,6 +599,8 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       if (!t || !t.data) return;
       const v = t.text;
       switch (t.data.edType) {
+        case EDIT_TYPES.TOP_LEFT: setTopLeftText(v); break;
+        case EDIT_TYPES.TOP_RIGHT: setTopRightText(v); break;
         case EDIT_TYPES.MAIN_TITLE: setMainTitleText(v); break;
         case EDIT_TYPES.SUB_TITLE: setSubTitleText(v); break;
         case EDIT_TYPES.BOTTOM_1: setBottom1Text(v); break;
@@ -556,6 +790,9 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     const cy = dims.height / 2;
 
     const anyCanvas = canvas as any;
+    if (anyCanvas.textLeftRef) anyCanvas.textLeftRef.set({ left: cw * 0.08, top: dims.height * 0.08 });
+    if (anyCanvas.textRightRef) anyCanvas.textRightRef.set({ left: cw * 0.92, top: dims.height * 0.08 });
+    
     if (anyCanvas.textTitleRef) anyCanvas.textTitleRef.set({ left: cw / 2, top: cy + 100, width: cw * 0.8 });
     if (anyCanvas.textSubRef) anyCanvas.textSubRef.set({ left: cw / 2, top: cy + 130, width: cw * 0.8 });
     
@@ -577,6 +814,42 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       fabricRef.current?.requestRenderAll();
     }
   };
+
+  useEffect(() => {
+    const canvas = fabricRef.current as any;
+    if (canvas && canvas.textLeftRef) {
+      isRebuildingRef.current = true;
+      canvas.textLeftRef.set({
+        text: topLeftText,
+        fill: topLeftColor,
+        fontFamily: topLeftFontFamily,
+        fontSize: topLeftFontSize,
+        charSpacing: topLeftCharSpacing,
+        fontWeight: topLeftFontWeight,
+        fontStyle: topLeftFontStyle
+      });
+      canvas.requestRenderAll();
+      isRebuildingRef.current = false;
+    }
+  }, [topLeftText, topLeftColor, topLeftFontFamily, topLeftFontSize, topLeftCharSpacing, topLeftFontWeight, topLeftFontStyle]);
+
+  useEffect(() => {
+    const canvas = fabricRef.current as any;
+    if (canvas && canvas.textRightRef) {
+      isRebuildingRef.current = true;
+      canvas.textRightRef.set({
+        text: topRightText,
+        fill: topRightColor,
+        fontFamily: topRightFontFamily,
+        fontSize: topRightFontSize,
+        charSpacing: topRightCharSpacing,
+        fontWeight: topRightFontWeight,
+        fontStyle: topRightFontStyle
+      });
+      canvas.requestRenderAll();
+      isRebuildingRef.current = false;
+    }
+  }, [topRightText, topRightColor, topRightFontFamily, topRightFontSize, topRightCharSpacing, topRightFontWeight, topRightFontStyle]);
 
   useEffect(() => {
     const canvas = fabricRef.current as any;
@@ -1218,6 +1491,48 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           <button className="back-btn" onClick={() => navigate('/trend-posters')}>&#10229; Back</button>
         </div>
 
+        <button className={`accordion-btn${openSections.presets ? ' open' : ''}`} onClick={() => toggleAccordion('presets')}>
+          &#127912; Templates & Presets<span className="arrow">&#9660;</span>
+        </button>
+        <div className={`accordion-content${openSections.presets ? ' open' : ''}`}>
+          <div className="form-row">
+            <label>Select Theme</label>
+            <select value={activePreset} onChange={(e) => applyPreset(e.target.value)}>
+              <option value="custom">Custom Design...</option>
+              <optgroup label="Family & Baby">
+                <option value="first-heartbeat">First Heartbeat</option>
+                <option value="first-cry">First Cry</option>
+                <option value="first-word">First Word</option>
+                <option value="first-laugh">First Laugh</option>
+              </optgroup>
+              <optgroup label="Love & Wedding">
+                <option value="proposal">The Proposal</option>
+                <option value="wedding-dance">First Dance</option>
+                <option value="i-love-you">I Love You Message</option>
+              </optgroup>
+              <optgroup label="Memories & Tributes">
+                <option value="memorial">In Loving Memory</option>
+                <option value="pet-memorial">Pet Memorial</option>
+              </optgroup>
+              <optgroup label="Music & Pop Culture">
+                <option value="song-chorus">Iconic Song Chorus</option>
+                <option value="movie-quote">Movie Quote</option>
+              </optgroup>
+              <optgroup label="Milestones & Other">
+                <option value="graduation">Graduation Speech</option>
+                <option value="inside-joke">Inside Joke / Laughter</option>
+                <option value="time-capsule">Time Capsule</option>
+                <option value="space-voyager">Space Voyager</option>
+              </optgroup>
+            </select>
+            {activePreset !== 'custom' && (
+              <p style={{ fontSize: '10px', color: 'var(--spotify-subtext)', marginTop: '8px', lineHeight: '1.4' }}>
+                {PRESETS.find(p => p.id === activePreset)?.desc}
+              </p>
+            )}
+          </div>
+        </div>
+
         <button className={`accordion-btn${openSections.size ? ' open' : ''}`} onClick={() => toggleAccordion('size')}>
           &#128208; Canvas Size<span className="arrow">&#9660;</span>
         </button>
@@ -1361,6 +1676,103 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           </div>
         </div>
 
+        <button className={`accordion-btn${openSections.texts ? ' open' : ''}`} onClick={() => toggleAccordion('texts')}>
+          &#128294; Typographic Details<span className="arrow">&#9660;</span>
+        </button>
+        <div className={`accordion-content${openSections.texts ? ' open' : ''}`}>
+          
+          <div className="form-row">
+            <label>Main Title</label>
+            <input type="text" value={mainTitleText}
+              onChange={(e) => updateTextContent(fabricRef.current?.textTitleRef, setMainTitleText, e.target.value)} />
+          </div>
+          <div className="form-row">
+            <label>Main Title Color</label>
+            <div className="color-row">
+              <input type="color" value={mainTitleColor}
+                onChange={(e) => setMainTitleColor(e.target.value)} />
+              <input type="text" value={mainTitleColor}
+                onChange={(e) => setMainTitleColor(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-row" style={{ marginTop: '12px' }}>
+            <label>Subtitle</label>
+            <input type="text" value={subTitleText}
+              onChange={(e) => updateTextContent(fabricRef.current?.textSubRef, setSubTitleText, e.target.value)} />
+          </div>
+          <div className="form-row">
+            <label>Subtitle Color</label>
+            <div className="color-row">
+              <input type="color" value={subTitleColor}
+                onChange={(e) => setSubTitleColor(e.target.value)} />
+              <input type="text" value={subTitleColor}
+                onChange={(e) => setSubTitleColor(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-row" style={{ marginTop: '12px' }}>
+            <label>Top Left Text</label>
+            <input type="text" value={topLeftText}
+              onChange={(e) => updateTextContent(fabricRef.current?.textLeftRef, setTopLeftText, e.target.value)} />
+          </div>
+          <div className="form-row">
+            <label>Top Left Color</label>
+            <div className="color-row">
+              <input type="color" value={topLeftColor}
+                onChange={(e) => setTopLeftColor(e.target.value)} />
+              <input type="text" value={topLeftColor}
+                onChange={(e) => setTopLeftColor(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-row" style={{ marginTop: '12px' }}>
+            <label>Top Right Text</label>
+            <input type="text" value={topRightText}
+              onChange={(e) => updateTextContent(fabricRef.current?.textRightRef, setTopRightText, e.target.value)} />
+          </div>
+          <div className="form-row">
+            <label>Top Right Color</label>
+            <div className="color-row">
+              <input type="color" value={topRightColor}
+                onChange={(e) => setTopRightColor(e.target.value)} />
+              <input type="text" value={topRightColor}
+                onChange={(e) => setTopRightColor(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-row" style={{ marginTop: '12px' }}>
+            <label>Bottom Text 1</label>
+            <input type="text" value={bottom1Text}
+              onChange={(e) => updateTextContent(fabricRef.current?.textBottom1Ref, setBottom1Text, e.target.value)} />
+          </div>
+          <div className="form-row">
+            <label>Bottom Text 1 Color</label>
+            <div className="color-row">
+              <input type="color" value={bottom1Color}
+                onChange={(e) => setBottom1Color(e.target.value)} />
+              <input type="text" value={bottom1Color}
+                onChange={(e) => setBottom1Color(e.target.value)} />
+            </div>
+          </div>
+
+          <div className="form-row" style={{ marginTop: '12px' }}>
+            <label>Bottom Text 2</label>
+            <input type="text" value={bottom2Text}
+              onChange={(e) => updateTextContent(fabricRef.current?.textBottom2Ref, setBottom2Text, e.target.value)} />
+          </div>
+          <div className="form-row">
+            <label>Bottom Text 2 Color</label>
+            <div className="color-row">
+              <input type="color" value={bottom2Color}
+                onChange={(e) => setBottom2Color(e.target.value)} />
+              <input type="text" value={bottom2Color}
+                onChange={(e) => setBottom2Color(e.target.value)} />
+            </div>
+          </div>
+
+        </div>
+
         <button className={`accordion-btn${openSections.multiExport ? ' open' : ''}`} onClick={() => toggleAccordion('multiExport')}>
           &#127912; Multi-Color Export<span className="arrow">&#9660;</span>
         </button>
@@ -1500,6 +1912,100 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
             </div>
           )}
 
+          {selectedType === EDIT_TYPES.MAIN_TITLE && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Main Title</div>
+                <div className="pf-row">
+                  <label>Text</label>
+                  <input type="text" value={mainTitleText}
+                    onChange={(e) => setMainTitleText(e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Family</label>
+                  <select value={mainTitleFontFamily} onChange={(e) => setMainTitleFontFamily(e.target.value)}>
+                    <option value="Josefin Sans, sans-serif">Josefin Sans</option>
+                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+                <div className="pf-row">
+                  <label>Font Style</label>
+                  <FontStyleSelector weight={mainTitleFontWeight} style={mainTitleFontStyle} onChange={(w, s) => { setMainTitleFontWeight(w); setMainTitleFontStyle(s); }} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Size</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="12" max="150" value={mainTitleFontSize} onChange={(e) => setMainTitleFontSize(Number(e.target.value))} />
+                    <span className="pf-range-val">{mainTitleFontSize}px</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Letter Spacing</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="0" max="600" step="10" value={mainTitleCharSpacing} onChange={(e) => setMainTitleCharSpacing(Number(e.target.value))} />
+                    <span className="pf-range-val">{mainTitleCharSpacing}</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Color</label>
+                  <div className="pf-color-row">
+                    <input type="color" value={mainTitleColor}
+                      onChange={(e) => setMainTitleColor(e.target.value)} />
+                    <input type="text" value={mainTitleColor}
+                      onChange={(e) => setMainTitleColor(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {selectedType === EDIT_TYPES.SUB_TITLE && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">Subtitle</div>
+                <div className="pf-row">
+                  <label>Text</label>
+                  <input type="text" value={subTitleText}
+                    onChange={(e) => setSubTitleText(e.target.value)} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Family</label>
+                  <select value={subTitleFontFamily} onChange={(e) => setSubTitleFontFamily(e.target.value)}>
+                    <option value="DM Sans, sans-serif">DM Sans</option>
+                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
+                  </select>
+                </div>
+                <div className="pf-row">
+                  <label>Font Style</label>
+                  <FontStyleSelector weight={subTitleFontWeight} style={subTitleFontStyle} onChange={(w, s) => { setSubTitleFontWeight(w); setSubTitleFontStyle(s); }} />
+                </div>
+                <div className="pf-row">
+                  <label>Font Size</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="8" max="72" value={subTitleFontSize} onChange={(e) => setSubTitleFontSize(Number(e.target.value))} />
+                    <span className="pf-range-val">{subTitleFontSize}px</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Letter Spacing</label>
+                  <div className="pf-range-row">
+                    <input type="range" min="0" max="600" step="10" value={subTitleCharSpacing} onChange={(e) => setSubTitleCharSpacing(Number(e.target.value))} />
+                    <span className="pf-range-val">{subTitleCharSpacing}</span>
+                  </div>
+                </div>
+                <div className="pf-row">
+                  <label>Color</label>
+                  <div className="pf-color-row">
+                    <input type="color" value={subTitleColor}
+                      onChange={(e) => setSubTitleColor(e.target.value)} />
+                    <input type="text" value={subTitleColor}
+                      onChange={(e) => setSubTitleColor(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {selectedType === EDIT_TYPES.TOP_LEFT && (
             <div id="props-fields">
               <div className="pf-section">
@@ -1588,100 +2094,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
                       onChange={(e) => setTopRightColor(e.target.value)} />
                     <input type="text" value={topRightColor}
                       onChange={(e) => setTopRightColor(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {selectedType === EDIT_TYPES.MAIN_TITLE && (
-            <div id="props-fields">
-              <div className="pf-section">
-                <div className="pf-section-title">Main Title</div>
-                <div className="pf-row">
-                  <label>Text</label>
-                  <input type="text" value={mainTitleText}
-                    onChange={(e) => setMainTitleText(e.target.value)} />
-                </div>
-                <div className="pf-row">
-                  <label>Font Family</label>
-                  <select value={mainTitleFontFamily} onChange={(e) => setMainTitleFontFamily(e.target.value)}>
-                    <option value="Josefin Sans, sans-serif">Josefin Sans</option>
-                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
-                  </select>
-                </div>
-                <div className="pf-row">
-                  <label>Font Style</label>
-                  <FontStyleSelector weight={mainTitleFontWeight} style={mainTitleFontStyle} onChange={(w, s) => { setMainTitleFontWeight(w); setMainTitleFontStyle(s); }} />
-                </div>
-                <div className="pf-row">
-                  <label>Font Size</label>
-                  <div className="pf-range-row">
-                    <input type="range" min="12" max="100" value={mainTitleFontSize} onChange={(e) => setMainTitleFontSize(Number(e.target.value))} />
-                    <span className="pf-range-val">{mainTitleFontSize}px</span>
-                  </div>
-                </div>
-                <div className="pf-row">
-                  <label>Letter Spacing</label>
-                  <div className="pf-range-row">
-                    <input type="range" min="0" max="400" step="10" value={mainTitleCharSpacing} onChange={(e) => setMainTitleCharSpacing(Number(e.target.value))} />
-                    <span className="pf-range-val">{mainTitleCharSpacing}</span>
-                  </div>
-                </div>
-                <div className="pf-row">
-                  <label>Color</label>
-                  <div className="pf-color-row">
-                    <input type="color" value={mainTitleColor}
-                      onChange={(e) => setMainTitleColor(e.target.value)} />
-                    <input type="text" value={mainTitleColor}
-                      onChange={(e) => setMainTitleColor(e.target.value)} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {selectedType === EDIT_TYPES.SUB_TITLE && (
-            <div id="props-fields">
-              <div className="pf-section">
-                <div className="pf-section-title">Subtitle</div>
-                <div className="pf-row">
-                  <label>Text</label>
-                  <input type="text" value={subTitleText}
-                    onChange={(e) => setSubTitleText(e.target.value)} />
-                </div>
-                <div className="pf-row">
-                  <label>Font Family</label>
-                  <select value={subTitleFontFamily} onChange={(e) => setSubTitleFontFamily(e.target.value)}>
-                    <option value="DM Sans, sans-serif">DM Sans</option>
-                    {GOOGLE_FONTS.map(f => <option key={f} value={`${f}, sans-serif`}>{f}</option>)}
-                  </select>
-                </div>
-                <div className="pf-row">
-                  <label>Font Style</label>
-                  <FontStyleSelector weight={subTitleFontWeight} style={subTitleFontStyle} onChange={(w, s) => { setSubTitleFontWeight(w); setSubTitleFontStyle(s); }} />
-                </div>
-                <div className="pf-row">
-                  <label>Font Size</label>
-                  <div className="pf-range-row">
-                    <input type="range" min="8" max="72" value={subTitleFontSize} onChange={(e) => setSubTitleFontSize(Number(e.target.value))} />
-                    <span className="pf-range-val">{subTitleFontSize}px</span>
-                  </div>
-                </div>
-                <div className="pf-row">
-                  <label>Letter Spacing</label>
-                  <div className="pf-range-row">
-                    <input type="range" min="0" max="400" step="10" value={subTitleCharSpacing} onChange={(e) => setSubTitleCharSpacing(Number(e.target.value))} />
-                    <span className="pf-range-val">{subTitleCharSpacing}</span>
-                  </div>
-                </div>
-                <div className="pf-row">
-                  <label>Color</label>
-                  <div className="pf-color-row">
-                    <input type="color" value={subTitleColor}
-                      onChange={(e) => setSubTitleColor(e.target.value)} />
-                    <input type="text" value={subTitleColor}
-                      onChange={(e) => setSubTitleColor(e.target.value)} />
                   </div>
                 </div>
               </div>
