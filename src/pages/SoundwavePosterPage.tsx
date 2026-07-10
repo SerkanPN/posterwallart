@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
 import jsPDF from 'jspdf';
+import { AlertTriangle, Lock, MessageCircle } from 'lucide-react';
 
 const GOOGLE_FONTS = [
   "Inter", "Montserrat", "Roboto", "Open Sans", "Oswald", "Lato", "Poppins", 
@@ -51,7 +52,7 @@ const PRESETS = [
   {
     id: 'first-heartbeat',
     label: 'First Heartbeat',
-    desc: 'Capture the rhythm of a new life. Perfect for gender reveals or nursery decor. Upload an ultrasound recording to make it real.',
+    desc: 'Capture the rhythm of a new life. Perfect for gender reveals or nursery decor.',
     texts: {
       tl: 'BABY BOY', tr: '14.05.2026', title: 'FIRST HEARTBEAT', sub: '142 BPM', b1: 'ULTRASOUND RECORDING', b2: 'MEMORIAL HOSPITAL'
     },
@@ -61,7 +62,7 @@ const PRESETS = [
   {
     id: 'first-cry',
     label: 'First Cry',
-    desc: 'The beautiful sound of arriving into the world. A warm, aesthetic sunset gradient representing the dawn of life.',
+    desc: 'The beautiful sound of arriving into the world. A warm, aesthetic sunset gradient.',
     texts: {
       tl: 'LEO ALEXANDER', tr: '08:42 AM', title: 'HELLO WORLD', sub: 'THE FIRST CRY', b1: 'WELCOME TO THE FAMILY', b2: '3.2 KG - 51 CM'
     },
@@ -81,7 +82,7 @@ const PRESETS = [
   {
     id: 'first-laugh',
     label: 'First Laugh',
-    desc: 'The best sound in the world. Refreshing teal and mint tones to match the pure joy of a baby laughing.',
+    desc: 'The best sound in the world. Refreshing teal and mint tones.',
     texts: {
       tl: 'BABY MILA', tr: '00:00:15', title: 'PURE JOY', sub: 'THE FIRST LAUGH', b1: 'THE BEST SOUND IN THE WORLD', b2: 'SUNDAY MORNING'
     },
@@ -91,7 +92,7 @@ const PRESETS = [
   {
     id: 'proposal',
     label: 'The Proposal',
-    desc: 'Turn a hidden voice recording of a marriage proposal into a timeless piece of art. Deep romantic tones.',
+    desc: 'Turn a hidden voice recording of a marriage proposal into a timeless piece of art.',
     texts: {
       tl: 'WILL YOU MARRY ME?', tr: '24.08.2025', title: 'SHE SAID YES', sub: 'THE PROPOSAL', b1: 'HIDDEN AUDIO RECORDING', b2: 'CENTRAL PARK, NEW YORK'
     },
@@ -101,7 +102,7 @@ const PRESETS = [
   {
     id: 'wedding-dance',
     label: 'First Dance',
-    desc: 'Elegant, timeless, and classic. A luxurious monochrome and gold theme for a wedding song soundwave.',
+    desc: 'Elegant, timeless, and classic. A luxurious monochrome and gold theme.',
     texts: {
       tl: 'SARAH & JOHN', tr: 'OUR WEDDING DAY', title: 'OUR FIRST DANCE', sub: 'PERFECT BY ED SHEERAN', b1: 'FOREVER AND ALWAYS', b2: '15TH OF SEPTEMBER'
     },
@@ -111,7 +112,7 @@ const PRESETS = [
   {
     id: 'i-love-you',
     label: 'I Love You Message',
-    desc: 'Perfect for long-distance relationships or simple affectionate gestures. A late-night voice message turned into art.',
+    desc: 'Perfect for long-distance relationships or simple affectionate gestures.',
     texts: {
       tl: 'FROM ALEX', tr: 'TO SOPHIA', title: 'I LOVE YOU', sub: 'A LATE NIGHT VOICE MESSAGE', b1: 'DISTANCE MEANS NOTHING', b2: '3400 KILOMETERS AWAY'
     },
@@ -121,7 +122,7 @@ const PRESETS = [
   {
     id: 'memorial',
     label: 'In Loving Memory',
-    desc: 'A solemn and respectful tribute. Preserve an old voicemail or video recording of a passed loved one.',
+    desc: 'A solemn and respectful tribute. Preserve an old voicemail or video recording.',
     texts: {
       tl: 'GRANDPA GEORGE', tr: '1940 - 2025', title: '"I AM ALWAYS WITH YOU"', sub: 'A SAVED VOICEMAIL', b1: 'IN LOVING MEMORY', b2: 'FOREVER IN OUR HEARTS'
     },
@@ -131,7 +132,7 @@ const PRESETS = [
   {
     id: 'pet-memorial',
     label: 'Pet Memorial',
-    desc: 'Immortalize your best friend’s bark, meow, or purr. Warm, earthy colors representing a loyal companion.',
+    desc: 'Immortalize your best friend’s bark, meow, or purr. Warm, earthy colors.',
     texts: {
       tl: 'CHARLIE THE GOLDEN', tr: '2012 - 2025', title: 'HAPPY BARKS', sub: 'THE BEST BOY', b1: 'THE SOUND OF HOME', b2: 'WE WILL MISS YOU'
     },
@@ -141,7 +142,7 @@ const PRESETS = [
   {
     id: 'song-chorus',
     label: 'Iconic Song Chorus',
-    desc: 'A vibrant cyberpunk aesthetic for displaying the exact soundwave of a legendary guitar solo or vocal chorus.',
+    desc: 'A vibrant cyberpunk aesthetic for displaying the exact soundwave of a legendary solo.',
     texts: {
       tl: 'PINK FLOYD', tr: '1979', title: 'COMFORTABLY NUMB', sub: 'THE GUITAR SOLO (04:30 - 06:22)', b1: 'THE WALL', b2: 'HARVEST RECORDS'
     },
@@ -151,7 +152,7 @@ const PRESETS = [
   {
     id: 'movie-quote',
     label: 'Movie Quote',
-    desc: 'Cinematic layout for your favorite movie or TV show dialogue. Bold, striking, and theatrical.',
+    desc: 'Cinematic layout for your favorite movie or TV show dialogue.',
     texts: {
       tl: 'MATTHEW MCCONAUGHEY', tr: '2014', title: 'INTERSTELLAR', sub: '"LOVE IS THE ONE THING WE\'RE CAPABLE OF PERCEIVING..."', b1: 'DIRECTED BY CHRISTOPHER NOLAN', b2: 'HANS ZIMMER SCORE'
     },
@@ -161,7 +162,7 @@ const PRESETS = [
   {
     id: 'graduation',
     label: 'Graduation Speech',
-    desc: 'Commemorate an academic achievement. Perfect for valedictorian speeches or commencement addresses.',
+    desc: 'Commemorate an academic achievement. Perfect for valedictorian speeches.',
     texts: {
       tl: 'MICHAEL CHANG', tr: 'CLASS OF 2026', title: 'THE SPEECH', sub: 'VALEDICTORIAN ADDRESS', b1: 'HARVARD UNIVERSITY', b2: 'THE BEGINNING OF EVERYTHING'
     },
@@ -191,7 +192,7 @@ const PRESETS = [
   {
     id: 'space-voyager',
     label: 'Space Voyager',
-    desc: 'Inspired by the Voyager Golden Record. Deep space aesthetics for scientific or cosmic audio clips.',
+    desc: 'Inspired by the Voyager Golden Record. Deep space aesthetics for scientific audio clips.',
     texts: {
       tl: 'NASA RECORDING', tr: '1977', title: 'THE SOUND OF EARTH', sub: 'VOYAGER GOLDEN RECORD', b1: 'INTERSTELLAR MISSION', b2: 'CARL SAGAN'
     },
@@ -246,11 +247,9 @@ function generateAestheticPeaks(count: number): number[] {
     const x = i / (count - 1);
     let envelope = Math.sin(x * Math.PI); 
     envelope = Math.pow(envelope, 0.6); 
-    
     const noise1 = Math.random();
     const noise2 = Math.random() * Math.random(); 
     const spike = Math.random() > 0.92 ? Math.random() : 0;
-    
     let val = (noise1 * 0.3 + noise2 * 0.6 + spike * 0.4) * envelope;
     val = Math.max(0.02, Math.min(1, val));
     peaks.push(val);
@@ -302,6 +301,11 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
   const isRebuildingRef = useRef<boolean>(false);
   const rawAudioDataRef = useRef<Float32Array | null>(null);
+
+  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
+  const [userConfirmed, setUserConfirmed] = useState<boolean>(false);
+  const [previewImage, setPreviewImage] = useState<string>('');
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     presets: true,
@@ -387,8 +391,8 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const [bgColor, setBgColor] = useState('#fbfbfb');
 
   const [showQR, setShowQR] = useState(false);
-  const [qrLink, setQrLink] = useState('https://posterwallart.shop');
-  const [qrSize, setQrSize] = useState(60);
+  const [qrLink, setQrLink] = useState('https://musicposters.shop');
+  const [qrSize, setQrSize] = useState(45);
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [toast, setToast] = useState<string>('');
@@ -441,7 +445,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       height: containerDims.height,
       backgroundColor: bgColor,
       preserveObjectStacking: true,
-      selection: true,
+      selection: !isLocked,
     });
     fabricRef.current = canvas;
 
@@ -457,7 +461,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     canvas.add(bgRect);
     bgRectRef.current = bgRect;
 
-    const cy = containerDims.height / 2;
     const cw = containerDims.width;
 
     const topLeft = new fabric.IText(topLeftText, {
@@ -489,7 +492,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const mainTitle = new fabric.Textbox(mainTitleText, {
       left: cw / 2,
-      top: cy + 100,
+      top: containerDims.height * 0.63,
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -505,7 +508,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const subTitle = new fabric.Textbox(subTitleText, {
       left: cw / 2,
-      top: cy + 130,
+      top: containerDims.height * 0.68,
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -519,7 +522,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     });
     canvas.add(subTitle);
 
-    const divider = new fabric.Line([cw * 0.35, cy + 155, cw * 0.65, cy + 155], {
+    const divider = new fabric.Line([cw * 0.35, containerDims.height * 0.72, cw * 0.65, containerDims.height * 0.72], {
       stroke: dividerColor,
       strokeWidth: 1,
       selectable: true,
@@ -529,7 +532,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const bottom1 = new fabric.Textbox(bottom1Text, {
       left: cw / 2,
-      top: cy + 175,
+      top: containerDims.height * 0.76,
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -545,7 +548,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const bottom2 = new fabric.Textbox(bottom2Text, {
       left: cw / 2,
-      top: cy + 195,
+      top: containerDims.height * 0.79,
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -570,30 +573,32 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     buildSoundwavePath(canvas, containerDims);
     buildQRCode(canvas, containerDims);
 
-    canvas.on('selection:created', onSelectionChange);
-    canvas.on('selection:updated', onSelectionChange);
-    
-    canvas.on('selection:cleared', () => {
-      if (isRebuildingRef.current) return;
-      const activeEl = document.activeElement;
-      if (activeEl && (activeEl.closest('#panel') || activeEl.closest('#props-panel'))) return;
-      setSelectedType(null);
-    });
+    if (!isLocked) {
+      canvas.on('selection:created', onSelectionChange);
+      canvas.on('selection:updated', onSelectionChange);
+      
+      canvas.on('selection:cleared', () => {
+        if (isRebuildingRef.current) return;
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.closest('#panel') || activeEl.closest('#props-panel'))) return;
+        setSelectedType(null);
+      });
 
-    canvas.on('text:changed', (e: any) => {
-      const t = e.target;
-      if (!t || !t.data) return;
-      const v = t.text;
-      switch (t.data.edType) {
-        case EDIT_TYPES.TOP_LEFT: setTopLeftText(v); break;
-        case EDIT_TYPES.TOP_RIGHT: setTopRightText(v); break;
-        case EDIT_TYPES.MAIN_TITLE: setMainTitleText(v); break;
-        case EDIT_TYPES.SUB_TITLE: setSubTitleText(v); break;
-        case EDIT_TYPES.BOTTOM_1: setBottom1Text(v); break;
-        case EDIT_TYPES.BOTTOM_2: setBottom2Text(v); break;
-        default: break;
-      }
-    });
+      canvas.on('text:changed', (e: any) => {
+        const t = e.target;
+        if (!t || !t.data) return;
+        const v = t.text;
+        switch (t.data.edType) {
+          case EDIT_TYPES.TOP_LEFT: setTopLeftText(v); break;
+          case EDIT_TYPES.TOP_RIGHT: setTopRightText(v); break;
+          case EDIT_TYPES.MAIN_TITLE: setMainTitleText(v); break;
+          case EDIT_TYPES.SUB_TITLE: setSubTitleText(v); break;
+          case EDIT_TYPES.BOTTOM_1: setBottom1Text(v); break;
+          case EDIT_TYPES.BOTTOM_2: setBottom2Text(v); break;
+          default: break;
+        }
+      });
+    }
 
     const fontWeightsStr = ':100,100i,300,300i,400,400i,500,500i,600,600i,700,700i,800,800i,900,900i';
     const link = document.createElement('link');
@@ -606,7 +611,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     return () => {
       canvas.dispose();
     };
-  }, []);
+  }, [isLocked]);
 
   useEffect(() => {
     const canvas = fabricRef.current;
@@ -618,7 +623,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   }, [zoom, containerDims]);
 
   function onSelectionChange(e: any) {
-    if (isRebuildingRef.current) return;
+    if (isRebuildingRef.current || isLocked) return;
     const obj = e.selected && e.selected.length === 1 ? e.selected[0] : null;
     if (obj) {
       if (obj.data && obj.data.edType) {
@@ -658,7 +663,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       rebuildSoundwave();
       
       const simulatedUniqueId = Math.random().toString(36).substring(2, 9);
-      setQrLink(`https://posterwallart.shop/listen/${simulatedUniqueId}`);
+      setQrLink(`https://musicposters.shop/listen/${simulatedUniqueId}`);
       setShowQR(true);
       
       showToast('Soundwave generated successfully.');
@@ -733,8 +738,9 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         originX: 'center',
         originY: 'center',
         left: dims.width / 2,
-        top: dims.height * 0.4, 
+        top: dims.height * 0.40, 
         objectCaching: false,
+        selectable: !isLocked,
         data: { edType: EDIT_TYPES.SOUNDWAVE },
     });
 
@@ -748,7 +754,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     canvas.add(wavePath);
     wavePathRef.current = wavePath;
 
-    if (wasSelected) {
+    if (wasSelected && !isLocked) {
       canvas.setActiveObject(wavePath);
     }
     
@@ -773,11 +779,12 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     fabric.Image.fromURL(apiUrl).then((img) => {
       img.set({
         left: dims.width / 2,
-        top: dims.height * 0.85,
+        top: dims.height * 0.88,
         originX: 'center',
         originY: 'center',
         scaleX: qrSize / img.width!,
         scaleY: qrSize / img.height!,
+        selectable: !isLocked,
         data: { edType: EDIT_TYPES.QR_CODE }
       });
       canvas.add(img);
@@ -793,13 +800,13 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     const canvas = fabricRef.current;
     if (!canvas) return;
     buildSoundwavePath(canvas, containerDims);
-  }, [containerDims, waveMode, waveDensity, waveThickness, waveWidthScale, waveHeightScale, waveFillType, waveSolidColor, waveGradientColors, waveGradientStops, waveGradientAngle]);
+  }, [containerDims, waveMode, waveDensity, waveThickness, waveWidthScale, waveHeightScale, waveFillType, waveSolidColor, waveGradientColors, waveGradientStops, waveGradientAngle, isLocked]);
 
   const rebuildQRCode = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
     buildQRCode(canvas, containerDims);
-  }, [containerDims, showQR, qrLink, qrSize]);
+  }, [containerDims, showQR, qrLink, qrSize, isLocked]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -809,6 +816,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   }, [rebuildQRCode]);
 
   const handleSizeOrOrientationChange = (newSize: string, newOrient: 'portrait' | 'landscape') => {
+    if(isLocked) return;
     setCanvasSize(newSize);
     setOrientation(newOrient);
     
@@ -824,21 +832,20 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     if (bgRectRef.current) bgRectRef.current.set({ width: dims.width, height: dims.height });
     
     const cw = dims.width;
-    const cy = dims.height / 2;
 
     const anyCanvas = canvas as any;
     if (anyCanvas.textLeftRef) anyCanvas.textLeftRef.set({ left: cw * 0.08, top: dims.height * 0.08 });
     if (anyCanvas.textRightRef) anyCanvas.textRightRef.set({ left: cw * 0.92, top: dims.height * 0.08 });
     
-    if (anyCanvas.textTitleRef) anyCanvas.textTitleRef.set({ left: cw / 2, top: cy + 100, width: cw * 0.8 });
-    if (anyCanvas.textSubRef) anyCanvas.textSubRef.set({ left: cw / 2, top: cy + 130, width: cw * 0.8 });
+    if (anyCanvas.textTitleRef) anyCanvas.textTitleRef.set({ left: cw / 2, top: dims.height * 0.63, width: cw * 0.8 });
+    if (anyCanvas.textSubRef) anyCanvas.textSubRef.set({ left: cw / 2, top: dims.height * 0.68, width: cw * 0.8 });
     
     if (anyCanvas.dividerRef) {
-      anyCanvas.dividerRef.set({ x1: cw * 0.35, y1: cy + 155, x2: cw * 0.65, y2: cy + 155 });
+      anyCanvas.dividerRef.set({ x1: cw * 0.35, y1: dims.height * 0.72, x2: cw * 0.65, y2: dims.height * 0.72 });
     }
     
-    if (anyCanvas.textBottom1Ref) anyCanvas.textBottom1Ref.set({ left: cw / 2, top: cy + 175, width: cw * 0.8 });
-    if (anyCanvas.textBottom2Ref) anyCanvas.textBottom2Ref.set({ left: cw / 2, top: cy + 195, width: cw * 0.8 });
+    if (anyCanvas.textBottom1Ref) anyCanvas.textBottom1Ref.set({ left: cw / 2, top: dims.height * 0.76, width: cw * 0.8 });
+    if (anyCanvas.textBottom2Ref) anyCanvas.textBottom2Ref.set({ left: cw / 2, top: dims.height * 0.79, width: cw * 0.8 });
     
     buildSoundwavePath(canvas, dims);
     buildQRCode(canvas, dims);
@@ -992,6 +999,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const handleAlign = (mode: string) => {
+    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
@@ -1058,6 +1066,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const edDistribute = (axis: string) => {
+    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const active = canvas.getActiveObject();
@@ -1100,6 +1109,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const handleGroup = () => {
+    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
@@ -1122,6 +1132,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const handleUngroup = () => {
+    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
@@ -1141,52 +1152,74 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     return (w * DPI) / containerDims.width;
   };
 
-  const downloadPNG = async () => {
+  const triggerDownloadAction = async (format: 'png' | 'pdf' | 'svg') => {
     const canvas = fabricRef.current;
     if (!canvas) return;
-    const multiplier = getMultiplier();
-    const dataUrl = canvas.toDataURL({ format: 'png', multiplier });
-    const a = document.createElement('a');
-    a.href = dataUrl;
-    a.download = `soundwave-poster.png`;
-    a.click();
-    showToast('PNG export ready');
-  };
-
-  const downloadPDF = async () => {
-    const canvas = fabricRef.current;
-    if (!canvas) return;
+    
+    canvas.discardActiveObject();
+    canvas.renderAll();
+    
     const multiplier = getMultiplier();
     const { w, h } = parseAndOrientSize(canvasSize, orientation);
-    const dataUrl = canvas.toDataURL({ format: 'png', multiplier });
-    const pdf = new jsPDF({
-      orientation: w > h ? 'landscape' : 'portrait',
-      unit: 'in',
-      format: [w, h],
-    });
-    pdf.addImage(dataUrl, 'PNG', 0, 0, w, h);
-    pdf.save(`soundwave-poster.pdf`);
-    showToast('PDF export ready');
+
+    if (format === 'png') {
+      const dataUrl = canvas.toDataURL({ format: 'png', multiplier });
+      const a = document.createElement('a');
+      a.href = dataUrl;
+      a.download = `soundwave-poster.png`;
+      a.click();
+      showToast('PNG Downloaded');
+    } else if (format === 'pdf') {
+      const dataUrl = canvas.toDataURL({ format: 'png', multiplier });
+      const pdf = new jsPDF({ orientation: w > h ? 'landscape' : 'portrait', unit: 'in', format: [w, h] });
+      pdf.addImage(dataUrl, 'PNG', 0, 0, w, h);
+      pdf.save(`soundwave-poster.pdf`);
+      showToast('PDF Downloaded');
+    } else if (format === 'svg') {
+      const svg = canvas.toSVG();
+      const blob = new Blob([svg], { type: 'image/svg+xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `soundwave-poster.svg`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('SVG Downloaded');
+    }
+
+    const designStateJSON = {
+      canvasSize, orientation, bgColor,
+      topLeftText, topLeftColor, topLeftFontFamily, topLeftFontSize, topLeftCharSpacing, topLeftFontWeight, topLeftFontStyle,
+      topRightText, topRightColor, topRightFontFamily, topRightFontSize, topRightCharSpacing, topRightFontWeight, topRightFontStyle,
+      mainTitleText, mainTitleColor, mainTitleFontFamily, mainTitleFontSize, mainTitleCharSpacing, mainTitleFontWeight, mainTitleFontStyle,
+      subTitleText, subTitleColor, subTitleFontFamily, subTitleFontSize, subTitleCharSpacing, subTitleFontWeight, subTitleFontStyle,
+      dividerColor,
+      bottom1Text, bottom1Color, bottom1FontFamily, bottom1FontSize, bottom1CharSpacing, bottom1FontWeight, bottom1FontStyle,
+      bottom2Text, bottom2Color, bottom2FontFamily, bottom2FontSize, bottom2CharSpacing, bottom2FontWeight, bottom2FontStyle,
+      waveMode, waveFillType, waveSolidColor, waveGradientStops, waveGradientColors, waveGradientAngle, waveDensity, waveThickness, waveHeightScale, waveWidthScale,
+      showQR, qrLink, qrSize
+    };
+
+    console.log("[SUPABASE SIMULATION] Design JSON Saved:", JSON.stringify(designStateJSON));
+
+    setShowReviewModal(false);
+    setIsLocked(true);
+    showToast('Design Locked. Read-Only Mode Active.');
   };
 
-  const downloadSVG = async () => {
+  const handleDownloadMasterpieceClick = () => {
     const canvas = fabricRef.current;
-    if (!canvas) return;
-    const svg = canvas.toSVG();
-    const blob = new Blob([svg], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `soundwave-poster.svg`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast('SVG export ready');
+    if (canvas) {
+      canvas.discardActiveObject();
+      setPreviewImage(canvas.toDataURL({ format: 'png', multiplier: 0.5 }));
+    }
+    setShowReviewModal(true);
   };
 
   return (
-    <div className="spotify-poster-page">
+    <div className={`soundwave-poster-page ${isLocked ? 'locked-mode' : ''}`}>
       <style>{`
-        .spotify-poster-page {
+        .soundwave-poster-page {
           --panel-bg: #0d0d0d;
           --panel-border: #1e1e1e;
           --spotify-text: #ffffff;
@@ -1202,7 +1235,17 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           font-family: 'DM Sans', sans-serif;
           overflow: hidden;
         }
-        .spotify-poster-page #panel {
+
+        .soundwave-poster-page.locked-mode #panel,
+        .soundwave-poster-page.locked-mode #props-panel {
+          display: none;
+        }
+
+        .soundwave-poster-page.locked-mode #canvas-area {
+          padding-top: 100px;
+        }
+
+        .soundwave-poster-page #panel {
           width: 300px;
           min-width: 300px;
           background: var(--panel-bg);
@@ -1211,89 +1254,105 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           display: flex;
           flex-direction: column;
         }
-        .spotify-poster-page #panel::-webkit-scrollbar { width: 3px; }
-        .spotify-poster-page #panel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-        .spotify-poster-page .panel-header {
+        .soundwave-poster-page #panel::-webkit-scrollbar { width: 3px; }
+        .soundwave-poster-page #panel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        .soundwave-poster-page .panel-header {
           display: flex; align-items: center; justify-content: space-between;
           padding: 16px; border-bottom: 1px solid var(--panel-border); flex-shrink: 0;
         }
-        .spotify-poster-page .title-group { display: flex; align-items: center; gap: 8px; }
-        .spotify-poster-page .title-group h1 {
+        .soundwave-poster-page .title-group { display: flex; align-items: center; gap: 8px; }
+        .soundwave-poster-page .title-group h1 {
           font-size: 13px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; margin: 0;
         }
-        .spotify-poster-page .back-btn {
+        .soundwave-poster-page .back-btn {
           background: none; border: 1px solid var(--panel-border); color: var(--spotify-subtext);
           font-size: 11px; padding: 6px 10px; border-radius: 6px; cursor: pointer; font-family: inherit;
           transition: all 0.15s;
         }
-        .spotify-poster-page .back-btn:hover { color: var(--spotify-text); border-color: #333; }
+        .soundwave-poster-page .back-btn:hover { color: var(--spotify-text); border-color: #333; }
 
-        .spotify-poster-page .form-row { padding: 0 16px 12px; }
-        .spotify-poster-page .form-row label {
+        .soundwave-poster-page .form-row { padding: 0 16px 12px; }
+        .soundwave-poster-page .form-row label {
           display: block; font-size: 10px; color: var(--spotify-subtext); margin-bottom: 5px;
           text-transform: uppercase; letter-spacing: 0.06em; font-weight: 600;
         }
-        .spotify-poster-page .form-row input[type=text],
-        .spotify-poster-page .form-row select,
-        .spotify-poster-page .form-row textarea {
+        .soundwave-poster-page .form-row input[type=text],
+        .soundwave-poster-page .form-row select,
+        .soundwave-poster-page .form-row textarea {
           width: 100%; background: var(--input-bg); border: 1px solid var(--input-border);
           border-radius: 6px; color: var(--spotify-text); padding: 8px 10px; font-size: 12px;
           font-family: inherit; outline: none; transition: border-color 0.15s; box-sizing: border-box;
         }
-        .spotify-poster-page .form-row input[type=text]:focus,
-        .spotify-poster-page .form-row select:focus,
-        .spotify-poster-page .form-row textarea:focus { border-color: var(--accent); }
-        .spotify-poster-page .form-row select option { background: #1a1a1a; }
+        .soundwave-poster-page .form-row input[type=text]:focus,
+        .soundwave-poster-page .form-row select:focus,
+        .soundwave-poster-page .form-row textarea:focus { border-color: var(--accent); }
+        .soundwave-poster-page .form-row select option { background: #1a1a1a; }
 
-        .spotify-poster-page .color-row { display: flex; gap: 8px; align-items: center; padding: 0 16px 12px; }
-        .spotify-poster-page .color-row input[type=color] {
+        .soundwave-poster-page .color-row { display: flex; gap: 8px; align-items: center; padding: 0 16px 12px; }
+        .soundwave-poster-page .color-row input[type=color] {
           width: 34px; height: 30px; border: none; border-radius: 6px; padding: 2px;
           background: var(--input-bg); cursor: pointer; flex-shrink: 0;
         }
-        .spotify-poster-page .color-row input[type=text] {
+        .soundwave-poster-page .color-row input[type=text] {
           flex: 1; background: var(--input-bg); border: 1px solid var(--input-border);
           border-radius: 6px; color: var(--spotify-text); padding: 6px 8px; font-size: 11px; font-family: inherit;
         }
 
-        .spotify-poster-page .range-row { display: flex; align-items: center; gap: 8px; padding: 0 16px 12px; }
-        .spotify-poster-page .range-row input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; }
-        .spotify-poster-page .range-val { font-size: 10px; color: var(--accent); font-weight: 600; min-width: 34px; text-align: right; }
+        .soundwave-poster-page .range-row { display: flex; align-items: center; gap: 8px; padding: 0 16px 12px; }
+        .soundwave-poster-page .range-row input[type=range] { flex: 1; accent-color: var(--accent); cursor: pointer; }
+        .soundwave-poster-page .range-val { font-size: 10px; color: var(--accent); font-weight: 600; min-width: 34px; text-align: right; }
 
-        .spotify-poster-page .upload-area {
+        .soundwave-poster-page .upload-area {
           position: relative; border: 1px dashed var(--panel-border); border-radius: 8px;
           padding: 22px 12px; text-align: center; cursor: pointer; margin: 0 16px 4px;
           transition: border-color 0.15s;
         }
-        .spotify-poster-page .upload-area:hover { border-color: var(--accent); }
-        .spotify-poster-page .upload-area p { font-size: 11px; color: var(--spotify-subtext); margin: 0; }
+        .soundwave-poster-page .upload-area:hover { border-color: var(--accent); }
+        .soundwave-poster-page .upload-area p { font-size: 11px; color: var(--spotify-subtext); margin: 0; }
 
-        .spotify-poster-page .btn {
+        .soundwave-poster-page .btn {
           border: none; border-radius: 6px; padding: 9px 14px; font-size: 12px; font-weight: 600;
           cursor: pointer; font-family: inherit; transition: opacity 0.15s;
         }
-        .spotify-poster-page .btn:hover { opacity: 0.85; }
-        .spotify-poster-page .btn-primary { background: var(--accent); color: #000; }
-        .spotify-poster-page .btn-secondary {
+        .soundwave-poster-page .btn:hover { opacity: 0.85; }
+        .soundwave-poster-page .btn-primary { background: var(--accent); color: #000; }
+        .soundwave-poster-page .btn-secondary {
           background: var(--input-bg); color: var(--spotify-text); border: 1px solid var(--input-border); flex: 1;
         }
 
-        .spotify-poster-page .canvas-header-actions {
-          display: flex; gap: 8px; margin-bottom: 16px; z-index: 50; position: relative;
+        .soundwave-poster-page .canvas-header-actions {
+          display: flex; gap: 8px; margin-bottom: 24px; z-index: 50; position: relative;
+        }
+        
+        .soundwave-poster-page .btn-masterpiece {
+          background: linear-gradient(to right, #4f46e5, #9333ea);
+          color: white;
+          padding: 12px 32px;
+          font-size: 14px;
+          border-radius: 30px;
+          text-transform: uppercase;
+          letter-spacing: 0.1em;
+          box-shadow: 0 10px 25px rgba(79, 70, 229, 0.4);
+          transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .soundwave-poster-page .btn-masterpiece:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 15px 30px rgba(79, 70, 229, 0.6);
         }
 
-        .spotify-poster-page #canvas-area {
+        .soundwave-poster-page #canvas-area {
           flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-start;
           background: #0d0d0d; padding: 30px; overflow: auto; position: relative;
         }
-        .spotify-poster-page #canvas-area::before {
+        .soundwave-poster-page #canvas-area::before {
           content: ''; position: absolute; inset: 0;
           background: radial-gradient(ellipse at center, #1a1a1a 0%, #0d0d0d 70%); pointer-events: none;
         }
-        .spotify-poster-page #poster-wrapper {
+        .soundwave-poster-page #poster-wrapper {
           position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; gap: 20px;
           padding: 40px;
         }
-        .spotify-poster-page #poster-container {
+        .soundwave-poster-page #poster-container {
           position: relative; overflow: hidden;
           box-shadow: 0 32px 80px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.05);
           border-radius: 4px;
@@ -1301,71 +1360,71 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           transition: transform 0.15s ease-out, width 0.4s cubic-bezier(0.4,0,0.2,1), height 0.4s cubic-bezier(0.4,0,0.2,1);
         }
 
-        .spotify-poster-page .accordion-btn {
+        .soundwave-poster-page .accordion-btn {
           width: 100%; background: none; border: none; color: var(--spotify-subtext);
           font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
           text-align: left; padding: 16px; cursor: pointer; display: flex; justify-content: space-between;
           align-items: center; border-bottom: 1px solid var(--panel-border); font-family: 'DM Sans', sans-serif;
           transition: color 0.15s;
         }
-        .spotify-poster-page .accordion-btn:hover { color: var(--spotify-text); }
-        .spotify-poster-page .accordion-btn .arrow { font-size: 9px; transition: transform 0.2s; }
-        .spotify-poster-page .accordion-btn.open .arrow { transform: rotate(180deg); }
-        .spotify-poster-page .accordion-content { display: none; padding: 14px 0; border-bottom: 1px solid var(--panel-border); }
-        .spotify-poster-page .accordion-content.open { display: block; }
+        .soundwave-poster-page .accordion-btn:hover { color: var(--spotify-text); }
+        .soundwave-poster-page .accordion-btn .arrow { font-size: 9px; transition: transform 0.2s; }
+        .soundwave-poster-page .accordion-btn.open .arrow { transform: rotate(180deg); }
+        .soundwave-poster-page .accordion-content { display: none; padding: 14px 0; border-bottom: 1px solid var(--panel-border); }
+        .soundwave-poster-page .accordion-content.open { display: block; }
 
-        .spotify-poster-page #toast {
+        .soundwave-poster-page #toast {
           position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
           background: var(--accent); color: #000; padding: 10px 20px; border-radius: 24px;
           font-size: 13px; font-weight: 600; opacity: 0; transition: all 0.3s; z-index: 9999; pointer-events: none;
         }
-        .spotify-poster-page #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .soundwave-poster-page #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-        .spotify-poster-page #props-panel {
+        .soundwave-poster-page #props-panel {
           width: 260px; min-width: 260px; background: var(--panel-bg); border-left: 1px solid var(--panel-border);
           overflow-y: auto; flex-shrink: 0; display: flex; flex-direction: column;
         }
-        .spotify-poster-page #props-panel::-webkit-scrollbar { width: 3px; }
-        .spotify-poster-page #props-panel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
-        .spotify-poster-page #props-header {
+        .soundwave-poster-page #props-panel::-webkit-scrollbar { width: 3px; }
+        .soundwave-poster-page #props-panel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
+        .soundwave-poster-page #props-header {
           padding: 14px 16px 10px; border-bottom: 1px solid var(--panel-border); font-size: 10px;
           font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--spotify-subtext);
           display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
         }
-        .spotify-poster-page #props-selected-name { color: var(--accent); font-size: 10px; font-weight: 600; letter-spacing: 0; text-transform: none; }
-        .spotify-poster-page #props-body { flex: 1; overflow-y: auto; padding: 12px 14px; }
-        .spotify-poster-page #props-body::-webkit-scrollbar { width: 3px; }
-        .spotify-poster-page #props-body::-webkit-scrollbar-thumb { background: #333; }
-        .spotify-poster-page #props-empty-state { padding: 32px 16px; text-align: center; color: #444; font-size: 11px; line-height: 1.7; }
-        .spotify-poster-page #props-empty-state svg { margin-bottom: 12px; }
+        .soundwave-poster-page #props-selected-name { color: var(--accent); font-size: 10px; font-weight: 600; letter-spacing: 0; text-transform: none; }
+        .soundwave-poster-page #props-body { flex: 1; overflow-y: auto; padding: 12px 14px; }
+        .soundwave-poster-page #props-body::-webkit-scrollbar { width: 3px; }
+        .soundwave-poster-page #props-body::-webkit-scrollbar-thumb { background: #333; }
+        .soundwave-poster-page #props-empty-state { padding: 32px 16px; text-align: center; color: #444; font-size: 11px; line-height: 1.7; }
+        .soundwave-poster-page #props-empty-state svg { margin-bottom: 12px; }
 
-        .spotify-poster-page .pf-section { margin-bottom: 4px; }
-        .spotify-poster-page .pf-section-title { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #555; margin: 12px 0 6px; }
-        .spotify-poster-page .pf-row { margin-bottom: 7px; }
-        .spotify-poster-page .pf-row label { display: block; font-size: 10px; color: var(--spotify-subtext); margin-bottom: 3px; }
-        .spotify-poster-page .pf-row input[type=text],
-        .spotify-poster-page .pf-row input[type=number],
-        .spotify-poster-page .pf-row select {
+        .soundwave-poster-page .pf-section { margin-bottom: 4px; }
+        .soundwave-poster-page .pf-section-title { font-size: 9px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: #555; margin: 12px 0 6px; }
+        .soundwave-poster-page .pf-row { margin-bottom: 7px; }
+        .soundwave-poster-page .pf-row label { display: block; font-size: 10px; color: var(--spotify-subtext); margin-bottom: 3px; }
+        .soundwave-poster-page .pf-row input[type=text],
+        .soundwave-poster-page .pf-row input[type=number],
+        .soundwave-poster-page .pf-row select {
           width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 5px;
           color: var(--spotify-text); padding: 5px 8px; font-size: 11px; font-family: 'DM Sans', sans-serif; outline: none;
           transition: border-color 0.15s;
         }
-        .spotify-poster-page .pf-row input:focus, .spotify-poster-page .pf-row select:focus { border-color: var(--accent); }
-        .spotify-poster-page .pf-row select option { background: #1a1a1a; }
-        .spotify-poster-page .pf-row input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
-        .spotify-poster-page .pf-row input[type=color] { width: 30px; height: 26px; border: none; border-radius: 4px; cursor: pointer; padding: 2px; background: var(--input-bg); }
-        .spotify-poster-page .pf-color-row { display: flex; gap: 6px; align-items: center; }
-        .spotify-poster-page .pf-color-row input[type=text] { flex: 1; }
-        .spotify-poster-page .pf-range-row { display: flex; align-items: center; gap: 6px; }
-        .spotify-poster-page .pf-range-val { font-size: 10px; color: var(--accent); font-weight: 600; min-width: 32px; text-align: right; }
+        .soundwave-poster-page .pf-row input:focus, .soundwave-poster-page .pf-row select:focus { border-color: var(--accent); }
+        .soundwave-poster-page .pf-row select option { background: #1a1a1a; }
+        .soundwave-poster-page .pf-row input[type=range] { width: 100%; accent-color: var(--accent); cursor: pointer; }
+        .soundwave-poster-page .pf-row input[type=color] { width: 30px; height: 26px; border: none; border-radius: 4px; cursor: pointer; padding: 2px; background: var(--input-bg); }
+        .soundwave-poster-page .pf-color-row { display: flex; gap: 6px; align-items: center; }
+        .soundwave-poster-page .pf-color-row input[type=text] { flex: 1; }
+        .soundwave-poster-page .pf-range-row { display: flex; align-items: center; gap: 6px; }
+        .soundwave-poster-page .pf-range-val { font-size: 10px; color: var(--accent); font-weight: 600; min-width: 32px; text-align: right; }
 
-        .spotify-poster-page .global-tools-panel {
+        .soundwave-poster-page .global-tools-panel {
           padding: 14px 16px;
           border-bottom: 1px solid var(--panel-border);
           background: #0f0f0f;
           flex-shrink: 0;
         }
-        .spotify-poster-page .gt-section-title {
+        .soundwave-poster-page .gt-section-title {
           font-size: 9px;
           font-weight: 700;
           letter-spacing: 0.12em;
@@ -1373,13 +1432,13 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           color: var(--spotify-subtext);
           margin-bottom: 8px;
         }
-        .spotify-poster-page .gt-align-grid {
+        .soundwave-poster-page .gt-align-grid {
           display: grid;
           grid-template-columns: repeat(4, 1fr);
           gap: 4px;
           margin-bottom: 8px;
         }
-        .spotify-poster-page .gt-align-btn {
+        .soundwave-poster-page .gt-align-btn {
           height: 28px;
           display: flex;
           align-items: center;
@@ -1391,21 +1450,21 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           cursor: pointer;
           transition: all 0.15s;
         }
-        .spotify-poster-page .gt-align-btn:hover {
+        .soundwave-poster-page .gt-align-btn:hover {
           background: #1a1a1a;
           border-color: var(--accent);
           color: var(--spotify-text);
         }
-        .spotify-poster-page .gt-align-btn svg {
+        .soundwave-poster-page .gt-align-btn svg {
           width: 14px;
           height: 14px;
         }
-        .spotify-poster-page .gt-group-row {
+        .soundwave-poster-page .gt-group-row {
           display: flex;
           gap: 6px;
           margin-bottom: 12px;
         }
-        .spotify-poster-page .gt-group-btn {
+        .soundwave-poster-page .gt-group-btn {
           flex: 1;
           height: 28px;
           font-size: 10px;
@@ -1419,29 +1478,29 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           cursor: pointer;
           transition: all 0.15s;
         }
-        .spotify-poster-page .gt-group-btn:hover {
+        .soundwave-poster-page .gt-group-btn:hover {
           background: var(--accent);
           color: #000;
           border-color: var(--accent);
         }
-        .spotify-poster-page .gt-zoom-row {
+        .soundwave-poster-page .gt-zoom-row {
           display: flex;
           align-items: center;
           gap: 8px;
         }
-        .spotify-poster-page .gt-zoom-row input[type=range] {
+        .soundwave-poster-page .gt-zoom-row input[type=range] {
           flex: 1;
           accent-color: var(--accent);
           cursor: pointer;
         }
-        .spotify-poster-page .gt-zoom-val {
+        .soundwave-poster-page .gt-zoom-val {
           font-size: 11px;
           font-weight: 600;
           color: var(--accent);
           min-width: 32px;
           text-align: right;
         }
-        .spotify-poster-page .gt-zoom-reset {
+        .soundwave-poster-page .gt-zoom-reset {
           background: #222;
           border: 1px solid #333;
           color: #fff;
@@ -1450,7 +1509,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           border-radius: 4px;
           cursor: pointer;
         }
-        .spotify-poster-page .gt-zoom-reset:hover {
+        .soundwave-poster-page .gt-zoom-reset:hover {
           background: #333;
         }
         .orient-group {
@@ -1462,8 +1521,113 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .pf-checkbox-row input[type=checkbox] {
           width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent);
         }
+
+        .review-modal-overlay {
+          position: fixed; inset: 0; background: rgba(0,0,0,0.85); backdrop-filter: blur(10px);
+          display: flex; align-items: center; justify-content: center; z-index: 9999;
+        }
+        .review-modal-content {
+          background: #111; border: 1px solid #222; border-radius: 24px; padding: 40px;
+          max-width: 900px; width: 90%; display: flex; gap: 40px; box-shadow: 0 25px 50px rgba(0,0,0,0.5);
+        }
+        .review-preview-col {
+          flex: 1; display: flex; justify-content: center; align-items: center;
+          background: #000; border-radius: 12px; padding: 20px; border: 1px solid #222;
+        }
+        .review-preview-img {
+          max-width: 100%; max-height: 50vh; object-fit: contain; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+        .review-action-col {
+          flex: 1; display: flex; flex-direction: column; justify-content: center;
+        }
+        .review-warning-box {
+          background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.2);
+          padding: 16px; border-radius: 12px; display: flex; gap: 12px; align-items: flex-start; margin-bottom: 24px;
+        }
+        .review-checkbox-wrapper {
+          display: flex; align-items: flex-start; gap: 12px; cursor: pointer; margin-bottom: 32px;
+          background: #1a1a1a; padding: 16px; border-radius: 12px; border: 1px solid #333; transition: border-color 0.2s;
+        }
+        .review-checkbox-wrapper:hover { border-color: #555; }
+        .review-checkbox-wrapper input[type=checkbox] {
+          width: 20px; height: 20px; margin-top: 2px; accent-color: var(--accent); cursor: pointer;
+        }
+        .review-btn-grid {
+          display: grid; grid-template-columns: 1fr; gap: 12px;
+        }
+        .review-btn-grid button {
+          padding: 14px; border-radius: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; font-size: 13px;
+        }
+
+        .readonly-banner {
+          background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);
+          color: #fca5a5; padding: 16px 24px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between;
+          max-width: 800px; margin: 0 auto 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
       `}</style>
-      <div id="panel">
+
+      {showReviewModal && (
+        <div className="review-modal-overlay">
+          <div className="review-modal-content">
+            <div className="review-preview-col">
+              <img src={previewImage} alt="Preview" className="review-preview-img" />
+            </div>
+            <div className="review-action-col">
+              <h2 className="text-3xl font-black uppercase text-white mb-6 tracking-tight">Final Review</h2>
+              
+              <div className="review-warning-box">
+                <AlertTriangle className="w-6 h-6 text-red-400 shrink-0" />
+                <p className="text-red-200 text-sm leading-relaxed">
+                  Please review your design carefully. Once downloaded, the design will be <strong>locked and cannot be edited again.</strong>
+                </p>
+              </div>
+
+              <label className="review-checkbox-wrapper">
+                <input type="checkbox" checked={userConfirmed} onChange={(e) => setUserConfirmed(e.target.checked)} />
+                <div className="text-sm text-zinc-300">
+                  <strong className="text-white block mb-1">I approve my design</strong>
+                  I confirm that all names, dates, texts, and colors are correct and exactly how I want them to be printed.
+                </div>
+              </label>
+
+              <div className="review-btn-grid">
+                <button 
+                  className={`btn ${userConfirmed ? 'btn-primary' : 'bg-zinc-800 text-zinc-500 cursor-not-allowed'}`}
+                  disabled={!userConfirmed}
+                  onClick={() => triggerDownloadAction('pdf')}
+                >
+                  Download PDF (Print Ready)
+                </button>
+                <div className="grid grid-cols-2 gap-3">
+                  <button 
+                    className={`btn ${userConfirmed ? 'btn-secondary' : 'bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed'}`}
+                    disabled={!userConfirmed}
+                    onClick={() => triggerDownloadAction('png')}
+                  >
+                    Download PNG
+                  </button>
+                  <button 
+                    className={`btn ${userConfirmed ? 'btn-secondary' : 'bg-zinc-900 text-zinc-600 border-zinc-800 cursor-not-allowed'}`}
+                    disabled={!userConfirmed}
+                    onClick={() => triggerDownloadAction('svg')}
+                  >
+                    Download SVG
+                  </button>
+                </div>
+              </div>
+
+              <button 
+                className="mt-6 text-zinc-500 hover:text-white text-xs font-bold uppercase tracking-wider transition-colors"
+                onClick={() => setShowReviewModal(false)}
+              >
+                Cancel & Go Back to Editing
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div id="panel" className={isLocked ? 'hidden' : ''}>
         <div className="panel-header">
           <div className="title-group">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1551,8 +1715,8 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           <div className="form-row">
             <label>Background Color</label>
             <div className="color-row">
-              <input type="color" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
-              <input type="text" value={bgColor} onChange={(e) => setBgColor(e.target.value)} />
+              <input type="color" value={bgColor} onChange={(e) => updateBgColor(e.target.value)} />
+              <input type="text" value={bgColor} onChange={(e) => updateBgColor(e.target.value)} />
             </div>
           </div>
         </div>
@@ -1686,13 +1850,29 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         </div>
       </div>
 
-      <div id="canvas-area" ref={containerRef}>
+      <div id="canvas-area" ref={containerRef} className={isLocked ? 'locked-mode' : ''}>
         
-        <div className="canvas-header-actions">
-          <button className="btn btn-secondary" onClick={downloadPNG}>Download PNG</button>
-          <button className="btn btn-secondary" onClick={downloadPDF}>Download PDF</button>
-          <button className="btn btn-secondary" onClick={downloadSVG}>Download SVG</button>
-        </div>
+        {isLocked && (
+          <div className="readonly-banner">
+            <div>
+              <div className="flex items-center gap-2 text-red-200 font-bold mb-1">
+                <Lock className="w-4 h-4" /> Design Locked (Read-Only Mode)
+              </div>
+              <p className="text-xs text-red-300/80">Your design has been finalized. If you made a mistake, please contact support.</p>
+            </div>
+            <button className="flex items-center gap-2 bg-red-950 border border-red-900 text-red-200 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-900 transition-colors">
+              <MessageCircle className="w-4 h-4" /> Open Support Ticket
+            </button>
+          </div>
+        )}
+
+        {!isLocked && (
+          <div className="canvas-header-actions">
+            <button className="btn btn-masterpiece" onClick={handleDownloadMasterpieceClick}>
+              Download Masterpiece
+            </button>
+          </div>
+        )}
 
         <div id="poster-wrapper">
           <div id="poster-container" style={{ 
@@ -1704,7 +1884,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         </div>
       </div>
 
-      <div id="props-panel">
+      <div id="props-panel" className={isLocked ? 'hidden' : ''}>
         <div id="props-header">
           Properties
           <span id="props-selected-name">
@@ -1962,7 +2142,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
                 <div className="pf-row">
                   <label>Font Size</label>
                   <div className="pf-range-row">
-                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setTopRightFontSize(Number(e.target.value))} />
+                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setRightFontSize(Number(e.target.value))} />
                     <span className="pf-range-val">{topRightFontSize}px</span>
                   </div>
                 </div>
