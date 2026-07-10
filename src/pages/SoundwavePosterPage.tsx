@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import * as fabric from 'fabric';
 import jsPDF from 'jspdf';
-import { AlertTriangle, Lock, MessageCircle, X } from 'lucide-react';
+import { AlertTriangle, MessageCircle, X } from 'lucide-react';
 
 const GOOGLE_FONTS = [
   "Inter", "Montserrat", "Roboto", "Open Sans", "Oswald", "Lato", "Poppins", 
@@ -314,7 +314,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const isRebuildingRef = useRef<boolean>(false);
   const rawAudioDataRef = useRef<Float32Array | null>(null);
 
-  const [isLocked, setIsLocked] = useState<boolean>(false);
   const [showReviewModal, setShowReviewModal] = useState<boolean>(false);
   const [userConfirmed, setUserConfirmed] = useState<boolean>(false);
   const [previewImage, setPreviewImage] = useState<string>('');
@@ -477,7 +476,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       height: containerDims.height,
       backgroundColor: bgColor,
       preserveObjectStacking: true,
-      selection: !isLocked,
+      selection: true,
     });
     fabricRef.current = canvas;
 
@@ -607,32 +606,30 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     buildSoundwavePath(canvas, containerDims);
     buildQRCode(canvas, containerDims);
 
-    if (!isLocked) {
-      canvas.on('selection:created', onSelectionChange);
-      canvas.on('selection:updated', onSelectionChange);
-      
-      canvas.on('selection:cleared', () => {
-        if (isRebuildingRef.current) return;
-        const activeEl = document.activeElement;
-        if (activeEl && (activeEl.closest('#panel') || activeEl.closest('#props-panel'))) return;
-        setSelectedType(null);
-      });
+    canvas.on('selection:created', onSelectionChange);
+    canvas.on('selection:updated', onSelectionChange);
+    
+    canvas.on('selection:cleared', () => {
+      if (isRebuildingRef.current) return;
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.closest('#panel') || activeEl.closest('#props-panel'))) return;
+      setSelectedType(null);
+    });
 
-      canvas.on('text:changed', (e: any) => {
-        const t = e.target;
-        if (!t || !t.data) return;
-        const v = t.text;
-        switch (t.data.edType) {
-          case EDIT_TYPES.TOP_LEFT: setTopLeftText(v); break;
-          case EDIT_TYPES.TOP_RIGHT: setTopRightText(v); break;
-          case EDIT_TYPES.MAIN_TITLE: setMainTitleText(v); break;
-          case EDIT_TYPES.SUB_TITLE: setSubTitleText(v); break;
-          case EDIT_TYPES.BOTTOM_1: setBottom1Text(v); break;
-          case EDIT_TYPES.BOTTOM_2: setBottom2Text(v); break;
-          default: break;
-        }
-      });
-    }
+    canvas.on('text:changed', (e: any) => {
+      const t = e.target;
+      if (!t || !t.data) return;
+      const v = t.text;
+      switch (t.data.edType) {
+        case EDIT_TYPES.TOP_LEFT: setTopLeftText(v); break;
+        case EDIT_TYPES.TOP_RIGHT: setTopRightText(v); break;
+        case EDIT_TYPES.MAIN_TITLE: setMainTitleText(v); break;
+        case EDIT_TYPES.SUB_TITLE: setSubTitleText(v); break;
+        case EDIT_TYPES.BOTTOM_1: setBottom1Text(v); break;
+        case EDIT_TYPES.BOTTOM_2: setBottom2Text(v); break;
+        default: break;
+      }
+    });
 
     const fontWeightsStr = ':100,100i,300,300i,400,400i,500,500i,600,600i,700,700i,800,800i,900,900i';
     const link = document.createElement('link');
@@ -645,7 +642,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     return () => {
       canvas.dispose();
     };
-  }, [isLocked]);
+  }, []);
 
   useEffect(() => {
     applyDynamicLayout(fabricRef.current, containerDims, showQR, qrSize);
@@ -661,7 +658,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   }, [zoom, containerDims]);
 
   function onSelectionChange(e: any) {
-    if (isRebuildingRef.current || isLocked) return;
+    if (isRebuildingRef.current) return;
     const obj = e.selected && e.selected.length === 1 ? e.selected[0] : null;
     if (obj) {
       if (obj.data && obj.data.edType) {
@@ -778,7 +775,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         left: dims.width / 2,
         top: dims.height * 0.40, 
         objectCaching: false,
-        selectable: !isLocked,
+        selectable: true,
         data: { edType: EDIT_TYPES.SOUNDWAVE },
     });
 
@@ -792,7 +789,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     canvas.add(wavePath);
     wavePathRef.current = wavePath;
 
-    if (wasSelected && !isLocked) {
+    if (wasSelected) {
       canvas.setActiveObject(wavePath);
     }
     
@@ -822,7 +819,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         originY: 'center',
         scaleX: qrSize / img.width!,
         scaleY: qrSize / img.height!,
-        selectable: !isLocked,
+        selectable: true,
         data: { edType: EDIT_TYPES.QR_CODE }
       });
       canvas.add(img);
@@ -838,13 +835,13 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     const canvas = fabricRef.current;
     if (!canvas) return;
     buildSoundwavePath(canvas, containerDims);
-  }, [containerDims, waveMode, waveDensity, waveThickness, waveWidthScale, waveHeightScale, waveFillType, waveSolidColor, waveGradientColors, waveGradientStops, waveGradientAngle, isLocked]);
+  }, [containerDims, waveMode, waveDensity, waveThickness, waveWidthScale, waveHeightScale, waveFillType, waveSolidColor, waveGradientColors, waveGradientStops, waveGradientAngle]);
 
   const rebuildQRCode = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
     buildQRCode(canvas, containerDims);
-  }, [containerDims, showQR, qrLink, qrSize, isLocked]);
+  }, [containerDims, showQR, qrLink, qrSize]);
 
   useEffect(() => {
     const handler = setTimeout(() => {
@@ -854,7 +851,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   }, [rebuildQRCode]);
 
   const handleSizeOrOrientationChange = (newSize: string, newOrient: 'portrait' | 'landscape') => {
-    if(isLocked) return;
     setCanvasSize(newSize);
     setOrientation(newOrient);
     
@@ -1021,7 +1017,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const handleAlign = (mode: string) => {
-    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
@@ -1087,7 +1082,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const edDistribute = (axis: string) => {
-    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const active = canvas.getActiveObject();
@@ -1130,7 +1124,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const handleGroup = () => {
-    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
@@ -1151,7 +1144,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   const handleUngroup = () => {
-    if(isLocked) return;
     const canvas = fabricRef.current;
     if (!canvas) return;
     const activeObj = canvas.getActiveObject();
@@ -1202,7 +1194,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     }
 
     setShowReviewModal(false);
-    setIsLocked(true);
   };
 
   const handleDownloadMasterpieceClick = () => {
@@ -1215,7 +1206,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   };
 
   return (
-    <div className={`soundwave-poster-page ${isLocked ? 'locked-mode' : ''}`}>
+    <div className="soundwave-poster-page">
       <style>{`
         .soundwave-poster-page {
           --panel-bg: #0d0d0d;
@@ -1232,15 +1223,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           color: var(--spotify-text);
           font-family: 'DM Sans', sans-serif;
           overflow: hidden;
-        }
-
-        .soundwave-poster-page.locked-mode #panel,
-        .soundwave-poster-page.locked-mode #props-panel {
-          display: none;
-        }
-
-        .soundwave-poster-page.locked-mode #canvas-area {
-          padding-top: 100px;
         }
 
         .soundwave-poster-page #panel {
@@ -1369,7 +1351,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .soundwave-poster-page .accordion-btn .arrow { font-size: 9px; transition: transform 0.2s; }
         .soundwave-poster-page .accordion-btn.open .arrow { transform: rotate(180deg); }
         .soundwave-poster-page .accordion-content { display: none; padding: 14px 0; border-bottom: 1px solid var(--panel-border); }
-        .spotify-poster-page .accordion-content.open { display: block; }
+        .soundwave-poster-page .accordion-content.open { display: block; }
 
         .soundwave-poster-page #props-panel {
           width: 260px; min-width: 260px; background: var(--panel-bg); border-left: 1px solid var(--panel-border);
@@ -1407,7 +1389,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .soundwave-poster-page .pf-color-row { display: flex; gap: 6px; align-items: center; }
         .soundwave-poster-page .pf-color-row input[type=text] { flex: 1; }
         .soundwave-poster-page .pf-range-row { display: flex; align-items: center; gap: 6px; }
-        .spotify-poster-page .pf-range-val { font-size: 10px; color: var(--accent); font-weight: 600; min-width: 32px; text-align: right; }
+        .soundwave-poster-page .pf-range-val { font-size: 10px; color: var(--accent); font-weight: 600; min-width: 32px; text-align: right; }
 
         .soundwave-poster-page .global-tools-panel {
           padding: 14px 16px;
@@ -1500,7 +1482,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           border-radius: 4px;
           cursor: pointer;
         }
-        .spotify-poster-page .gt-zoom-reset:hover {
+        .soundwave-poster-page .gt-zoom-reset:hover {
           background: #333;
         }
         .orient-group {
@@ -1551,12 +1533,6 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .review-btn-grid button {
           padding: 16px 32px; border-radius: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; font-size: 14px; min-width: 240px;
         }
-
-        .readonly-banner {
-          background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3);
-          color: #fca5a5; padding: 16px 24px; border-radius: 16px; display: flex; align-items: center; justify-content: space-between;
-          max-width: 800px; margin: 0 auto 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); width: 100%;
-        }
       `}</style>
 
       {showReviewModal && (
@@ -1566,9 +1542,9 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
             <div className="review-warning-box">
               <AlertTriangle className="w-8 h-8 text-red-400 shrink-0" />
               <div>
-                <h3 className="text-red-400 font-black uppercase tracking-wider mb-1">Final Review Required</h3>
+                <h3 className="text-red-400 font-black uppercase tracking-wider mb-1">Final Review</h3>
                 <p className="text-red-200/80 text-sm leading-relaxed">
-                  Please review your design carefully. Once downloaded, the design will be <strong>locked and cannot be edited again.</strong>
+                  Please review your design carefully. Check all spellings, dates, and color choices.
                 </p>
               </div>
             </div>
@@ -1579,7 +1555,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
               <label className="review-checkbox-wrapper">
                 <input type="checkbox" checked={userConfirmed} onChange={(e) => setUserConfirmed(e.target.checked)} />
                 <span className="text-sm text-zinc-300 font-medium">
-                  <strong className="text-white">I approve my design.</strong> I confirm that all names, dates, texts, and colors are exactly how I want them to be printed.
+                  <strong className="text-white block mb-1">I approve my design.</strong> I confirm that all details are exactly how I want them to be printed.
                 </span>
               </label>
 
@@ -1619,7 +1595,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         </div>
       )}
 
-      <div id="panel" className={isLocked ? 'hidden' : ''}>
+      <div id="panel">
         <div className="panel-header">
           <div className="title-group">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -1842,29 +1818,13 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         </div>
       </div>
 
-      <div id="canvas-area" ref={containerRef} className={isLocked ? 'locked-mode' : ''}>
+      <div id="canvas-area" ref={containerRef}>
         
-        {isLocked && (
-          <div className="readonly-banner">
-            <div>
-              <div className="flex items-center gap-2 text-red-200 font-bold mb-1">
-                <Lock className="w-4 h-4" /> Design Locked (Read-Only Mode)
-              </div>
-              <p className="text-xs text-red-300/80">Your design has been finalized. If you made a mistake, please contact support.</p>
-            </div>
-            <button className="flex items-center gap-2 bg-red-950 border border-red-900 text-red-200 px-4 py-2 rounded-xl text-xs font-bold hover:bg-red-900 transition-colors cursor-pointer">
-              <MessageCircle className="w-4 h-4" /> Open Support Ticket
-            </button>
-          </div>
-        )}
-
-        {!isLocked && (
-          <div className="canvas-header-actions">
-            <button className="btn btn-masterpiece" onClick={handleDownloadMasterpieceClick}>
-              Download Masterpiece
-            </button>
-          </div>
-        )}
+        <div className="canvas-header-actions">
+          <button className="btn btn-masterpiece" onClick={handleDownloadMasterpieceClick}>
+            Download Masterpiece
+          </button>
+        </div>
 
         <div id="poster-wrapper">
           <div id="poster-container" style={{ 
@@ -1876,7 +1836,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         </div>
       </div>
 
-      <div id="props-panel" className={isLocked ? 'hidden' : ''}>
+      <div id="props-panel">
         <div id="props-header">
           Properties
           <span id="props-selected-name">
