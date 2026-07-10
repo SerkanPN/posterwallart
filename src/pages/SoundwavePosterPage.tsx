@@ -406,7 +406,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
   const [showQR, setShowQR] = useState(false);
   const [qrLink, setQrLink] = useState('https://musicposters.shop');
-  const [qrSize, setQrSize] = useState(45);
+  const [qrSize, setQrSize] = useState(25);
 
   const [selectedType, setSelectedType] = useState<string | null>(null);
   const [toast, setToast] = useState<string>('');
