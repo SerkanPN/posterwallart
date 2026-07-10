@@ -227,7 +227,8 @@ const EDIT_TYPES = {
   BOTTOM_2: 'sw-bottom-2',
   SOUNDWAVE: 'sw-soundwave',
   TOP_LEFT: 'sw-top-left',
-  TOP_RIGHT: 'sw-top-right'
+  TOP_RIGHT: 'sw-top-right',
+  QR_CODE: 'sw-qrcode'
 };
 
 interface OrientedSize {
@@ -312,6 +313,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const containerRef = useRef<HTMLDivElement | null>(null);
   const bgRectRef = useRef<fabric.Rect | null>(null);
   const wavePathRef = useRef<fabric.Path | null>(null);
+  const qrCodeRef = useRef<fabric.Image | null>(null);
 
   const isRebuildingRef = useRef<boolean>(false);
   const rawAudioDataRef = useRef<Float32Array | null>(null);
@@ -319,8 +321,9 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     presets: true,
     size: false,
-    texts: true,
+    texts: false,
     soundwave: false,
+    qrcode: false,
     background: false,
     multiExport: false,
     download: true,
@@ -400,6 +403,10 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
   const [waveWidthScale, setWaveWidthScale] = useState(80); 
 
   const [bgColor, setBgColor] = useState('#fbfbfb');
+
+  const [showQR, setShowQR] = useState(false);
+  const [qrLink, setQrLink] = useState('https://posterwallart.shop');
+  const [qrSize, setQrSize] = useState(60);
 
   const [exportColors, setExportColors] = useState(
     DEFAULT_POSTER_COLORS.map((c) => ({ color: c, checked: true }))
@@ -583,6 +590,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     (canvas as any).textBottom2Ref = bottom2;
 
     buildSoundwavePath(canvas, containerDims);
+    buildQRCode(canvas, containerDims);
 
     canvas.on('selection:created', onSelectionChange);
     canvas.on('selection:updated', onSelectionChange);
@@ -670,6 +678,11 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
       const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
       rawAudioDataRef.current = audioBuffer.getChannelData(0);
       rebuildSoundwave();
+      
+      const simulatedUniqueId = Math.random().toString(36).substring(2, 9);
+      setQrLink(`https://posterwallart.shop/listen/${simulatedUniqueId}`);
+      setShowQR(true);
+      
       showToast('Soundwave generated successfully.');
     } catch (err) {
       showToast('Error processing audio file.');
@@ -765,11 +778,57 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     isRebuildingRef.current = false;
   }
 
+  function buildQRCode(canvas: fabric.Canvas, dims: { width: number; height: number }) {
+    if (qrCodeRef.current) {
+      canvas.remove(qrCodeRef.current);
+      qrCodeRef.current = null;
+    }
+
+    if (!showQR || !qrLink.trim()) {
+      canvas.requestRenderAll();
+      return;
+    }
+
+    isRebuildingRef.current = true;
+    const apiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(qrLink)}`;
+
+    fabric.Image.fromURL(apiUrl).then((img) => {
+      img.set({
+        left: dims.width / 2,
+        top: dims.height * 0.85,
+        originX: 'center',
+        originY: 'center',
+        scaleX: qrSize / img.width!,
+        scaleY: qrSize / img.height!,
+        data: { edType: EDIT_TYPES.QR_CODE }
+      });
+      canvas.add(img);
+      qrCodeRef.current = img;
+      canvas.requestRenderAll();
+      isRebuildingRef.current = false;
+    }).catch(() => {
+      isRebuildingRef.current = false;
+    });
+  }
+
   const rebuildSoundwave = useCallback(() => {
     const canvas = fabricRef.current;
     if (!canvas) return;
     buildSoundwavePath(canvas, containerDims);
   }, [containerDims, waveMode, waveDensity, waveThickness, waveWidthScale, waveHeightScale, waveFillType, waveSolidColor, waveGradientColors, waveGradientStops, waveGradientAngle]);
+
+  const rebuildQRCode = useCallback(() => {
+    const canvas = fabricRef.current;
+    if (!canvas) return;
+    buildQRCode(canvas, containerDims);
+  }, [containerDims, showQR, qrLink, qrSize]);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      rebuildQRCode();
+    }, 400);
+    return () => clearTimeout(handler);
+  }, [rebuildQRCode]);
 
   const handleSizeOrOrientationChange = (newSize: string, newOrient: 'portrait' | 'landscape') => {
     setCanvasSize(newSize);
@@ -804,6 +863,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     if (anyCanvas.textBottom2Ref) anyCanvas.textBottom2Ref.set({ left: cw / 2, top: cy + 195, width: cw * 0.8 });
     
     buildSoundwavePath(canvas, dims);
+    buildQRCode(canvas, dims);
     canvas.requestRenderAll();
   };
 
@@ -1479,6 +1539,12 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
         .orient-group {
           display: flex; gap: 8px; margin-top: 8px;
         }
+        .pf-checkbox-row {
+          display: flex; align-items: center; gap: 8px; margin-bottom: 12px; cursor: pointer;
+        }
+        .pf-checkbox-row input[type=checkbox] {
+          width: 16px; height: 16px; cursor: pointer; accent-color: var(--accent);
+        }
       `}</style>
       <div id="panel">
         <div className="panel-header">
@@ -1676,6 +1742,32 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
           </div>
         </div>
 
+        <button className={`accordion-btn${openSections.qrcode ? ' open' : ''}`} onClick={() => toggleAccordion('qrcode')}>
+          &#128241; QR Code Settings<span className="arrow">&#9660;</span>
+        </button>
+        <div className={`accordion-content${openSections.qrcode ? ' open' : ''}`}>
+          <label className="pf-checkbox-row">
+            <input type="checkbox" checked={showQR} onChange={(e) => setShowQR(e.target.checked)} />
+            <span style={{ fontSize: '12px', fontWeight: 'bold' }}>Show QR Code</span>
+          </label>
+
+          {showQR && (
+            <>
+              <div className="form-row">
+                <label>QR Link / Audio URL</label>
+                <input type="text" value={qrLink} placeholder="https://..." onChange={(e) => setQrLink(e.target.value)} />
+              </div>
+              <div className="form-row">
+                <label>QR Size</label>
+                <div className="pf-range-row">
+                  <input type="range" min="20" max="200" value={qrSize} onChange={(e) => setQrSize(Number(e.target.value))} />
+                  <span className="pf-range-val">{qrSize}px</span>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
         <button className={`accordion-btn${openSections.texts ? ' open' : ''}`} onClick={() => toggleAccordion('texts')}>
           &#128294; Typographic Details<span className="arrow">&#9660;</span>
         </button>
@@ -1831,6 +1923,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
             {selectedType === EDIT_TYPES.BOTTOM_1 && 'Bottom Text 1'}
             {selectedType === EDIT_TYPES.BOTTOM_2 && 'Bottom Text 2'}
             {selectedType === EDIT_TYPES.SOUNDWAVE && 'Soundwave'}
+            {selectedType === EDIT_TYPES.QR_CODE && 'QR Code'}
             {selectedType === 'group' && 'Group'}
             {selectedType === 'multi' && 'Multiple'}
           </span>
@@ -2076,7 +2169,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
                 <div className="pf-row">
                   <label>Font Size</label>
                   <div className="pf-range-row">
-                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setTopRightFontSize(Number(e.target.value))} />
+                    <input type="range" min="8" max="72" value={topRightFontSize} onChange={(e) => setRightFontSize(Number(e.target.value))} />
                     <span className="pf-range-val">{topRightFontSize}px</span>
                   </div>
                 </div>
@@ -2215,38 +2308,20 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
             <div id="props-fields">
               <div className="pf-section">
                 <div className="pf-section-title">Soundwave Styling</div>
-                
-                <div className="pf-row">
-                  <label>Line Density (Details)</label>
-                  <div className="pf-range-row">
-                    <input type="range" min="50" max="800" step="10" value={waveDensity} onChange={(e) => setWaveDensity(Number(e.target.value))} />
-                    <span className="pf-range-val">{waveDensity}</span>
-                  </div>
-                </div>
+                <p style={{ fontSize: '11px', color: '#888', lineHeight: '1.6', marginBottom: '8px' }}>
+                  Use the left panel to change wave density, colors, and audio file.
+                </p>
+              </div>
+            </div>
+          )}
 
-                <div className="pf-row">
-                  <label>Line Thickness</label>
-                  <div className="pf-range-row">
-                    <input type="range" min="0.5" max="10" step="0.5" value={waveThickness} onChange={(e) => setWaveThickness(Number(e.target.value))} />
-                    <span className="pf-range-val">{waveThickness}px</span>
-                  </div>
-                </div>
-
-                <div className="pf-row">
-                  <label>Max Height Scale (%)</label>
-                  <div className="pf-range-row">
-                    <input type="range" min="10" max="250" value={waveHeightScale} onChange={(e) => setWaveHeightScale(Number(e.target.value))} />
-                    <span className="pf-range-val">{waveHeightScale}%</span>
-                  </div>
-                </div>
-
-                <div className="pf-row">
-                  <label>Wave Width Scale (%)</label>
-                  <div className="pf-range-row">
-                    <input type="range" min="10" max="100" value={waveWidthScale} onChange={(e) => setWaveWidthScale(Number(e.target.value))} />
-                    <span className="pf-range-val">{waveWidthScale}%</span>
-                  </div>
-                </div>
+          {selectedType === EDIT_TYPES.QR_CODE && (
+            <div id="props-fields">
+              <div className="pf-section">
+                <div className="pf-section-title">QR Code Properties</div>
+                <p style={{ fontSize: '11px', color: '#888', lineHeight: '1.6', marginBottom: '8px' }}>
+                  Use the left panel to change the QR link or toggle visibility.
+                </p>
               </div>
             </div>
           )}
