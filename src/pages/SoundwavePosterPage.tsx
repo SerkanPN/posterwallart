@@ -512,7 +512,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const topRight = new fabric.IText(topRightText, {
       left: cw * 0.92,
-      top: ch * 0.08,
+      top: cy + 100 + (showQR ? -30 : 0),
       originX: 'right',
       fontSize: topRightFontSize,
       fontFamily: topRightFontFamily,
@@ -526,7 +526,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const mainTitle = new fabric.Textbox(mainTitleText, {
       left: cw / 2,
-      top: ch * 0.65,
+      top: cy + 130 + (showQR ? -30 : 0),
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -542,7 +542,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const subTitle = new fabric.Textbox(subTitleText, {
       left: cw / 2,
-      top: ch * 0.70,
+      top: cy + 130 + (showQR ? -30 : 0),
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -556,7 +556,12 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
     });
     canvas.add(subTitle);
 
-    const divider = new fabric.Line([cw * 0.35, ch * 0.74, cw * 0.65, ch * 0.74], {
+    const divider = new fabric.Line([
+      cw * 0.35, 
+      cy + 155 + (showQR ? -30 : 0), 
+      cw * 0.65, 
+      cy + 155 + (showQR ? -30 : 0)
+    ], {
       stroke: dividerColor,
       strokeWidth: 1,
       selectable: true,
@@ -566,7 +571,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const bottom1 = new fabric.Textbox(bottom1Text, {
       left: cw / 2,
-      top: ch * 0.78,
+      top: cy + 175 + (showQR ? -30 : 0),
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
@@ -582,7 +587,7 @@ export default function SoundwavePosterPage({ navigate }: SoundwavePosterPagePro
 
     const bottom2 = new fabric.Textbox(bottom2Text, {
       left: cw / 2,
-      top: ch * 0.81,
+      top: cy + 195 + (showQR ? -30 : 0),
       width: cw * 0.8,
       originX: 'center',
       textAlign: 'center',
