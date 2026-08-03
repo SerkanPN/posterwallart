@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Met Museum Poster Generator</title>
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; padding: 20px; font-size: 15px; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
+        h2 { border-bottom: 2px solid #e1e4e8; padding-bottom: 10px; font-size: 20px; color: #111; margin-top: 0; }
+        .group { margin-bottom: 25px; padding: 20px; border: 1px solid #e1e4e8; border-radius: 10px; background: #fafbfc; }
+        .scroll-box { max-height: 400px; overflow-y: auto; background: #fff; padding: 15px; border: 1px solid #e1e4e8; border-radius: 8px; }
+        .row { display: flex; margin-bottom: 12px; align-items: center; }
+        .row label { width: 320px; font-weight: 600; color: #444; }
+        .row select, .row input { flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .row select:focus { border-color: #007bff; box-shadow: 0 0 0 3px rgba(0,123,255,0.25); }
+        .checkbox-group label { display: flex; margin-bottom: 8px; cursor: pointer; align-items: center; gap: 8px; font-weight: 500; }
+        .checkbox-group input[type="checkbox"] { width: 18px; height: 18px; accent-color: #007bff; cursor: pointer; margin: 0; }
+        button { background: linear-gradient(135deg, #007bff, #0056b3); color: #fff; border: none; padding: 16px 20px; font-size: 18px; width: 100%; cursor: pointer; border-radius: 8px; font-weight: bold; transition: opacity 0.2s, transform 0.1s; box-shadow: 0 4px 12px rgba(0,123,255,0.3); }
+        button:hover { opacity: 0.9; }
+        button:active { transform: translateY(2px); }
+        button:disabled { background: #cbd5e1; cursor: not-allowed; box-shadow: none; transform: none; color: #64748b; }
+        #status-bar { margin-top: 20px; font-weight: bold; color: #d9534f; text-align: center; font-size: 16px; }
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+        /* Preview Container */
+        #preview-container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 15px; }
+        #preview-container img { max-height: 350px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #ddd; }
+    </style>
+    <!-- CSV Okumak için PapaParse Kütüphanesi -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <div class="group">
+        <h2>1. Sistem Durumu</h2>
+        <div id="loading-status">MetObjects.csv sunucudan okunuyor, lütfen bekleyin... (Veri boyutuna göre birkaç saniye sürebilir)</div>
+    </div>
+
+    <div class="group">
+        <h2>2. Veri Filtreleme (Dropdownlardan Seçiniz)</h2>
+        <div class="checkbox-group" style="margin-bottom: 20px; border-bottom: 1px solid #e1e4e8; padding-bottom: 20px;">
+            <label><input type="checkbox" id="chk_public" checked> Sadece Public Domain (Kamu Malı) olanları getir</label>
+            <label><input type="checkbox" id="chk_highlight"> Sadece 'Öne Çıkan' (Highlight) eserleri getir</label>
+        </div>
+        <div class="scroll-box" id="filters-container">
+            <!-- Filtreler JS ile buraya yüklenecek -->
+        </div>
+    </div>
+
+    <div class="group">
+        <h2>3. Poster Tasarım Seçenekleri (Resmin Altına Eklenecek Metinler)</h2>
+        <div class="scroll-box checkbox-group" id="design-container">
+            <!-- Tasarım seçenekleri JS ile buraya yüklenecek -->
+        </div>
+    </div>
+
+    <button id="btn-start" disabled>Filtrele ve İndirmeye Başla</button>
+    <div id="status-bar"></div>
+
+    <div class="group" id="preview-group" style="display: none; margin-top: 25px;">
+        <h2>4. Oluşturulan Posterler (Önizleme)</h2>
+        <div id="preview-container"></div>
+    </div>
+</div>
+
+<script>
+    let globalData = [];
+    let columns = [];
+    let activeFilters = {};
+    let designOptions = {};
+
+    // 1. CSV'yi yükle ve ayrıştır
+    Papa.parse("https://met-api.posterwallart.shop/MetObjects.csv", {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function(results) {
+            globalData = results.data;
+            columns = results.meta.fields;
+            document.getElementById('loading-status').innerHTML = `<span style="color:#28a745;">Yüklendi: MetObjects.csv (${globalData.length} satır)</span>`;
+            buildUI();
+        },
+        error: function(err) {
+            document.getElementById('loading-status').innerHTML = `<span style="color:#dc3545;">Hata: MetObjects.csv dosyası bulunamadı veya okunamadı. Dosyanın dizinde olduğundan emin olun.</span>`;
+        }
+    });
+
+    function buildUI() {
+        const filtersContainer = document.getElementById('filters-container');
+        const designContainer = document.getElementById('design-container');
+        
+        // Sütunlardaki benzersiz verileri topla (Set ile)
+        const uniqueData = {};
+        columns.forEach(col => uniqueData[col] = new Set());
+        
+        globalData.forEach(row => {
+            columns.forEach(col => {
+                if (row[col] && row[col].toString().trim() !== "") {
+                    uniqueData[col].add(row[col]);
+                }
+            });
+        });
+
+        // Arayüz elemanlarını oluştur
+        columns.forEach(col => {
+            // Dropdown (Filtre)
+            let sortedVals = Array.from(uniqueData[col]).map(String).sort((a, b) => a.localeCompare(b));
+            
+            let rowDiv = document.createElement('div');
+            rowDiv.className = 'row';
+            
+            let label = document.createElement('label');
+            label.innerText = col + ':';
+            
+            let select = document.createElement('select');
+            select.id = 'filter_' + col;
+            select.innerHTML = `<option value="">-- Filtreleme Yapma --</option>`;
+            
+            sortedVals.forEach(val => {
+                let option = document.createElement('option');
+                option.value = val;
+                option.innerText = val;
+                select.appendChild(option);
+            });
+            
+            rowDiv.appendChild(label);
+            rowDiv.appendChild(select);
+            filtersContainer.appendChild(rowDiv);
+            
+            activeFilters[col] = select;
+
+            // Checkbox (Tasarım)
+            let chkLabel = document.createElement('label');
+            let chk = document.createElement('input');
+            chk.type = 'checkbox';
+            chk.id = 'design_' + col;
+            chkLabel.appendChild(chk);
+            chkLabel.appendChild(document.createTextNode(' ' + col));
+            designContainer.appendChild(chkLabel);
+            
+            designOptions[col] = chk;
+        });
+
+        document.getElementById('btn-start').disabled = false;
+    }
+
+    document.getElementById('btn-start').addEventListener('click', async function() {
+        const status = document.getElementById('status-bar');
+        const previewGroup = document.getElementById('preview-group');
+        const previewContainer = document.getElementById('preview-container');
+        
+        // Veriyi Filtrele
+        let filtered = globalData.slice();
+
+        if (document.getElementById('chk_public').checked) {
+            filtered = filtered.filter(row => String(row['Is Public Domain']).toLowerCase() === 'true');
+        }
+        if (document.getElementById('chk_highlight').checked) {
+            filtered = filtered.filter(row => String(row['Is Highlight']).toLowerCase() === 'true');
+        }
+
+        for (let col in activeFilters) {
+            let selectedVal = activeFilters[col].value;
+            if (selectedVal !== "") {
+                filtered = filtered.filter(row => String(row[col]) === selectedVal);
+            }
+        }
+
+        if (filtered.length === 0) {
+            alert("Seçilen filtrelere uygun eser bulunamadı.");
+            return;
+        }
+
+        if (!confirm(`Filtreler sonucunda ${filtered.length} adet eser bulundu. İndirme işlemi başlasın mı?`)) {
+            return;
+        }
+
+        this.disabled = true;
+        previewContainer.innerHTML = ''; // Eski önizlemeleri temizle
+        previewGroup.style.display = 'block';
+        
+        // Seçili tasarım ayarlarını al
+        let activeDesigns = {};
+        for (let col in designOptions) {
+            activeDesigns[col] = designOptions[col].checked;
+        }
+
+        // İndirme Döngüsü
+        for (let i = 0; i < filtered.length; i++) {
+            let row = filtered[i];
+            let objId = row['Object ID'];
+            
+            if (!objId) continue;
+
+            status.innerText = `İşleniyor: ${i + 1} / ${filtered.length} (ID: ${objId})`;
+
+            try {
+                // 1. API'den görsel linki
+                let apiRes = await fetch(`https://collectionapi.metmuseum.org/public/collection/v1/objects/${objId}`);
+                if (!apiRes.ok) continue;
+                let data = await apiRes.json();
+                
+                let imgUrl = data.primaryImage;
+                if (!imgUrl) continue;
+
+                // 2. Görseli Canvas'a çiz ve İndir
+                await generateAndDownloadPoster(imgUrl, row, activeDesigns, objId);
+                
+                // API Limitini doldurmamak için küçük bekleme (500ms)
+                await new Promise(r => setTimeout(r, 500));
+
+            } catch (err) {
+                console.error(`Hata (ID: ${objId}):`, err);
+            }
+        }
+
+        status.innerText = "Tüm işlemler başarıyla tamamlandı!";
+        this.disabled = false;
+    });
+
+    function generateAndDownloadPoster(imgUrl, row, activeDesigns, objId) {
+        return new Promise((resolve, reject) => {
+            const img = new Image();
+            img.crossOrigin = 'Anonymous'; // CORS aşımı
+            
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Herhangi bir metin seçili mi kontrolü
+                let hasText = Object.values(activeDesigns).some(val => val);
+                const margin = hasText ? 150 : 0; // Metin için alt boşluk
+                
+                canvas.width = img.width;
+                canvas.height = img.height + margin;
+                
+                // Beyaz arka plan (Sadece metin varsa alta taşar)
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Resmi üste çiz
+                ctx.drawImage(img, 0, 0);
+                
+                if (hasText) {
+                    ctx.fillStyle = 'black';
+                    ctx.font = '30px Arial';
+                    ctx.textAlign = 'center';
+                    
+                    let texts = [];
+                    for (let col in activeDesigns) {
+                        if (activeDesigns[col] && row[col]) {
+                            texts.push(`${col}: ${row[col]}`);
+                        }
+                    }
+                    
+                    let yOffset = img.height + 40;
+                    texts.forEach(text => {
+                        ctx.fillText(text, canvas.width / 2, yOffset);
+                        yOffset += 40;
+                    });
+                }
+                
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+
+                // Arayüze önizleme olarak ekle
+                const previewImg = document.createElement('img');
+                previewImg.src = dataUrl;
+                document.getElementById('preview-container').appendChild(previewImg);
+
+                // Tarayıcıdan indir
+                const a = document.createElement('a');
+                a.href = dataUrl;
+                a.download = `poster_${objId}.jpg`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                resolve();
+            };
+            
+            img.onerror = () => reject("Resim yüklenemedi.");
+            // Görseli engelsiz indirmek için Vercel'deki Serverless API proxy'mize gönderiyoruz
+            img.src = `/api/proxy?url=${encodeURIComponent(imgUrl)}`;
+        });
+    }
+</script>
+</body>
+</html>
