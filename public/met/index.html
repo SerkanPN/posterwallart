@@ -1,70 +1,100 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Met Museum Poster Generator</title>
-    <style>
-        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f0f2f5; padding: 20px; font-size: 15px; color: #333; }
-        .container { max-width: 1200px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 8px 20px rgba(0,0,0,0.05); }
-        h2 { border-bottom: 2px solid #e1e4e8; padding-bottom: 10px; font-size: 20px; color: #111; margin-top: 0; }
-        .group { margin-bottom: 25px; padding: 20px; border: 1px solid #e1e4e8; border-radius: 10px; background: #fafbfc; }
-        .scroll-box { max-height: 400px; overflow-y: auto; background: #fff; padding: 15px; border: 1px solid #e1e4e8; border-radius: 8px; }
-        .row { display: flex; margin-bottom: 12px; align-items: center; }
-        .row label { width: 320px; font-weight: 600; color: #444; }
-        .row select, .row input { flex: 1; padding: 10px; border: 1px solid #ced4da; border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.2s; }
-        .row select:focus { border-color: #007bff; box-shadow: 0 0 0 3px rgba(0,123,255,0.25); }
-        .checkbox-group label { display: flex; margin-bottom: 8px; cursor: pointer; align-items: center; gap: 8px; font-weight: 500; }
-        .checkbox-group input[type="checkbox"] { width: 18px; height: 18px; accent-color: #007bff; cursor: pointer; margin: 0; }
-        button { background: linear-gradient(135deg, #007bff, #0056b3); color: #fff; border: none; padding: 16px 20px; font-size: 18px; width: 100%; cursor: pointer; border-radius: 8px; font-weight: bold; transition: opacity 0.2s, transform 0.1s; box-shadow: 0 4px 12px rgba(0,123,255,0.3); }
-        button:hover { opacity: 0.9; }
-        button:active { transform: translateY(2px); }
-        button:disabled { background: #cbd5e1; cursor: not-allowed; box-shadow: none; transform: none; color: #64748b; }
-        #status-bar { margin-top: 20px; font-weight: bold; color: #d9534f; text-align: center; font-size: 16px; }
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 8px; }
-        ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-        /* Preview Container */
-        #preview-container { display: flex; flex-wrap: wrap; gap: 20px; justify-content: center; margin-top: 15px; }
-        #preview-container img { max-height: 350px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); border: 1px solid #ddd; }
-    </style>
-    <!-- CSV Okumak için PapaParse Kütüphanesi -->
+    <!-- Tailwind CSS (CDN) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        zinc: tailwind.colors.zinc,
+                        indigo: tailwind.colors.indigo,
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- CSV Okumak için PapaParse -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        /* Custom Scrollbar for Dark Theme */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #27272a; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb { background: #4f46e5; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6366f1; }
+    </style>
 </head>
-<body>
+<body class="bg-zinc-950 text-zinc-300 font-sans p-4 md:p-8 selection:bg-indigo-500 selection:text-white min-h-screen">
 
-<div class="container">
-    <div class="group">
-        <h2>1. Sistem Durumu</h2>
-        <div id="loading-status">MetObjects.csv sunucudan okunuyor, lütfen bekleyin... (Veri boyutuna göre birkaç saniye sürebilir)</div>
-    </div>
-
-    <div class="group">
-        <h2>2. Veri Filtreleme (Dropdownlardan Seçiniz)</h2>
-        <div class="checkbox-group" style="margin-bottom: 20px; border-bottom: 1px solid #e1e4e8; padding-bottom: 20px;">
-            <label><input type="checkbox" id="chk_public" checked> Sadece Public Domain (Kamu Malı) olanları getir</label>
-            <label><input type="checkbox" id="chk_highlight"> Sadece 'Öne Çıkan' (Highlight) eserleri getir</label>
-        </div>
-        <div class="scroll-box" id="filters-container">
-            <!-- Filtreler JS ile buraya yüklenecek -->
+<div class="max-w-7xl mx-auto space-y-6">
+    
+    <!-- 1. Sistem Durumu -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-bold text-zinc-100 border-b border-zinc-800 pb-3 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2m-2-4h.01M17 16h.01"></path></svg>
+            1. Sistem Durumu
+        </h2>
+        <div id="loading-status" class="text-indigo-400 font-medium flex items-center gap-3 bg-indigo-500/10 p-4 rounded-lg border border-indigo-500/20">
+            <svg class="animate-spin h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+            MetObjects.csv sunucudan okunuyor... (Dosya 300MB olduğu için arka planda işleniyor, lütfen bekleyin)
         </div>
     </div>
 
-    <div class="group">
-        <h2>3. Poster Tasarım Seçenekleri (Resmin Altına Eklenecek Metinler)</h2>
-        <div class="scroll-box checkbox-group" id="design-container">
-            <!-- Tasarım seçenekleri JS ile buraya yüklenecek -->
+    <!-- 2. Filtreleme -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-bold text-zinc-100 border-b border-zinc-800 pb-3 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path></svg>
+            2. Veri Filtreleme
+        </h2>
+        
+        <div class="flex flex-col sm:flex-row gap-6 mb-6 pb-6 border-b border-zinc-800/50">
+            <label class="flex items-center gap-3 cursor-pointer hover:text-white transition-colors">
+                <input type="checkbox" id="chk_public" checked class="w-5 h-5 rounded border-zinc-700 bg-zinc-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-zinc-900">
+                <span class="font-medium">Sadece Public Domain (Kamu Malı)</span>
+            </label>
+            <label class="flex items-center gap-3 cursor-pointer hover:text-white transition-colors">
+                <input type="checkbox" id="chk_highlight" class="w-5 h-5 rounded border-zinc-700 bg-zinc-800 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-zinc-900">
+                <span class="font-medium">Sadece 'Öne Çıkan' (Highlight)</span>
+            </label>
+        </div>
+        
+        <div id="filters-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 max-h-[500px] overflow-y-auto pr-2">
+            <!-- JS ile Dropdownlar Buraya Gelecek -->
         </div>
     </div>
 
-    <button id="btn-start" disabled>Filtrele ve İndirmeye Başla</button>
-    <div id="status-bar"></div>
+    <!-- 3. Tasarım -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-bold text-zinc-100 border-b border-zinc-800 pb-3 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path></svg>
+            3. Poster Alt Bilgi Metinleri
+        </h2>
+        <div id="design-container" class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 max-h-[300px] overflow-y-auto pr-2 bg-zinc-950/50 p-4 rounded-xl border border-zinc-800/50">
+            <!-- JS ile Checkboxlar Buraya Gelecek -->
+        </div>
+    </div>
 
-    <div class="group" id="preview-group" style="display: none; margin-top: 25px;">
-        <h2>4. Oluşturulan Posterler (Önizleme)</h2>
-        <div id="preview-container"></div>
+    <!-- Action Button -->
+    <div class="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl text-center">
+        <button id="btn-start" disabled class="w-full md:w-auto px-10 py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg shadow-indigo-600/20 disabled:opacity-50 disabled:cursor-not-allowed transition-all active:scale-95 text-lg flex items-center justify-center gap-2 mx-auto">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Filtrele ve İndirmeye Başla
+        </button>
+        <div id="status-bar" class="mt-5 font-semibold text-lg empty:hidden"></div>
+    </div>
+
+    <!-- Preview -->
+    <div id="preview-group" class="hidden bg-zinc-900 border border-zinc-800 rounded-2xl p-6 shadow-xl">
+        <h2 class="text-xl font-bold text-zinc-100 border-b border-zinc-800 pb-3 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+            4. Oluşturulan Posterler (Önizleme)
+        </h2>
+        <div id="preview-container" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
     </div>
 </div>
 
@@ -74,19 +104,27 @@
     let activeFilters = {};
     let designOptions = {};
 
-    // 1. CSV'yi yükle ve ayrıştır
+    // 1. CSV'yi yükle ve ayrıştır (Web Worker ile tarayıcıyı kitlemeden)
     Papa.parse("https://met-api.posterwallart.shop/MetObjects.csv", {
         download: true,
         header: true,
         skipEmptyLines: true,
+        worker: true, // Tarayıcı çökmesini engeller
         complete: function(results) {
             globalData = results.data;
             columns = results.meta.fields;
-            document.getElementById('loading-status').innerHTML = `<span style="color:#28a745;">Yüklendi: MetObjects.csv (${globalData.length} satır)</span>`;
-            buildUI();
+            document.getElementById('loading-status').className = "text-emerald-400 font-medium flex items-center gap-3 bg-emerald-500/10 p-4 rounded-lg border border-emerald-500/20";
+            document.getElementById('loading-status').innerHTML = `
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                Başarıyla Yüklendi: MetObjects.csv (${globalData.length.toLocaleString('tr-TR')} satır)
+            `;
+            
+            // Arayüzü oluşturmak için bekleme (UI thread'e nefes aldır)
+            setTimeout(buildUI, 100);
         },
         error: function(err) {
-            document.getElementById('loading-status').innerHTML = `<span style="color:#dc3545;">Hata: MetObjects.csv dosyası bulunamadı veya okunamadı. Dosyanın dizinde olduğundan emin olun.</span>`;
+            document.getElementById('loading-status').className = "text-red-400 font-medium flex items-center gap-3 bg-red-500/10 p-4 rounded-lg border border-red-500/20";
+            document.getElementById('loading-status').innerHTML = `Hata: CSV okunamadı. Lütfen sunucuda CORS (.htaccess) ayarının yapıldığından emin olun.`;
         }
     });
 
@@ -94,7 +132,6 @@
         const filtersContainer = document.getElementById('filters-container');
         const designContainer = document.getElementById('design-container');
         
-        // Sütunlardaki benzersiz verileri topla (Set ile)
         const uniqueData = {};
         columns.forEach(col => uniqueData[col] = new Set());
         
@@ -106,20 +143,21 @@
             });
         });
 
-        // Arayüz elemanlarını oluştur
         columns.forEach(col => {
-            // Dropdown (Filtre)
+            // Dropdown (Filtre) Zinc/Indigo Stili
             let sortedVals = Array.from(uniqueData[col]).map(String).sort((a, b) => a.localeCompare(b));
             
-            let rowDiv = document.createElement('div');
-            rowDiv.className = 'row';
+            let colDiv = document.createElement('div');
+            colDiv.className = 'flex flex-col space-y-2';
             
             let label = document.createElement('label');
-            label.innerText = col + ':';
+            label.className = 'text-xs font-bold text-zinc-400 uppercase tracking-wider pl-1';
+            label.innerText = col;
             
             let select = document.createElement('select');
             select.id = 'filter_' + col;
-            select.innerHTML = `<option value="">-- Filtreleme Yapma --</option>`;
+            select.className = 'w-full bg-zinc-800 border border-zinc-700 text-zinc-200 rounded-lg py-2.5 px-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow text-sm cursor-pointer appearance-none';
+            select.innerHTML = `<option value="">-- Tümü --</option>`;
             
             sortedVals.forEach(val => {
                 let option = document.createElement('option');
@@ -128,19 +166,23 @@
                 select.appendChild(option);
             });
             
-            rowDiv.appendChild(label);
-            rowDiv.appendChild(select);
-            filtersContainer.appendChild(rowDiv);
+            colDiv.appendChild(label);
+            colDiv.appendChild(select);
+            filtersContainer.appendChild(colDiv);
             
             activeFilters[col] = select;
 
-            // Checkbox (Tasarım)
+            // Checkbox (Tasarım) Zinc/Indigo Stili
             let chkLabel = document.createElement('label');
+            chkLabel.className = 'flex items-center gap-3 cursor-pointer text-sm font-medium text-zinc-400 hover:text-zinc-100 transition-colors p-2 rounded-lg hover:bg-zinc-800/50';
+            
             let chk = document.createElement('input');
             chk.type = 'checkbox';
             chk.id = 'design_' + col;
+            chk.className = 'w-4 h-4 rounded border-zinc-700 bg-zinc-900 text-indigo-500 focus:ring-indigo-500 focus:ring-offset-zinc-900 cursor-pointer';
+            
             chkLabel.appendChild(chk);
-            chkLabel.appendChild(document.createTextNode(' ' + col));
+            chkLabel.appendChild(document.createTextNode(col));
             designContainer.appendChild(chkLabel);
             
             designOptions[col] = chk;
@@ -181,14 +223,15 @@
         }
 
         this.disabled = true;
-        previewContainer.innerHTML = ''; // Eski önizlemeleri temizle
-        previewGroup.style.display = 'block';
+        previewContainer.innerHTML = '';
+        previewGroup.classList.remove('hidden');
         
-        // Seçili tasarım ayarlarını al
         let activeDesigns = {};
         for (let col in designOptions) {
             activeDesigns[col] = designOptions[col].checked;
         }
+
+        status.className = "mt-5 text-indigo-400 font-semibold text-lg";
 
         // İndirme Döngüsü
         for (let i = 0; i < filtered.length; i++) {
@@ -200,7 +243,6 @@
             status.innerText = `İşleniyor: ${i + 1} / ${filtered.length} (ID: ${objId})`;
 
             try {
-                // 1. API'den görsel linki
                 let apiRes = await fetch(`https://collectionapi.metmuseum.org/public/collection/v1/objects/${objId}`);
                 if (!apiRes.ok) continue;
                 let data = await apiRes.json();
@@ -208,10 +250,8 @@
                 let imgUrl = data.primaryImage;
                 if (!imgUrl) continue;
 
-                // 2. Görseli Canvas'a çiz ve İndir
                 await generateAndDownloadPoster(imgUrl, row, activeDesigns, objId);
                 
-                // API Limitini doldurmamak için küçük bekleme (500ms)
                 await new Promise(r => setTimeout(r, 500));
 
             } catch (err) {
@@ -219,6 +259,7 @@
             }
         }
 
+        status.className = "mt-5 text-emerald-400 font-semibold text-lg";
         status.innerText = "Tüm işlemler başarıyla tamamlandı!";
         this.disabled = false;
     });
@@ -226,24 +267,21 @@
     function generateAndDownloadPoster(imgUrl, row, activeDesigns, objId) {
         return new Promise((resolve, reject) => {
             const img = new Image();
-            img.crossOrigin = 'Anonymous'; // CORS aşımı
+            img.crossOrigin = 'Anonymous'; 
             
             img.onload = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Herhangi bir metin seçili mi kontrolü
                 let hasText = Object.values(activeDesigns).some(val => val);
-                const margin = hasText ? 150 : 0; // Metin için alt boşluk
+                const margin = hasText ? 150 : 0; 
                 
                 canvas.width = img.width;
                 canvas.height = img.height + margin;
                 
-                // Beyaz arka plan (Sadece metin varsa alta taşar)
                 ctx.fillStyle = 'white';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Resmi üste çiz
                 ctx.drawImage(img, 0, 0);
                 
                 if (hasText) {
@@ -267,12 +305,21 @@
                 
                 const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
 
-                // Arayüze önizleme olarak ekle
+                const previewDiv = document.createElement('div');
+                previewDiv.className = "bg-zinc-800 rounded-xl p-3 border border-zinc-700 shadow-lg flex flex-col items-center";
+                
                 const previewImg = document.createElement('img');
                 previewImg.src = dataUrl;
-                document.getElementById('preview-container').appendChild(previewImg);
+                previewImg.className = "w-full h-auto object-cover rounded-lg mb-3";
+                
+                const previewTitle = document.createElement('span');
+                previewTitle.className = "text-xs font-mono text-zinc-400";
+                previewTitle.innerText = `ID: ${objId}`;
 
-                // Tarayıcıdan indir
+                previewDiv.appendChild(previewImg);
+                previewDiv.appendChild(previewTitle);
+                document.getElementById('preview-container').appendChild(previewDiv);
+
                 const a = document.createElement('a');
                 a.href = dataUrl;
                 a.download = `poster_${objId}.jpg`;
@@ -284,7 +331,6 @@
             };
             
             img.onerror = () => reject("Resim yüklenemedi.");
-            // Görseli engelsiz indirmek için Vercel'deki Serverless API proxy'mize gönderiyoruz
             img.src = `/api/proxy?url=${encodeURIComponent(imgUrl)}`;
         });
     }
