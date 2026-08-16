@@ -19,7 +19,9 @@ import VinylPosterBuilder from './pages/VinylPosterBuilder';
 import TrendPostersSelection from './pages/TrendPostersSelection';
 import SoundwavePosterPage from './pages/SoundwavePosterPage';
 import METPage from './pages/METPage';
+import Tos from './pages/Tos';
 import { useStore } from './store/useStore';
+
 export default function App() {
   const { checkUser } = useStore();
   useEffect(() => {
@@ -43,12 +45,14 @@ export default function App() {
           {/* AI SERVICES & TOOLS */}
           <Route path="special" element={<SpecialForRoom />} />
           <Route path="lab" element={<HDTools />} />
+
           {/* POSTER BUILDERS HIERARCHY (MUSIC) */}
           <Route path="music-posters" element={<MusicPosterSelection />} />
           <Route path="custom-album" element={<AlbumPosterBuilder />} />
           <Route path="song-poster" element={<SongPosterSelection />} />
           <Route path="song-poster/spotify" element={<SpotifyPosterBuilder />} />
           <Route path="song-poster/vinyl" element={<VinylPosterBuilder />} />
+
           {/* POSTER BUILDERS HIERARCHY (TRENDS) */}
           <Route path="trend-posters" element={<TrendPostersSelection />} />
           <Route path="trend-posters/soundwave" element={<SoundwavePosterPage navigate={(path) => window.location.href = path} />} />
@@ -62,6 +66,10 @@ export default function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="seller" element={<SellerDashboard />} />
           <Route path="wishlist" element={<Wishlist />} />
+
+          {/* LEGAL */}
+          <Route path="tos" element={<Tos />} />
+
           {/* 404 FALLBACK */}
           <Route 
             path="*" 
